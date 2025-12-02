@@ -15,7 +15,7 @@ on:
 
 jobs:
   build-x64:
-    runs-on: macos-12  # Intel runner
+    runs-on: macos-14  # Apple Silicon runner (can build x64 via Rosetta 2)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
