@@ -30,6 +30,8 @@ jobs:
         run: npm ci
 
       - name: Build for x64 (Intel)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:x64
 
       - name: Upload x64 artifacts
@@ -57,6 +59,8 @@ jobs:
         run: npm ci
 
       - name: Build for arm64 (Apple Silicon)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:arm64
 
       - name: Upload arm64 artifacts

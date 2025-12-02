@@ -22,17 +22,12 @@
   "build": {
     "appId": "com.videoeditor.app",
     "productName": "Video Editor",
+    "publish": null,
     "mac": {
       "category": "public.app-category.video",
       "target": [
-        {
-          "target": "dmg",
-          "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "zip",
-          "arch": ["x64", "arm64"]
-        }
+        "dmg",
+        "zip"
       ]
     },
     "files": [
