@@ -21,7 +21,7 @@
   "license": "MIT",
   "build": {
     "appId": "com.videoeditor.app",
-    "productName": "Video Editor",
+    "productName": "Video Merger",
     "publish": null,
     "mac": {
       "category": "public.app-category.video",
