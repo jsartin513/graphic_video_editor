@@ -1,0 +1,55 @@
+{
+  "name": "video-editor",
+  "version": "1.0.0",
+  "description": "Video editor for merging GoPro videos",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder --mac --x64 --arm64",
+    "build:mac": "electron-builder --mac",
+    "build:arm64": "electron-builder --mac --arm64",
+    "build:x64": "electron-builder --mac --x64",
+    "dist": "npm run build"
+  },
+  "keywords": [
+    "video",
+    "editor",
+    "gopro"
+  ],
+  "author": "",
+  "license": "MIT",
+  "build": {
+    "appId": "com.videoeditor.app",
+    "productName": "Video Editor",
+    "mac": {
+      "category": "public.app-category.video",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ]
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}
+

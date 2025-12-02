@@ -1,0 +1,106 @@
+# Video Editor
+
+A Mac desktop application for selecting and reviewing GoPro video files before merging them.
+
+## Features
+
+- Select multiple video files via file picker dialog
+- Select a folder containing video files (recursively scans for videos)
+- Drag and drop video files or folders directly into the app
+- View selected files with metadata (file size, modification date)
+- Remove individual files from the selection list
+
+## Getting Started
+
+### Prerequisites
+
+- macOS 10.13 or later
+- ffmpeg (required for video merging)
+- Node.js (v14 or higher) - only needed for development/building
+- npm - only needed for development/building
+
+### Installing Prerequisites
+
+Run the installation script to automatically install ffmpeg and Homebrew (if needed):
+
+```bash
+./install_prerequisites.sh
+```
+
+Or check if prerequisites are installed:
+
+```bash
+./check_prerequisites.sh
+```
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Run the application:
+```bash
+npm start
+```
+
+## Supported Video Formats
+
+- MP4
+- MOV
+- AVI
+- MKV
+- M4V
+
+## Project Structure
+
+- `main.js` - Electron main process (handles file dialogs and system operations)
+- `preload.js` - Secure preload script (exposes safe APIs to renderer)
+- `renderer/` - UI files
+  - `index.html` - Main HTML structure
+  - `styles.css` - Application styling
+  - `renderer.js` - UI logic and event handlers
+
+## Development
+
+The application uses Electron with context isolation for security. File operations are handled in the main process, and the renderer communicates with it via IPC.
+
+## Building for Distribution
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm
+- ffmpeg (must be installed on the target system)
+
+### Build Steps
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Build the application:
+```bash
+npm run build
+```
+
+This will create a distributable package in the `dist/` directory:
+- **DMG file**: For easy installation on macOS (Video Editor-1.0.0.dmg)
+- **ZIP file**: Alternative distribution format
+
+### Installing ffmpeg
+
+Users will need ffmpeg installed on their system. On macOS, they can install it via Homebrew:
+
+```bash
+brew install ffmpeg
+```
+
+### Distribution
+
+The built DMG file can be distributed to users. When they open it, they can drag the app to their Applications folder.
+
+**Note**: The app requires ffmpeg to be installed on the user's system. Make sure to include this requirement in your distribution notes.
+

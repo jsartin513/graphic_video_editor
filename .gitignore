@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+*.dmg
+*.zip
+*.app
+build/icon.icns
+
+# GitHub Actions
+!.github/workflows/
+
