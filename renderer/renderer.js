@@ -228,17 +228,26 @@ async function handlePrepareMerge() {
     }
     
     // Calculate durations for each group
+    let hasDurations = false;
     for (const group of videoGroups) {
       let totalDuration = 0;
       for (const filePath of group.files) {
         try {
           const duration = await window.electronAPI.getVideoDuration(filePath);
+          if (duration > 0) {
+            hasDurations = true;
+          }
           totalDuration += duration;
         } catch (error) {
           console.error(`Error getting duration for ${filePath}:`, error);
         }
       }
       group.totalDuration = totalDuration;
+    }
+    
+    // Warn if no durations were found (likely ffprobe not installed)
+    if (!hasDurations && videoGroups.length > 0) {
+      console.warn('Could not retrieve video durations. ffprobe may not be installed.');
     }
     
     // Show preview screen

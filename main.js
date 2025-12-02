@@ -1,9 +1,12 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
-const { spawn } = require('child_process');
+const fsSync = require('fs');
+const { spawn, execSync } = require('child_process');
 
 let mainWindow;
+let ffmpegPath = null;
+let ffprobePath = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -250,12 +253,16 @@ ipcMain.handle('analyze-videos', async (event, filePaths) => {
 // Get video duration using ffprobe
 ipcMain.handle('get-video-duration', async (event, filePath) => {
   return new Promise((resolve, reject) => {
-    const ffprobe = spawn('ffprobe', [
+    const ffprobeCmd = getFFprobePath();
+    const ffprobe = spawn(ffprobeCmd, [
       '-v', 'error',
       '-show_entries', 'format=duration',
       '-of', 'default=noprint_wrappers=1:nokey=1',
       filePath
-    ]);
+    ], { 
+      shell: true,
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
     
     let output = '';
     let errorOutput = '';
@@ -268,12 +275,24 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
       errorOutput += data.toString();
     });
     
+    ffprobe.on('error', (error) => {
+      // Handle case where ffprobe is not found
+      if (error.code === 'ENOENT') {
+        console.error('ffprobe not found. Please install ffmpeg.');
+        resolve(0); // Return 0 duration instead of failing
+      } else {
+        reject(error);
+      }
+    });
+    
     ffprobe.on('close', (code) => {
       if (code === 0) {
         const duration = parseFloat(output.trim());
         resolve(isNaN(duration) ? 0 : duration);
       } else {
-        reject(new Error(`ffprobe failed: ${errorOutput}`));
+        // Don't fail completely, just return 0 duration
+        console.error(`ffprobe failed for ${filePath}: ${errorOutput}`);
+        resolve(0);
       }
     });
   });
@@ -288,18 +307,32 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
     
     fs.writeFile(tempFileList, fileListContent, 'utf8')
       .then(() => {
-        const ffmpeg = spawn('ffmpeg', [
+        const ffmpegCmd = getFFmpegPath();
+        const ffmpeg = spawn(ffmpegCmd, [
           '-f', 'concat',
           '-safe', '0',
           '-i', tempFileList,
           '-c', 'copy',
           outputPath
-        ]);
+        ], { 
+          shell: true,
+          env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+        });
         
         let errorOutput = '';
         
         ffmpeg.stderr.on('data', (data) => {
           errorOutput += data.toString();
+        });
+        
+        ffmpeg.on('error', (error) => {
+          fs.unlink(tempFileList).catch(() => {});
+          // Handle case where ffmpeg is not found
+          if (error.code === 'ENOENT') {
+            reject(new Error('ffmpeg not found. Please install ffmpeg using the prerequisites installer or run: brew install ffmpeg'));
+          } else {
+            reject(error);
+          }
         });
         
         ffmpeg.on('close', (code) => {
@@ -311,11 +344,6 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           } else {
             reject(new Error(`ffmpeg failed: ${errorOutput}`));
           }
-        });
-        
-        ffmpeg.on('error', (error) => {
-          fs.unlink(tempFileList).catch(() => {});
-          reject(error);
         });
       })
       .catch(reject);
@@ -346,8 +374,72 @@ ipcMain.handle('check-ffmpeg', async () => {
   return await checkFFmpeg();
 });
 
+// Find the actual path to ffmpeg/ffprobe
+function findExecutablePath(command) {
+  try {
+    // Common Homebrew paths
+    const commonPaths = [
+      '/opt/homebrew/bin',  // Apple Silicon
+      '/usr/local/bin',      // Intel Mac
+      '/usr/bin',
+      '/bin'
+    ];
+    
+    // First try using which with proper environment
+    try {
+      const envPath = process.env.PATH || '';
+      const fullPath = [envPath, ...commonPaths].filter(p => p).join(':');
+      const result = execSync(`which ${command}`, { 
+        encoding: 'utf8',
+        env: { ...process.env, PATH: fullPath },
+        shell: '/bin/bash'
+      }).trim();
+      if (result && result.length > 0) {
+        return result;
+      }
+    } catch (e) {
+      // which failed, try direct paths
+    }
+    
+    // Fallback: check common paths directly
+    for (const basePath of commonPaths) {
+      const fullCommandPath = path.join(basePath, command);
+      try {
+        fsSync.accessSync(fullCommandPath, fsSync.constants.F_OK);
+        return fullCommandPath;
+      } catch (e) {
+        // File doesn't exist, continue
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Get the path to ffmpeg/ffprobe, finding it if needed
+function getFFmpegPath() {
+  if (ffmpegPath) return ffmpegPath;
+  ffmpegPath = findExecutablePath('ffmpeg') || 'ffmpeg';
+  return ffmpegPath;
+}
+
+function getFFprobePath() {
+  if (ffprobePath) return ffprobePath;
+  ffprobePath = findExecutablePath('ffprobe') || 'ffprobe';
+  return ffprobePath;
+}
+
 async function checkFFmpeg() {
   return new Promise((resolve) => {
+    // Find paths first
+    const foundFFmpegPath = findExecutablePath('ffmpeg');
+    const foundFFprobePath = findExecutablePath('ffprobe');
+    
+    ffmpegPath = foundFFmpegPath;
+    ffprobePath = foundFFprobePath;
+    
     let ffmpegFound = false;
     let ffprobeFound = false;
     let brewFound = false;
@@ -369,12 +461,15 @@ async function checkFFmpeg() {
     }
     
     // Check ffmpeg
-    const ffmpegCheck = spawn('which', ['ffmpeg'], { shell: true });
+    const ffmpegCheck = spawn('which', ['ffmpeg'], { 
+      shell: true,
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
     ffmpegCheck.on('close', (code) => {
-      ffmpegFound = code === 0;
-      if (ffmpegFound) {
-        // Get version
-        const versionCheck = spawn('ffmpeg', ['-version'], { shell: true });
+      ffmpegFound = code === 0 || foundFFmpegPath !== null;
+      if (ffmpegFound && foundFFmpegPath) {
+        // Get version using found path
+        const versionCheck = spawn(foundFFmpegPath, ['-version'], { shell: true });
         let output = '';
         versionCheck.stdout.on('data', (data) => {
           output += data.toString();
@@ -402,9 +497,12 @@ async function checkFFmpeg() {
     });
     
     // Check ffprobe
-    const ffprobeCheck = spawn('which', ['ffprobe'], { shell: true });
+    const ffprobeCheck = spawn('which', ['ffprobe'], { 
+      shell: true,
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
     ffprobeCheck.on('close', (code) => {
-      ffprobeFound = code === 0;
+      ffprobeFound = code === 0 || foundFFprobePath !== null;
       checkComplete();
     });
     ffprobeCheck.on('error', () => {
@@ -412,7 +510,10 @@ async function checkFFmpeg() {
     });
     
     // Check brew
-    const brewCheck = spawn('which', ['brew'], { shell: true });
+    const brewCheck = spawn('which', ['brew'], { 
+      shell: true,
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
     brewCheck.on('close', (code) => {
       brewFound = code === 0;
       checkComplete();

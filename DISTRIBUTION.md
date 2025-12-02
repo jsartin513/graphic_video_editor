@@ -47,13 +47,39 @@ brew install ffmpeg
 3. Drag "Video Editor" to your Applications folder
 4. Open the app from Applications
 
-### First Launch
+### First Launch - "App is Damaged" Error
 
-On first launch, macOS may show a security warning because the app is not code-signed. To allow it:
+**Important**: If you see an error saying the app is "damaged" or "can't be opened", this is macOS Gatekeeper blocking unsigned apps. Here's how to fix it:
 
-1. Go to System Preferences > Security & Privacy
-2. Click "Open Anyway" next to the message about Video Editor
-3. Or right-click the app and select "Open"
+**Method 1: Right-click to Open (Easiest)**
+1. Right-click (or Control-click) on "Video Merger.app"
+2. Select "Open" from the context menu
+3. Click "Open" in the security dialog that appears
+4. The app will now open normally
+
+**Method 2: Remove Quarantine Attribute (Automated)**
+1. Download the `fix_damaged_app.sh` script from the repository
+2. Open Terminal and run:
+   ```bash
+   bash fix_damaged_app.sh
+   ```
+3. Then try opening the app normally
+
+**Method 2b: Remove Quarantine Attribute (Manual)**
+1. Open Terminal
+2. Run this command:
+   ```bash
+   xattr -cr /Applications/Video\ Merger.app
+   ```
+3. Then try opening the app normally
+
+**Method 3: System Settings**
+1. Go to System Settings > Privacy & Security
+2. Scroll down to find the message about Video Merger being blocked
+3. Click "Open Anyway"
+4. Confirm by clicking "Open" in the dialog
+
+**Why this happens**: The app is not code-signed with an Apple Developer certificate. This is normal for apps distributed outside the App Store. The app is safe to use - macOS just needs your explicit permission the first time.
 
 ## For Developers
 

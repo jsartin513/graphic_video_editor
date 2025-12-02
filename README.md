@@ -74,6 +74,10 @@ The application uses Electron with context isolation for security. File operatio
 - npm
 - ffmpeg (must be installed on the target system)
 
+### Important: "App is Damaged" Error
+
+If users see "app is damaged" when opening the app, this is macOS Gatekeeper blocking unsigned apps. **Solution**: Right-click the app and select "Open", then click "Open" in the security dialog. See [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md) for details.
+
 ### Build Steps
 
 1. Install dependencies:
