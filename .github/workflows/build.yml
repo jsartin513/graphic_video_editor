@@ -34,6 +34,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:x64
 
+      - name: Rename x64 files to include architecture suffix
+        run: |
+          cd dist
+          for file in *.dmg *.zip; do
+            if [[ -f "$file" && "$file" != *"arm64"* && "$file" != *"x64"* ]]; then
+              newname="${file%.*}-x64.${file##*.}"
+              mv "$file" "$newname" || true
+              echo "Renamed $file to $newname"
+            fi
+          done
+          ls -la
+
       - name: Upload x64 artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -41,6 +53,7 @@ jobs:
           path: |
             dist/*x64*.dmg
             dist/*x64*.zip
+          if-no-files-found: error
           retention-days: 30
 
   build-arm64:
