@@ -45,6 +45,33 @@ After the GitHub Actions workflow completes, you can find the built applications
    - **"Chip"** showing "Apple M1", "Apple M2", "Apple M3", etc. → Use **arm64** version
    - **"Processor"** showing "Intel Core" → Use **x64** version
 
+## Installing the App
+
+⚠️ **IMPORTANT**: This app is not code-signed, so macOS will block it by default.
+
+### Using the ZIP File (Recommended)
+
+1. Download the `.zip` file for your Mac type
+2. Extract the ZIP - you'll see:
+   - `Video Merger.app` - the application
+   - `fix_damaged_app.sh` - the fix script
+   - `README_FIRST.txt` - installation instructions
+3. **Run the fix script FIRST**: Double-click `fix_damaged_app.sh` (or run `bash fix_damaged_app.sh` in Terminal)
+4. Drag `Video Merger.app` to your Applications folder
+5. Open and enjoy!
+
+### Using the DMG File
+
+1. Download the `.dmg` file for your Mac type
+2. Open the DMG and drag the app to Applications
+3. If you get "App is Damaged" error, open Terminal and run:
+   ```bash
+   xattr -cr /Applications/Video\ Merger.app
+   ```
+4. Try opening the app again
+
+See `INSTALLATION_TROUBLESHOOTING.md` for more detailed help.
+
 ## Troubleshooting
 
 ### "No files found" Error in GitHub Actions
