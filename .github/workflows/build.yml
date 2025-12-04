@@ -26,6 +26,17 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+      - name: Set version with build number
+        run: |
+          # Get base version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          # Create build version: base-buildNumber (e.g., 1.0.0-42)
+          BUILD_VERSION="${BASE_VERSION}-${{ github.run_number }}"
+          echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
+          echo "Building version: $BUILD_VERSION"
+          # Update package.json with build version
+          npm version $BUILD_VERSION --no-git-tag-version --allow-same-version
+
       - name: Install dependencies
         run: npm ci
 
@@ -34,42 +45,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:x64
 
-      - name: Create custom ZIP with install files
+      - name: Rename x64 files to include architecture suffix
         run: |
           cd dist
-          # Find the .app in the mac folder
-          APP_DIR="mac"
-          if [ -d "mac-x64" ]; then
-            APP_DIR="mac-x64"
-          fi
-          
-          # Create a staging directory
-          mkdir -p staging
-          cp -R "${APP_DIR}/Video Merger.app" staging/
-          cp ../fix_damaged_app.sh staging/
-          cp ../README_FIRST.txt staging/
-          chmod +x staging/fix_damaged_app.sh
-          
-          # Create the custom ZIP with version number
-          cd staging
-          zip -r "../Video Merger-1.0.0-x64-mac.zip" .
-          cd ..
-          rm -rf staging
-          
-          # Remove the original electron-builder ZIP if it exists
-          rm -f "Video Merger"*.zip 2>/dev/null || true
-          rm -f *-mac.zip 2>/dev/null || true
-          # Keep our new zip
-          mv "Video Merger-1.0.0-x64-mac.zip" temp.zip || true
-          rm -f *.zip 2>/dev/null || true
-          mv temp.zip "Video Merger-1.0.0-x64-mac.zip" || true
-          
-          ls -la
-
-      - name: Rename DMG files to include architecture suffix
-        run: |
-          cd dist
-          for file in *.dmg; do
+          for file in *.dmg *.zip; do
             if [[ -f "$file" && "$file" != *"arm64"* && "$file" != *"x64"* ]]; then
               newname="${file%.*}-x64.${file##*.}"
               mv "$file" "$newname" || true
@@ -81,7 +60,7 @@ jobs:
       - name: Upload x64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Video-Editor-x64
+          name: Video-Editor-x64-build-${{ github.run_number }}
           path: |
             dist/*x64*.dmg
             dist/*x64*.zip
@@ -100,6 +79,17 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+      - name: Set version with build number
+        run: |
+          # Get base version from package.json
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          # Create build version: base-buildNumber (e.g., 1.0.0-42)
+          BUILD_VERSION="${BASE_VERSION}-${{ github.run_number }}"
+          echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
+          echo "Building version: $BUILD_VERSION"
+          # Update package.json with build version
+          npm version $BUILD_VERSION --no-git-tag-version --allow-same-version
+
       - name: Install dependencies
         run: npm ci
 
@@ -108,39 +98,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:arm64
 
-      - name: Create custom ZIP with install files
-        run: |
-          cd dist
-          # Find the .app in the mac folder
-          APP_DIR="mac"
-          if [ -d "mac-arm64" ]; then
-            APP_DIR="mac-arm64"
-          fi
-          
-          # Create a staging directory
-          mkdir -p staging
-          cp -R "${APP_DIR}/Video Merger.app" staging/
-          cp ../fix_damaged_app.sh staging/
-          cp ../README_FIRST.txt staging/
-          chmod +x staging/fix_damaged_app.sh
-          
-          # Create the custom ZIP with version number
-          cd staging
-          zip -r "../Video Merger-1.0.0-arm64-mac.zip" .
-          cd ..
-          rm -rf staging
-          
-          # Remove original electron-builder ZIPs, keep our new one
-          mv "Video Merger-1.0.0-arm64-mac.zip" temp.zip || true
-          rm -f *.zip 2>/dev/null || true
-          mv temp.zip "Video Merger-1.0.0-arm64-mac.zip" || true
-          
-          ls -la
-
       - name: Upload arm64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Video-Editor-arm64
+          name: Video-Editor-arm64-build-${{ github.run_number }}
           path: |
             dist/*arm64*.dmg
             dist/*arm64*.zip
@@ -155,13 +116,13 @@ jobs:
       - name: Download x64 artifacts
         uses: actions/download-artifact@v4
         with:
-          name: Video-Editor-x64
+          name: Video-Editor-x64-build-${{ github.run_number }}
           path: artifacts/x64
 
       - name: Download arm64 artifacts
         uses: actions/download-artifact@v4
         with:
-          name: Video-Editor-arm64
+          name: Video-Editor-arm64-build-${{ github.run_number }}
           path: artifacts/arm64
 
       - name: Create Release
