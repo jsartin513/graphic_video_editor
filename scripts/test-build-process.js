@@ -11,9 +11,9 @@ const distDir = path.join(__dirname, '..', 'dist');
 let testsPassed = 0;
 let testsFailed = 0;
 
-function test(name, fn) {
+async function test(name, fn) {
   try {
-    fn();
+    await fn();
     console.log(`✅ ${name}`);
     testsPassed++;
   } catch (error) {
@@ -58,7 +58,7 @@ async function main() {
   
   // Test 1: Check dependencies are installed
   console.log('\n📦 Test 1: Checking dependencies...');
-  test('ffmpeg-static package exists', () => {
+  await test('ffmpeg-static package exists', () => {
     try {
       require('ffmpeg-static');
     } catch (e) {
@@ -66,7 +66,7 @@ async function main() {
     }
   });
   
-  test('ffprobe-static package exists', () => {
+  await test('ffprobe-static package exists', () => {
     try {
       require('ffprobe-static');
     } catch (e) {
@@ -82,13 +82,13 @@ async function main() {
     fs.rmSync(resourcesDir, { recursive: true, force: true });
   }
   
-  test('Copy script runs with BUNDLE_FFMPEG=false', async () => {
+  await test('Copy script runs with BUNDLE_FFMPEG=false', async () => {
     await runCommand('node', ['scripts/copy-ffmpeg-binaries.js'], {
       BUNDLE_FFMPEG: 'false'
     });
   });
   
-  test('Resources directory is removed for lite build', () => {
+  await test('Resources directory is removed for lite build', () => {
     if (fs.existsSync(resourcesDir)) {
       throw new Error('Resources directory should not exist for lite build');
     }
@@ -97,19 +97,19 @@ async function main() {
   // Test 3: Test fat build (with bundling)
   console.log('\n📦 Test 3: Testing Fat Build (BUNDLE_FFMPEG=true)...');
   
-  test('Copy script runs with BUNDLE_FFMPEG=true', async () => {
+  await test('Copy script runs with BUNDLE_FFMPEG=true', async () => {
     await runCommand('node', ['scripts/copy-ffmpeg-binaries.js'], {
       BUNDLE_FFMPEG: 'true'
     });
   });
   
-  test('Resources directory exists for fat build', () => {
+  await test('Resources directory exists for fat build', () => {
     if (!fs.existsSync(resourcesDir)) {
       throw new Error('Resources directory should exist for fat build');
     }
   });
   
-  test('ffmpeg binary exists in resources', () => {
+  await test('ffmpeg binary exists in resources', () => {
     const ffmpegPath = path.join(resourcesDir, 'ffmpeg');
     if (!fs.existsSync(ffmpegPath)) {
       throw new Error('ffmpeg binary not found in resources directory');
@@ -120,7 +120,7 @@ async function main() {
     }
   });
   
-  test('ffprobe binary exists in resources', () => {
+  await test('ffprobe binary exists in resources', () => {
     const ffprobePath = path.join(resourcesDir, 'ffprobe');
     if (!fs.existsSync(ffprobePath)) {
       throw new Error('ffprobe binary not found in resources directory');
@@ -134,7 +134,7 @@ async function main() {
   // Test 4: Test electron-builder config
   console.log('\n📦 Test 4: Testing Electron Builder Config...');
   
-  test('electron-builder.config.js loads correctly', () => {
+  await test('electron-builder.config.js loads correctly', () => {
     const config = require('../electron-builder.config.js');
     if (!config.appId) {
       throw new Error('Config missing appId');
@@ -144,7 +144,7 @@ async function main() {
     }
   });
   
-  test('electron-builder.config.js includes extraResources when resources exist', () => {
+  await test('electron-builder.config.js includes extraResources when resources exist', () => {
     const config = require('../electron-builder.config.js');
     if (!config.extraResources || config.extraResources.length === 0) {
       throw new Error('extraResources should be included when resources directory exists');
@@ -156,25 +156,25 @@ async function main() {
   
   const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   
-  test('build:fat script exists', () => {
+  await test('build:fat script exists', () => {
     if (!packageJson.scripts['build:fat']) {
       throw new Error('build:fat script not found');
     }
   });
   
-  test('build:lite script exists', () => {
+  await test('build:lite script exists', () => {
     if (!packageJson.scripts['build:lite']) {
       throw new Error('build:lite script not found');
     }
   });
   
-  test('build:fat:arm64 script exists', () => {
+  await test('build:fat:arm64 script exists', () => {
     if (!packageJson.scripts['build:fat:arm64']) {
       throw new Error('build:fat:arm64 script not found');
     }
   });
   
-  test('build:lite:arm64 script exists', () => {
+  await test('build:lite:arm64 script exists', () => {
     if (!packageJson.scripts['build:lite:arm64']) {
       throw new Error('build:lite:arm64 script not found');
     }
