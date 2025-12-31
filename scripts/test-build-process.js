@@ -144,6 +144,7 @@ async function main() {
   });
   
   await test('electron-builder.config.js includes extraResources when resources exist', () => {
+    delete require.cache[require.resolve('../electron-builder.config.js')];
     const config = require('../electron-builder.config.js');
     if (!config.extraResources || config.extraResources.length === 0) {
       throw new Error('extraResources should be included when resources directory exists');
