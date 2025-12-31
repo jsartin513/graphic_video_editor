@@ -63,10 +63,22 @@ async function handlePullRequest(subArgs) {
         process.exit(1);
       }
 
+      if (titleIndex + 1 >= subArgs.length || !subArgs[titleIndex + 1]) {
+        console.error('Error: --title requires a value');
+        console.error('Usage: github-cli.js pr create --title "Title" --body "Body" --head branch --base main');
+        process.exit(1);
+      }
+
+      if (headIndex + 1 >= subArgs.length || !subArgs[headIndex + 1]) {
+        console.error('Error: --head requires a value');
+        console.error('Usage: github-cli.js pr create --title "Title" --body "Body" --head branch --base main');
+        process.exit(1);
+      }
+
       const title = subArgs[titleIndex + 1];
-      const body = bodyIndex !== -1 ? subArgs[bodyIndex + 1] : '';
+      const body = bodyIndex !== -1 && bodyIndex + 1 < subArgs.length ? subArgs[bodyIndex + 1] : '';
       const head = subArgs[headIndex + 1];
-      const base = baseIndex !== -1 ? subArgs[baseIndex + 1] : 'main';
+      const base = baseIndex !== -1 && baseIndex + 1 < subArgs.length ? subArgs[baseIndex + 1] : 'main';
 
       const result = await createPullRequest(title, body, head, base);
       if (result.success) {
@@ -87,9 +99,19 @@ async function handlePullRequest(subArgs) {
 
       const options = {};
       if (stateIndex !== -1) {
+        if (stateIndex + 1 >= subArgs.length) {
+          console.error('Error: --state requires a value');
+          console.error('Usage: github-cli.js pr list [--state open|closed|all] [--labels label1,label2]');
+          process.exit(1);
+        }
         options.state = subArgs[stateIndex + 1];
       }
       if (labelsIndex !== -1) {
+        if (labelsIndex + 1 >= subArgs.length) {
+          console.error('Error: --labels requires a value');
+          console.error('Usage: github-cli.js pr list [--state open|closed|all] [--labels label1,label2]');
+          process.exit(1);
+        }
         options.labels = subArgs[labelsIndex + 1].split(',');
       }
 
@@ -125,12 +147,27 @@ async function handleIssue(subArgs) {
 
       const options = {};
       if (stateIndex !== -1) {
+        if (stateIndex + 1 >= subArgs.length) {
+          console.error('Error: --state requires a value');
+          console.error('Usage: github-cli.js issue list [--state open|closed|all] [--labels label1,label2] [--assignee username]');
+          process.exit(1);
+        }
         options.state = subArgs[stateIndex + 1];
       }
       if (labelsIndex !== -1) {
+        if (labelsIndex + 1 >= subArgs.length || typeof subArgs[labelsIndex + 1] !== 'string') {
+          console.error('Error: --labels requires a value');
+          console.error('Usage: github-cli.js issue list [--state open|closed|all] [--labels label1,label2] [--assignee username]');
+          process.exit(1);
+        }
         options.labels = subArgs[labelsIndex + 1].split(',');
       }
       if (assigneeIndex !== -1) {
+        if (assigneeIndex + 1 >= subArgs.length) {
+          console.error('Error: --assignee requires a value');
+          console.error('Usage: github-cli.js issue list [--state open|closed|all] [--labels label1,label2] [--assignee username]');
+          process.exit(1);
+        }
         options.assignee = subArgs[assigneeIndex + 1];
       }
 
@@ -159,7 +196,7 @@ async function handleIssue(subArgs) {
       const issueNum = parseInt(subArgs[1]);
       const assignees = subArgs.slice(2);
 
-      if (!issueNum || assignees.length === 0) {
+      if (isNaN(issueNum) || issueNum <= 0 || assignees.length === 0) {
         console.error('Usage: github-cli.js issue assign <number> <assignee1> [assignee2...]');
         process.exit(1);
       }
@@ -177,7 +214,7 @@ async function handleIssue(subArgs) {
       const commentIssueNum = parseInt(subArgs[1]);
       const commentBody = subArgs.slice(2).join(' ');
 
-      if (!commentIssueNum || !commentBody) {
+      if (isNaN(commentIssueNum) || commentIssueNum <= 0 || !commentBody) {
         console.error('Usage: github-cli.js issue comment <number> "comment text"');
         process.exit(1);
       }
@@ -200,7 +237,11 @@ async function handleIssue(subArgs) {
 async function handleReadFile(subArgs) {
   const filePath = subArgs[0];
   const branchIndex = subArgs.indexOf('--branch');
-  const branch = branchIndex !== -1 ? subArgs[branchIndex + 1] : 'main';
+  
+  let branch = 'main';
+  if (branchIndex !== -1 && branchIndex + 1 < subArgs.length && subArgs[branchIndex + 1]) {
+    branch = subArgs[branchIndex + 1];
+  }
 
   if (!filePath) {
     console.error('Usage: github-cli.js read-file <path> [--branch branch]');

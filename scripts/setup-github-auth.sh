@@ -52,13 +52,16 @@ if [ -z "$token" ]; then
     exit 1
 fi
 
+# Escape special characters for sed
+escaped_token=$(printf '%s\n' "$token" | sed 's/[\/&]/\\&/g')
+
 # Update .env file
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
-    sed -i '' "s/GITHUB_TOKEN=.*/GITHUB_TOKEN=$token/" .env
+    sed -i '' "s/GITHUB_TOKEN=.*/GITHUB_TOKEN=$escaped_token/" .env
 else
     # Linux
-    sed -i "s/GITHUB_TOKEN=.*/GITHUB_TOKEN=$token/" .env
+    sed -i "s/GITHUB_TOKEN=.*/GITHUB_TOKEN=$escaped_token/" .env
 fi
 
 echo "✅ Token saved to .env file"
@@ -67,10 +70,11 @@ echo ""
 # Optional: Set repository
 read -p "Enter repository (owner/repo) or press Enter to auto-detect from git: " repo
 if [ -n "$repo" ]; then
+    escaped_repo=$(printf '%s\n' "$repo" | sed 's/[\/&]/\\&/g')
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/GITHUB_REPO=.*/GITHUB_REPO=$repo/" .env
+        sed -i '' "s/GITHUB_REPO=.*/GITHUB_REPO=$escaped_repo/" .env
     else
-        sed -i "s/GITHUB_REPO=.*/GITHUB_REPO=$repo/" .env
+        sed -i "s/GITHUB_REPO=.*/GITHUB_REPO=$escaped_repo/" .env
     fi
     echo "✅ Repository set to: $repo"
 else
