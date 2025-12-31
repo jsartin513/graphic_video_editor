@@ -6,10 +6,20 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "prebuild": "node scripts/copy-ffmpeg-binaries.js",
+    "prebuild:mac": "node scripts/copy-ffmpeg-binaries.js",
+    "prebuild:arm64": "node scripts/copy-ffmpeg-binaries.js",
+    "prebuild:x64": "node scripts/copy-ffmpeg-binaries.js",
     "build": "electron-builder --mac --x64 --arm64",
     "build:mac": "electron-builder --mac",
     "build:arm64": "electron-builder --mac --arm64",
     "build:x64": "electron-builder --mac --x64",
+    "build:fat": "BUNDLE_FFMPEG=true npm run build",
+    "build:fat:arm64": "BUNDLE_FFMPEG=true npm run build:arm64",
+    "build:fat:x64": "BUNDLE_FFMPEG=true npm run build:x64",
+    "build:lite": "BUNDLE_FFMPEG=false npm run build",
+    "build:lite:arm64": "BUNDLE_FFMPEG=false npm run build:arm64",
+    "build:lite:x64": "BUNDLE_FFMPEG=false npm run build:x64",
     "dist": "npm run build"
   },
   "keywords": [
@@ -19,28 +29,9 @@
   ],
   "author": "",
   "license": "MIT",
-  "build": {
-    "appId": "com.videoeditor.app",
-    "productName": "Video Merger",
-    "publish": null,
-    "mac": {
-      "category": "public.app-category.video",
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
-    "files": [
-      "main.js",
-      "preload.js",
-      "renderer/**/*",
-      "package.json"
-    ],
-    "extraResources": [],
-    "directories": {
-      "buildResources": "build",
-      "output": "dist"
-    }
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
   },
   "devDependencies": {
     "electron": "^28.0.0",

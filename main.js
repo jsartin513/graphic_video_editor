@@ -372,8 +372,48 @@ ipcMain.handle('check-ffmpeg', async () => {
   return await checkFFmpeg();
 });
 
-// Find the actual path to ffmpeg/ffprobe
-function findExecutablePath(command) {
+// Get the path to bundled ffmpeg/ffprobe binaries
+function getBundledBinaryPath(binaryName) {
+  try {
+    if (app.isPackaged) {
+      // Packaged app: binaries are typically under <app>.app/Contents/Resources/resources/ (note the nested resources directory)
+      const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+      const binaryPath = path.join(resourcesPath, 'resources', binaryName);
+      
+      if (fsSync.existsSync(binaryPath)) {
+        // Make sure it's executable
+        try {
+          fsSync.chmodSync(binaryPath, 0o755);
+        } catch (e) {
+          console.warn(`Failed to set executable permissions on "${binaryPath}":`, e);
+        }
+        return binaryPath;
+      }
+    } else {
+      // Development: use the packages directly
+      try {
+        if (binaryName === 'ffmpeg') {
+          return require('ffmpeg-static');
+        } else if (binaryName === 'ffprobe') {
+          const ffprobeStatic = require('ffprobe-static');
+          // Handle both cases: path as string or object with .path property
+          return ffprobeStatic.path || ffprobeStatic;
+        }
+      } catch (e) {
+        // Packages not installed or not found
+        return null;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Error getting bundled binary for ${binaryName}:`, error);
+    return null;
+  }
+}
+
+// Find the actual path to ffmpeg/ffprobe (system install)
+function findSystemExecutablePath(command) {
   try {
     // Common Homebrew paths
     const commonPaths = [
@@ -416,24 +456,46 @@ function findExecutablePath(command) {
   }
 }
 
-// Get the path to ffmpeg/ffprobe, finding it if needed
+// Get the path to ffmpeg/ffprobe, checking bundled first, then system
 function getFFmpegPath() {
   if (ffmpegPath) return ffmpegPath;
-  ffmpegPath = findExecutablePath('ffmpeg') || 'ffmpeg';
+  
+  // First try bundled binary
+  const bundled = getBundledBinaryPath('ffmpeg');
+  if (bundled) {
+    ffmpegPath = bundled;
+    return ffmpegPath;
+  }
+  
+  // Fall back to system binary
+  ffmpegPath = findSystemExecutablePath('ffmpeg') || 'ffmpeg';
   return ffmpegPath;
 }
 
 function getFFprobePath() {
   if (ffprobePath) return ffprobePath;
-  ffprobePath = findExecutablePath('ffprobe') || 'ffprobe';
+  
+  // First try bundled binary
+  const bundled = getBundledBinaryPath('ffprobe');
+  if (bundled) {
+    ffprobePath = bundled;
+    return ffprobePath;
+  }
+  
+  // Fall back to system binary
+  ffprobePath = findSystemExecutablePath('ffprobe') || 'ffprobe';
   return ffprobePath;
 }
 
 async function checkFFmpeg() {
   return new Promise((resolve) => {
-    // Find paths first
-    const foundFFmpegPath = findExecutablePath('ffmpeg');
-    const foundFFprobePath = findExecutablePath('ffprobe');
+    // Check bundled binaries first
+    const bundledFFmpeg = getBundledBinaryPath('ffmpeg');
+    const bundledFFprobe = getBundledBinaryPath('ffprobe');
+    
+    // Then check system binaries
+    const foundFFmpegPath = bundledFFmpeg || findSystemExecutablePath('ffmpeg');
+    const foundFFprobePath = bundledFFprobe || findSystemExecutablePath('ffprobe');
     
     ffmpegPath = foundFFmpegPath;
     ffprobePath = foundFFprobePath;

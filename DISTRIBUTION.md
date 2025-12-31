@@ -4,10 +4,21 @@
 
 ### System Requirements
 
+**For Fat Build (Recommended):**
 - macOS 10.13 or later
-- ffmpeg installed on the system
+- **No additional software needed** - ffmpeg is bundled with the app
 
-### Installing Prerequisites
+**For Lite Build:**
+- macOS 10.13 or later
+- ffmpeg installed on the system (via Homebrew: `brew install ffmpeg`)
+
+### Note: Node.js NOT Required
+
+**End users do NOT need Node.js!** The app is a standalone macOS application. Node.js is only needed during the **build process** (which happens on the developer's machine or CI server), not when installing or running the app.
+
+### Installing Prerequisites (For Lite Builds Only)
+
+**If you're distributing a lite build** (without bundled ffmpeg), users will need to install ffmpeg. This is **NOT needed for fat builds**.
 
 **Easy Method**: Run the installation script:
 
