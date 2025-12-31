@@ -2,6 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// Minimum expected size for ffmpeg/ffprobe binaries (50MB)
+const MIN_BINARY_SIZE_BYTES = 50 * 1024 * 1024;
+
 // Validate that a binary exists and is executable
 function isValidExecutable(filePath) {
   try {
@@ -18,7 +21,7 @@ function isValidExecutable(filePath) {
     // When building macOS apps on non-macOS platforms (e.g., Linux in CI),
     // we can't execute the binaries but we can still check if they're valid Mach-O files
     // For now, just check size - a valid ffmpeg/ffprobe should be at least 50MB
-    if (stats.size < 50 * 1024 * 1024) {
+    if (stats.size < MIN_BINARY_SIZE_BYTES) {
       console.warn(`Warning: Binary ${filePath} seems too small (${stats.size} bytes)`);
       return false;
     }
@@ -29,7 +32,7 @@ function isValidExecutable(filePath) {
     } catch (e) {
       // If we can't check executable permission (e.g., cross-platform build),
       // just verify the file exists and has reasonable size
-      return stats.size >= 50 * 1024 * 1024;
+      return stats.size >= MIN_BINARY_SIZE_BYTES;
     }
   } catch (e) {
     return false;

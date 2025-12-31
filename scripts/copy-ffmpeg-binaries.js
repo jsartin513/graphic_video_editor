@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
+// Binary versions - update these when upgrading ffmpeg/ffprobe
+const FFMPEG_RELEASE = 'b6.1.1';
+const FFPROBE_RELEASE = 'v0.3.4';
+
 // Check if bundling is enabled (default: true for backward compatibility)
 const BUNDLE_FFMPEG = process.env.BUNDLE_FFMPEG !== 'false';
 
@@ -49,7 +53,13 @@ function downloadFile(url, destPath) {
     https.get(url, (response) => {
       if (response.statusCode === 302 || response.statusCode === 301) {
         // Follow redirect
-        https.get(response.headers.location, (redirectResponse) => {
+        const redirectUrl = response.headers.location;
+        if (!redirectUrl) {
+          reject(new Error('Redirect response missing location header'));
+          return;
+        }
+        
+        https.get(redirectUrl, (redirectResponse) => {
           if (redirectResponse.statusCode !== 200) {
             reject(new Error(`Failed to download: HTTP ${redirectResponse.statusCode}`));
             return;
@@ -86,16 +96,12 @@ function downloadFile(url, destPath) {
 
 // Get the appropriate binary URL based on target architecture
 function getBinaryUrl(binaryName, arch) {
-  // ffmpeg-static release tag
-  const ffmpegRelease = 'b6.1.1';
-  const ffprobeRelease = 'v0.3.4';
-  
   if (binaryName === 'ffmpeg') {
     // URL format: https://github.com/eugeneware/ffmpeg-static/releases/download/{release}/ffmpeg-{platform}-{arch}.gz
-    return `https://github.com/eugeneware/ffmpeg-static/releases/download/${ffmpegRelease}/ffmpeg-darwin-${arch}.gz`;
+    return `https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_RELEASE}/ffmpeg-darwin-${arch}.gz`;
   } else if (binaryName === 'ffprobe') {
     // URL format: https://github.com/ffprobe-static/ffprobe-static/releases/download/{release}/ffprobe-{platform}-{arch}.gz
-    return `https://github.com/ffprobe-static/ffprobe-static/releases/download/${ffprobeRelease}/ffprobe-darwin-${arch}.gz`;
+    return `https://github.com/ffprobe-static/ffprobe-static/releases/download/${FFPROBE_RELEASE}/ffprobe-darwin-${arch}.gz`;
   }
   return null;
 }
