@@ -342,6 +342,13 @@ body {
   color: #86868b;
 }
 
+.preview-item-directory {
+  font-size: 13px;
+  color: #007aff;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
 .preview-item-body {
   display: flex;
   flex-direction: column;

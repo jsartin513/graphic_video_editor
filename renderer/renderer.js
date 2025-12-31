@@ -191,6 +191,14 @@ function getFileName(filePath) {
   return parts[parts.length - 1];
 }
 
+function getDirectoryName(filePath) {
+  const parts = filePath.split(/[/\\]/);
+  if (parts.length > 1) {
+    return parts[parts.length - 2]; // Get parent directory name
+  }
+  return '';
+}
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
@@ -264,17 +272,29 @@ function showPreviewScreen() {
   fileListContainer.style.display = 'none';
   previewScreen.style.display = 'block';
   
+  // Check if we have multiple directories (for display purposes)
+  // Extract directory from first file in each group if directory field not available
+  const directories = new Set(videoGroups.map(g => {
+    if (g.directory) return g.directory;
+    if (g.files.length > 0) {
+      const parts = g.files[0].split(/[/\\]/);
+      return parts.slice(0, -1).join('/'); // All parts except filename
+    }
+    return '';
+  }));
+  const hasMultipleDirectories = directories.size > 1;
+  
   previewList.innerHTML = '';
   
   for (let i = 0; i < videoGroups.length; i++) {
     const group = videoGroups[i];
-    const previewItem = createPreviewItem(group, i);
+    const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
     previewList.appendChild(previewItem);
   }
 }
 
 // Create preview item
-function createPreviewItem(group, index) {
+function createPreviewItem(group, index, showDirectory = false) {
   const item = document.createElement('div');
   item.className = 'preview-item';
   
@@ -283,10 +303,23 @@ function createPreviewItem(group, index) {
     return `<div class="input-file">${escapeHtml(name)}</div>`;
   }).join('');
   
+  // Get directory name for display (use group.directory if available, otherwise extract from first file)
+  let directoryName = '';
+  if (showDirectory) {
+    if (group.directory) {
+      // Extract just the directory name from the full path
+      const parts = group.directory.split(/[/\\]/);
+      directoryName = parts[parts.length - 1] || group.directory;
+    } else if (group.files.length > 0) {
+      directoryName = getDirectoryName(group.files[0]);
+    }
+  }
+  const directoryDisplay = directoryName ? `<span class="preview-item-directory">📁 ${escapeHtml(directoryName)}</span>` : '';
+  
   item.innerHTML = `
     <div class="preview-item-header">
       <div class="preview-item-info">
-        <h3>Session ${group.sessionId}</h3>
+        <h3>Session ${group.sessionId}${directoryDisplay ? ` ${directoryDisplay}` : ''}</h3>
         <span class="preview-item-meta">${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}</span>
       </div>
     </div>

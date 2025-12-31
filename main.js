@@ -213,7 +213,8 @@ function extractSessionId(filename) {
   return null;
 }
 
-// Analyze and group video files by session ID
+// Analyze and group video files by session ID and directory
+// Files from different subdirectories with the same session ID are processed separately
 ipcMain.handle('analyze-videos', async (event, filePaths) => {
   const groups = new Map();
   
@@ -226,26 +227,54 @@ ipcMain.handle('analyze-videos', async (event, filePaths) => {
       continue;
     }
     
-    if (!groups.has(sessionId)) {
-      groups.set(sessionId, []);
+    // Group by directory path AND session ID to handle files with same name in different directories
+    const directory = path.dirname(filePath);
+    const groupKey = `${directory}:${sessionId}`;
+    
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        sessionId,
+        directory,
+        files: []
+      });
     }
     
-    groups.get(sessionId).push(filePath);
+    groups.get(groupKey).files.push(filePath);
   }
   
-  // Sort files within each group
+  // Sort files within each group and create result objects
   const result = [];
-  for (const [sessionId, files] of groups.entries()) {
-    const sortedFiles = files.sort();
+  for (const [groupKey, groupData] of groups.entries()) {
+    const sortedFiles = groupData.files.sort();
+    
+    // For display, use session ID. If multiple directories have the same session ID,
+    // include directory name in the output filename to differentiate
+    const hasDuplicateSessionId = Array.from(groups.values())
+      .filter(g => g.sessionId === groupData.sessionId).length > 1;
+    
+    let outputFilename = `PROCESSED${groupData.sessionId}.MP4`;
+    if (hasDuplicateSessionId) {
+      // Include directory name to differentiate files from different directories
+      const dirName = path.basename(groupData.directory) || 'root';
+      // Sanitize directory name for filename (remove invalid chars)
+      const sanitizedDirName = dirName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      outputFilename = `PROCESSED${groupData.sessionId}_${sanitizedDirName}.MP4`;
+    }
+    
     result.push({
-      sessionId,
+      sessionId: groupData.sessionId,
+      directory: groupData.directory,
       files: sortedFiles,
-      outputFilename: `PROCESSED${sessionId}.MP4`
+      outputFilename
     });
   }
   
-  // Sort by session ID
-  result.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
+  // Sort by directory first, then by session ID
+  result.sort((a, b) => {
+    const dirCompare = a.directory.localeCompare(b.directory);
+    if (dirCompare !== 0) return dirCompare;
+    return a.sessionId.localeCompare(b.sessionId);
+  });
   
   return result;
 });
