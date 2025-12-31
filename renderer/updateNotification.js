@@ -47,33 +47,56 @@ function showUpdateNotification(info) {
   const notification = document.createElement('div');
   notification.id = 'updateNotification';
   notification.className = 'update-notification';
-  notification.innerHTML = `
-    <div class="update-notification-content">
-      <div class="update-notification-header">
-        <span class="update-icon">🎉</span>
-        <h3>Update Available</h3>
-      </div>
-      <p class="update-message">Version ${info.version} is now available. You're currently using version ${info.currentVersion || '1.0.0'}.</p>
-      <div class="update-actions">
-        <button id="downloadUpdateBtn" class="btn btn-primary btn-small">
-          <span class="btn-icon">⬇</span>
-          Download Update
-        </button>
-        <button id="dismissUpdateBtn" class="btn btn-text btn-small">
-          Remind Me Later
-        </button>
-      </div>
-    </div>
+  
+  const content = document.createElement('div');
+  content.className = 'update-notification-content';
+  
+  // Header
+  const header = document.createElement('div');
+  header.className = 'update-notification-header';
+  header.innerHTML = `
+    <span class="update-icon">🎉</span>
+    <h3>Update Available</h3>
   `;
+  
+  // Message with safe version text
+  const message = document.createElement('p');
+  message.className = 'update-message';
+  message.textContent = `Version ${info.version} is now available. You're currently using version ${info.currentVersion || '1.0.0'}.`;
+  
+  // Actions
+  const actions = document.createElement('div');
+  actions.className = 'update-actions';
+  
+  const downloadBtn = document.createElement('button');
+  downloadBtn.id = 'downloadUpdateBtn';
+  downloadBtn.className = 'btn btn-primary btn-small';
+  downloadBtn.innerHTML = `
+    <span class="btn-icon">⬇</span>
+    Download Update
+  `;
+  
+  const dismissBtn = document.createElement('button');
+  dismissBtn.id = 'dismissUpdateBtn';
+  dismissBtn.className = 'btn btn-text btn-small';
+  dismissBtn.textContent = 'Remind Me Later';
+  
+  actions.appendChild(downloadBtn);
+  actions.appendChild(dismissBtn);
+  
+  content.appendChild(header);
+  content.appendChild(message);
+  content.appendChild(actions);
+  notification.appendChild(content);
   
   document.body.appendChild(notification);
 
   // Add event listeners
-  document.getElementById('downloadUpdateBtn').addEventListener('click', async () => {
+  downloadBtn.addEventListener('click', async () => {
     await downloadUpdate();
   });
 
-  document.getElementById('dismissUpdateBtn').addEventListener('click', () => {
+  dismissBtn.addEventListener('click', () => {
     dismissUpdateNotification();
   });
 
