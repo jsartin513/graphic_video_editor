@@ -10,17 +10,18 @@ function isValidExecutable(filePath) {
     if (!stats.isFile() || stats.size === 0) {
       return false;
     }
-    // Check if file has executable permissions (on Unix-like systems)
+    // On Windows, we can't reliably check executable permissions
+    // so we just verify the file exists and is not empty
+    if (process.platform === 'win32') {
+      return true;
+    }
+    // On Unix-like systems, check if file has executable permissions
     try {
       fs.accessSync(filePath, fs.constants.X_OK);
+      return true;
     } catch (e) {
-      // On Windows, accessSync with X_OK might not work as expected
-      // so we just check if we can read it
-      if (process.platform !== 'win32') {
-        return false;
-      }
+      return false;
     }
-    return true;
   } catch (e) {
     return false;
   }
