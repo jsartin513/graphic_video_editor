@@ -7,4 +7,7 @@ resources/
 *.zip
 *.app
 build/icon.icns
+.env
+.env.local
+.env.*.local
 
