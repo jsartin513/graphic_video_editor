@@ -55,12 +55,3 @@ const domElements = {
   ffprobeStatus: document.getElementById('ffprobeStatus'),
   brewStatus: document.getElementById('brewStatus')
 };
-
-// Initialize all modules
-const fileHandling = initializeFileHandling(state, domElements);
-const splitVideo = initializeSplitVideo(domElements);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
-const prerequisites = initializePrerequisites(domElements);
-
-// Make state accessible for debugging
-window.appState = state;
