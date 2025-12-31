@@ -155,7 +155,7 @@ async function handleIssue(subArgs) {
         options.state = subArgs[stateIndex + 1];
       }
       if (labelsIndex !== -1) {
-        if (labelsIndex + 1 >= subArgs.length || typeof subArgs[labelsIndex + 1] !== 'string') {
+        if (labelsIndex + 1 >= subArgs.length) {
           console.error('Error: --labels requires a value');
           console.error('Usage: github-cli.js issue list [--state open|closed|all] [--labels label1,label2] [--assignee username]');
           process.exit(1);
