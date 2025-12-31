@@ -260,7 +260,6 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
       '-of', 'default=noprint_wrappers=1:nokey=1',
       filePath
     ], { 
-      shell: true,
       env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
     });
     
@@ -315,7 +314,6 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           '-c', 'copy',
           outputPath
         ], { 
-          shell: true,
           env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
         });
         
@@ -529,7 +527,7 @@ async function checkFFmpeg() {
       ffmpegFound = code === 0 || foundFFmpegPath !== null;
       if (ffmpegFound && foundFFmpegPath) {
         // Get version using found path
-        const versionCheck = spawn(foundFFmpegPath, ['-version'], { shell: true });
+        const versionCheck = spawn(foundFFmpegPath, ['-version']);
         let output = '';
         versionCheck.stdout.on('data', (data) => {
           output += data.toString();
