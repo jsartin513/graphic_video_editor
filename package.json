@@ -20,7 +20,9 @@
     "build:lite": "BUNDLE_FFMPEG=false npm run build",
     "build:lite:arm64": "BUNDLE_FFMPEG=false npm run build:arm64",
     "build:lite:x64": "BUNDLE_FFMPEG=false npm run build:x64",
-    "dist": "npm run build"
+    "dist": "npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "video",
@@ -35,7 +37,13 @@
   },
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
   }
 }
-
