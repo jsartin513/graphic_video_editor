@@ -213,70 +213,13 @@ function extractSessionId(filename) {
   return null;
 }
 
+// Import video grouping functions
+const { analyzeAndGroupVideos } = require('./src/video-grouping');
+
 // Analyze and group video files by session ID and directory
 // Files from different subdirectories with the same session ID are processed separately
 ipcMain.handle('analyze-videos', async (event, filePaths) => {
-  const groups = new Map();
-  
-  for (const filePath of filePaths) {
-    const filename = path.basename(filePath);
-    const sessionId = extractSessionId(filename);
-    
-    if (!sessionId) {
-      // Skip files that don't match GoPro patterns
-      continue;
-    }
-    
-    // Group by directory path AND session ID to handle files with same name in different directories
-    const directory = path.dirname(filePath);
-    const groupKey = `${directory}:${sessionId}`;
-    
-    if (!groups.has(groupKey)) {
-      groups.set(groupKey, {
-        sessionId,
-        directory,
-        files: []
-      });
-    }
-    
-    groups.get(groupKey).files.push(filePath);
-  }
-  
-  // Sort files within each group and create result objects
-  const result = [];
-  for (const [groupKey, groupData] of groups.entries()) {
-    const sortedFiles = groupData.files.sort();
-    
-    // For display, use session ID. If multiple directories have the same session ID,
-    // include directory name in the output filename to differentiate
-    const hasDuplicateSessionId = Array.from(groups.values())
-      .filter(g => g.sessionId === groupData.sessionId).length > 1;
-    
-    let outputFilename = `PROCESSED${groupData.sessionId}.MP4`;
-    if (hasDuplicateSessionId) {
-      // Include directory name to differentiate files from different directories
-      const dirName = path.basename(groupData.directory) || 'root';
-      // Sanitize directory name for filename (remove invalid chars)
-      const sanitizedDirName = dirName.replace(/[^a-zA-Z0-9_-]/g, '_');
-      outputFilename = `PROCESSED${groupData.sessionId}_${sanitizedDirName}.MP4`;
-    }
-    
-    result.push({
-      sessionId: groupData.sessionId,
-      directory: groupData.directory,
-      files: sortedFiles,
-      outputFilename
-    });
-  }
-  
-  // Sort by directory first, then by session ID
-  result.sort((a, b) => {
-    const dirCompare = a.directory.localeCompare(b.directory);
-    if (dirCompare !== 0) return dirCompare;
-    return a.sessionId.localeCompare(b.sessionId);
-  });
-  
-  return result;
+  return analyzeAndGroupVideos(filePaths);
 });
 
 // Get video duration using ffprobe
@@ -387,6 +330,28 @@ ipcMain.handle('get-output-directory', async (event, inputPath) => {
     return outputDir;
   } catch (error) {
     throw new Error(`Failed to create output directory: ${error.message}`);
+  }
+});
+
+// Select output destination folder
+ipcMain.handle('select-output-destination', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Select Output Destination Folder'
+  });
+
+  if (result.canceled) {
+    return { canceled: true, path: null };
+  }
+
+  const selectedPath = result.filePaths[0];
+  
+  try {
+    // Ensure the directory exists
+    await fs.mkdir(selectedPath, { recursive: true });
+    return { canceled: false, path: selectedPath };
+  } catch (error) {
+    throw new Error(`Failed to access output directory: ${error.message}`);
   }
 });
 

@@ -2,6 +2,7 @@
 let selectedFiles = [];
 let videoGroups = [];
 let currentScreen = 'fileList'; // 'fileList', 'preview', 'progress'
+let selectedOutputDestination = null; // null means use default
 
 // DOM elements
 const selectFilesBtn = document.getElementById('selectFilesBtn');
@@ -33,6 +34,11 @@ const ffmpegStatus = document.getElementById('ffmpegStatus');
 const ffprobeStatus = document.getElementById('ffprobeStatus');
 const brewStatus = document.getElementById('brewStatus');
 
+// Output destination elements
+const outputDestinationPath = document.getElementById('outputDestinationPath');
+const selectOutputDestinationBtn = document.getElementById('selectOutputDestinationBtn');
+const useDefaultDestinationBtn = document.getElementById('useDefaultDestinationBtn');
+
 // Video file extensions
 const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
 
@@ -42,6 +48,10 @@ selectFolderBtn.addEventListener('click', handleSelectFolder);
 prepareMergeBtn.addEventListener('click', handlePrepareMerge);
 backBtn.addEventListener('click', handleBack);
 mergeBtn.addEventListener('click', handleMerge);
+
+// Output destination listeners
+selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
+useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
 
 // Prerequisites modal listeners
 installBtn.addEventListener('click', handleInstallPrerequisites);
@@ -272,6 +282,10 @@ function showPreviewScreen() {
   fileListContainer.style.display = 'none';
   previewScreen.style.display = 'block';
   
+  // Reset output destination to default when showing preview
+  selectedOutputDestination = null;
+  updateOutputDestinationDisplay();
+  
   // Check if we have multiple directories (for display purposes)
   // Extract directory from first file in each group if directory field not available
   const directories = new Set(videoGroups.map(g => {
@@ -375,6 +389,39 @@ function handleBack() {
   fileListContainer.style.display = 'block';
 }
 
+// Handle output destination selection
+async function handleSelectOutputDestination() {
+  try {
+    const result = await window.electronAPI.selectOutputDestination();
+    if (!result.canceled && result.path) {
+      selectedOutputDestination = result.path;
+      updateOutputDestinationDisplay();
+    }
+  } catch (error) {
+    console.error('Error selecting output destination:', error);
+    alert('Error selecting output destination: ' + error.message);
+  }
+}
+
+// Handle use default destination
+function handleUseDefaultDestination() {
+  selectedOutputDestination = null;
+  updateOutputDestinationDisplay();
+}
+
+// Update output destination display
+function updateOutputDestinationDisplay() {
+  if (selectedOutputDestination) {
+    outputDestinationPath.textContent = selectedOutputDestination;
+    outputDestinationPath.classList.add('custom-path');
+    useDefaultDestinationBtn.style.display = 'inline-block';
+  } else {
+    outputDestinationPath.textContent = 'Using default location (merged_videos subfolder)';
+    outputDestinationPath.classList.remove('custom-path');
+    useDefaultDestinationBtn.style.display = 'none';
+  }
+}
+
 // Handle Merge button
 async function handleMerge() {
   if (videoGroups.length === 0) return;
@@ -387,10 +434,16 @@ async function handleMerge() {
     }
   }
   
-  // Get output directory (use first file's directory)
+  // Get output directory (use custom if selected, otherwise default)
   let outputDir;
   try {
-    outputDir = await window.electronAPI.getOutputDirectory(videoGroups[0].files[0]);
+    if (selectedOutputDestination) {
+      // Use custom output destination (already ensured to exist by dialog)
+      outputDir = selectedOutputDestination;
+    } else {
+      // Use default (merged_videos subfolder)
+      outputDir = await window.electronAPI.getOutputDirectory(videoGroups[0].files[0]);
+    }
   } catch (error) {
     alert('Error creating output directory: ' + error.message);
     return;
@@ -454,39 +507,119 @@ function updateProgress(current, total, message) {
 function showMergeResults(results, outputDir) {
   const successCount = results.filter(r => r.success).length;
   const failCount = results.filter(r => !r.success).length;
+  const totalCount = results.length;
   
-  let resultsHtml = `
-    <h3>Merge Complete!</h3>
-    <p><strong>${successCount}</strong> video${successCount !== 1 ? 's' : ''} merged successfully</p>
-  `;
-  
-  if (failCount > 0) {
-    resultsHtml += `<p><strong>${failCount}</strong> failed</p>`;
+  // Update progress screen title to show completion
+  const progressTitle = document.querySelector('.progress-content h2');
+  if (progressTitle) {
+    progressTitle.textContent = failCount === 0 ? '✓ Merge Complete!' : 'Merge Finished';
   }
   
-  resultsHtml += `
-    <div class="results-list">
-      <h4>Results:</h4>
+  // Update progress bar to 100%
+  progressBar.style.width = '100%';
+  progressText.textContent = failCount === 0 
+    ? `Successfully merged ${successCount} video${successCount !== 1 ? 's' : ''}` 
+    : `Completed: ${successCount} succeeded, ${failCount} failed`;
+  
+  // Build results HTML with improved design
+  let resultsHtml = `
+    <div class="completion-summary">
+      <div class="completion-icon" role="img" aria-label="${failCount === 0 ? 'Success' : 'Warning'}">${failCount === 0 ? '✅' : '⚠️'}</div>
+      <h3 class="completion-title">${failCount === 0 ? 'Workflow Complete!' : 'Merge Finished'}</h3>
+      <p class="completion-description">
+        ${failCount === 0 
+          ? `All ${successCount} video${successCount !== 1 ? 's were' : ' was'} merged successfully and saved to the output folder.`
+          : `${successCount} of ${totalCount} video${totalCount !== 1 ? 's' : ''} merged successfully. ${failCount} failed.`
+        }
+      </p>
+    </div>
+    
+    <div class="results-section">
+      <div class="results-summary">
+        <div class="summary-stat">
+          <span class="stat-value">${successCount}</span>
+          <span class="stat-label">Succeeded</span>
+        </div>
+        ${failCount > 0 ? `
+        <div class="summary-stat error-stat">
+          <span class="stat-value">${failCount}</span>
+          <span class="stat-label">Failed</span>
+        </div>
+        ` : ''}
+        <div class="summary-stat">
+          <span class="stat-value">${totalCount}</span>
+          <span class="stat-label">Total</span>
+        </div>
+      </div>
+      
+      <div class="output-location">
+        <div class="location-label">Output Location:</div>
+        <div class="location-path">${escapeHtml(outputDir)}</div>
+      </div>
+      
+      ${successCount > 0 ? `
+      <div class="results-list">
+        <h4>Merged Videos:</h4>
+        <div class="result-items">
+      ` : ''}
   `;
   
+  // Add successful results
   for (const result of results) {
     if (result.success) {
       const filename = getFileName(result.outputPath);
-      resultsHtml += `<div class="result-item success">✓ ${escapeHtml(filename)}</div>`;
-    } else {
-      resultsHtml += `<div class="result-item error">✗ Session ${result.sessionId}: ${escapeHtml(result.error)}</div>`;
+      resultsHtml += `
+        <div class="result-item success">
+          <span class="result-icon">✓</span>
+          <span class="result-name">${escapeHtml(filename)}</span>
+        </div>
+      `;
     }
+  }
+  
+  if (successCount > 0) {
+    resultsHtml += `</div></div>`;
+  }
+  
+  // Add failed results if any
+  if (failCount > 0) {
+    resultsHtml += `
+      <div class="results-list error-list">
+        <h4>Failed Merges:</h4>
+        <div class="result-items">
+    `;
+    
+    for (const result of results) {
+      if (!result.success) {
+        resultsHtml += `
+          <div class="result-item error">
+            <span class="result-icon">✗</span>
+            <span class="result-name">Session ${result.sessionId}: ${escapeHtml(result.error)}</span>
+          </div>
+        `;
+      }
+    }
+    
+    resultsHtml += `</div></div>`;
   }
   
   resultsHtml += `
     </div>
+    
     <div class="results-actions">
-      <button id="openFolderBtn" class="btn btn-primary">Open Output Folder</button>
-      <button id="newMergeBtn" class="btn btn-secondary">Start New Merge</button>
+      <button id="openFolderBtn" class="btn btn-primary btn-large">
+        <span class="btn-icon">📂</span>
+        View Files in Finder
+      </button>
+      <button id="newMergeBtn" class="btn btn-secondary btn-large">
+        <span class="btn-icon">➕</span>
+        Merge More Videos
+      </button>
     </div>
   `;
   
   progressDetails.innerHTML = resultsHtml;
+  progressDetails.classList.add('completion-results');
   
   // Add event listeners
   const openFolderBtn = document.getElementById('openFolderBtn');
@@ -495,19 +628,41 @@ function showMergeResults(results, outputDir) {
       try {
         await window.electronAPI.openFolder(outputDir);
       } catch (error) {
+        console.error('Error opening folder:', error);
         alert(`Output folder: ${outputDir}`);
       }
     });
   }
   
-  document.getElementById('newMergeBtn').addEventListener('click', () => {
-    selectedFiles = [];
-    videoGroups = [];
-    currentScreen = 'fileList';
-    progressScreen.style.display = 'none';
-    fileListContainer.style.display = 'none';
-    updateFileList();
-  });
+  const newMergeBtn = document.getElementById('newMergeBtn');
+  if (newMergeBtn) {
+    newMergeBtn.addEventListener('click', () => {
+      handleNewMerge();
+    });
+  }
+}
+
+// Handle starting a new merge
+function handleNewMerge() {
+  selectedFiles = [];
+  videoGroups = [];
+  currentScreen = 'fileList';
+  progressScreen.style.display = 'none';
+  fileListContainer.style.display = 'none';
+  dropZone.style.display = 'block';
+  
+  // Reset progress screen
+  progressBar.style.width = '0%';
+  progressText.textContent = 'Preparing...';
+  progressDetails.innerHTML = '';
+  progressDetails.classList.remove('completion-results');
+  
+  const progressTitle = document.querySelector('.progress-content h2');
+  if (progressTitle) {
+    progressTitle.textContent = 'Merging Videos';
+  }
+  
+  updateFileList();
 }
 
 // Prerequisites functions
