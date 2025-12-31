@@ -76,9 +76,9 @@ async function handlePullRequest(subArgs) {
       }
 
       const title = subArgs[titleIndex + 1];
-      const body = bodyIndex !== -1 && bodyIndex + 1 < subArgs.length ? subArgs[bodyIndex + 1] : '';
+      const body = bodyIndex !== -1 && bodyIndex + 1 < subArgs.length && subArgs[bodyIndex + 1] ? subArgs[bodyIndex + 1] : '';
       const head = subArgs[headIndex + 1];
-      const base = baseIndex !== -1 && baseIndex + 1 < subArgs.length ? subArgs[baseIndex + 1] : 'main';
+      const base = baseIndex !== -1 && baseIndex + 1 < subArgs.length && subArgs[baseIndex + 1] ? subArgs[baseIndex + 1] : 'main';
 
       const result = await createPullRequest(title, body, head, base);
       if (result.success) {

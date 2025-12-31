@@ -29,8 +29,7 @@ function getRepoInfo() {
     const repoEnv = process.env.GITHUB_REPO;
     const parts = repoEnv.split('/');
     if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
-      const [owner, repo] = parts;
-      return { owner: owner.trim(), repo: repo.trim() };
+      return { owner: parts[0].trim(), repo: parts[1].trim() };
     }
     // If GITHUB_REPO is set but malformed, fall through to git remote detection
   }
