@@ -2,6 +2,7 @@
 let selectedFiles = [];
 let videoGroups = [];
 let currentScreen = 'fileList'; // 'fileList', 'preview', 'progress'
+let selectedOutputDestination = null; // null means use default
 
 // DOM elements
 const selectFilesBtn = document.getElementById('selectFilesBtn');
@@ -33,6 +34,11 @@ const ffmpegStatus = document.getElementById('ffmpegStatus');
 const ffprobeStatus = document.getElementById('ffprobeStatus');
 const brewStatus = document.getElementById('brewStatus');
 
+// Output destination elements
+const outputDestinationPath = document.getElementById('outputDestinationPath');
+const selectOutputDestinationBtn = document.getElementById('selectOutputDestinationBtn');
+const useDefaultDestinationBtn = document.getElementById('useDefaultDestinationBtn');
+
 // Video file extensions
 const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
 
@@ -42,6 +48,10 @@ selectFolderBtn.addEventListener('click', handleSelectFolder);
 prepareMergeBtn.addEventListener('click', handlePrepareMerge);
 backBtn.addEventListener('click', handleBack);
 mergeBtn.addEventListener('click', handleMerge);
+
+// Output destination listeners
+selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
+useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
 
 // Prerequisites modal listeners
 installBtn.addEventListener('click', handleInstallPrerequisites);
@@ -264,6 +274,10 @@ function showPreviewScreen() {
   fileListContainer.style.display = 'none';
   previewScreen.style.display = 'block';
   
+  // Reset output destination to default when showing preview
+  selectedOutputDestination = null;
+  updateOutputDestinationDisplay();
+  
   previewList.innerHTML = '';
   
   for (let i = 0; i < videoGroups.length; i++) {
@@ -342,6 +356,39 @@ function handleBack() {
   fileListContainer.style.display = 'block';
 }
 
+// Handle output destination selection
+async function handleSelectOutputDestination() {
+  try {
+    const result = await window.electronAPI.selectOutputDestination();
+    if (!result.canceled && result.path) {
+      selectedOutputDestination = result.path;
+      updateOutputDestinationDisplay();
+    }
+  } catch (error) {
+    console.error('Error selecting output destination:', error);
+    alert('Error selecting output destination: ' + error.message);
+  }
+}
+
+// Handle use default destination
+function handleUseDefaultDestination() {
+  selectedOutputDestination = null;
+  updateOutputDestinationDisplay();
+}
+
+// Update output destination display
+function updateOutputDestinationDisplay() {
+  if (selectedOutputDestination) {
+    outputDestinationPath.textContent = selectedOutputDestination;
+    outputDestinationPath.classList.add('custom-path');
+    useDefaultDestinationBtn.style.display = 'inline-block';
+  } else {
+    outputDestinationPath.textContent = 'Using default location (merged_videos subfolder)';
+    outputDestinationPath.classList.remove('custom-path');
+    useDefaultDestinationBtn.style.display = 'none';
+  }
+}
+
 // Handle Merge button
 async function handleMerge() {
   if (videoGroups.length === 0) return;
@@ -354,10 +401,16 @@ async function handleMerge() {
     }
   }
   
-  // Get output directory (use first file's directory)
+  // Get output directory (use custom if selected, otherwise default)
   let outputDir;
   try {
-    outputDir = await window.electronAPI.getOutputDirectory(videoGroups[0].files[0]);
+    if (selectedOutputDestination) {
+      // Use custom output destination (already ensured to exist by dialog)
+      outputDir = selectedOutputDestination;
+    } else {
+      // Use default (merged_videos subfolder)
+      outputDir = await window.electronAPI.getOutputDirectory(videoGroups[0].files[0]);
+    }
   } catch (error) {
     alert('Error creating output directory: ' + error.message);
     return;
