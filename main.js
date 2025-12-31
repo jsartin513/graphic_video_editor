@@ -213,41 +213,13 @@ function extractSessionId(filename) {
   return null;
 }
 
-// Analyze and group video files by session ID
+// Import video grouping functions
+const { analyzeAndGroupVideos } = require('./src/video-grouping');
+
+// Analyze and group video files by session ID and directory
+// Files from different subdirectories with the same session ID are processed separately
 ipcMain.handle('analyze-videos', async (event, filePaths) => {
-  const groups = new Map();
-  
-  for (const filePath of filePaths) {
-    const filename = path.basename(filePath);
-    const sessionId = extractSessionId(filename);
-    
-    if (!sessionId) {
-      // Skip files that don't match GoPro patterns
-      continue;
-    }
-    
-    if (!groups.has(sessionId)) {
-      groups.set(sessionId, []);
-    }
-    
-    groups.get(sessionId).push(filePath);
-  }
-  
-  // Sort files within each group
-  const result = [];
-  for (const [sessionId, files] of groups.entries()) {
-    const sortedFiles = files.sort();
-    result.push({
-      sessionId,
-      files: sortedFiles,
-      outputFilename: `PROCESSED${sessionId}.MP4`
-    });
-  }
-  
-  // Sort by session ID
-  result.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
-  
-  return result;
+  return analyzeAndGroupVideos(filePaths);
 });
 
 // Get video duration using ffprobe
