@@ -35,7 +35,7 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
   isValidExecutable(ffprobePath);
 
 const baseConfig = {
-  appId: "com.videoeditor.app",
+  appId: "com.videomerger.app",
   productName: "Video Merger",
   publish: null,
   mac: {
