@@ -35,8 +35,6 @@ BUNDLE_FFMPEG=false npm run build:arm64  # Don't bundle ffmpeg
 
 ## Runtime Behavior
 
-The app uses a **smart hybrid approach** that works with both build types:
-
 The app uses a **smart hybrid approach** that checks for bundled binaries first, then falls back to system-installed ffmpeg. This gives us the best of both worlds:
 
 1. **Bundled binaries checked first** - If included in the app, uses those (works out of the box)
