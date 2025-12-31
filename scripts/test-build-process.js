@@ -6,7 +6,6 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const resourcesDir = path.join(__dirname, '..', 'resources');
-const distDir = path.join(__dirname, '..', 'dist');
 
 let testsPassed = 0;
 let testsFailed = 0;
