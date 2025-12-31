@@ -575,6 +575,28 @@ body {
   border: 1px solid #f5c6cb;
 }
 
+.result-item.success {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-split-video {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: #007aff;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: background 0.2s ease;
+}
+
+.btn-split-video:hover {
+  background: #0051d5;
+}
+
 .results-actions {
   display: flex;
   gap: 12px;
@@ -614,11 +636,39 @@ body {
   border-bottom: 1px solid #e0e0e0;
 }
 
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .modal-header h2 {
   font-size: 24px;
   font-weight: 600;
   color: #1d1d1f;
   margin: 0;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #86868b;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: #f0f0f0;
+  color: #1d1d1f;
 }
 
 .modal-body {
@@ -631,6 +681,123 @@ body {
   color: #1d1d1f;
   margin-bottom: 24px;
   line-height: 1.5;
+}
+
+/* Split Video Modal Styles */
+.split-video-info {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.split-video-info p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #1d1d1f;
+}
+
+.split-mode-selector {
+  margin-bottom: 24px;
+}
+
+.split-mode-selector label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #1d1d1f;
+  cursor: pointer;
+}
+
+.split-mode-selector input[type="radio"] {
+  margin: 0;
+}
+
+.split-settings {
+  margin-bottom: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  margin-bottom: 8px;
+}
+
+.duration-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duration-input {
+  padding: 8px 12px;
+  font-size: 16px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  width: 80px;
+  text-align: center;
+}
+
+.duration-input:focus {
+  outline: none;
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.duration-label {
+  font-size: 14px;
+  color: #86868b;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #86868b;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.split-preview {
+  background: #e8f4fd;
+  border: 1px solid #b3d9f2;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 16px;
+}
+
+.split-preview p {
+  margin: 0;
+  font-size: 13px;
+  color: #1d1d1f;
+}
+
+.split-progress {
+  margin: 24px 0;
+}
+
+.split-result {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.split-result.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.split-result.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 .prerequisites-status {
