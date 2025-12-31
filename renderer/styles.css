@@ -490,6 +490,7 @@ body {
 /* Completion Results */
 .progress-details.completion-results {
   padding: 24px 0;
+  max-height: none;
 }
 
 .completion-summary {
