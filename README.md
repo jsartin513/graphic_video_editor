@@ -14,8 +14,12 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 
 ### Prerequisites
 
+**For Running the App:**
 - macOS 10.13 or later
-- ffmpeg (required for video merging)
+- **No Node.js needed** - the app is a standalone macOS application
+- **No ffmpeg installation needed** - included in fat builds (recommended)
+
+**For Building/Developing:**
 - Node.js (v14 or higher) - only needed for development/building
 - npm - only needed for development/building
 
@@ -72,7 +76,30 @@ The application uses Electron with context isolation for security. File operatio
 
 - Node.js (v14 or higher)
 - npm
-- ffmpeg (must be installed on the target system)
+- ffmpeg (only needed if building "lite" version without bundled dependencies)
+
+### Build Options
+
+**Fat Build (with bundled ffmpeg) - Recommended for distribution:**
+```bash
+npm run build:fat          # Build both architectures
+npm run build:fat:arm64    # Apple Silicon only
+npm run build:fat:x64      # Intel only
+```
+
+**Lite Build (requires system ffmpeg):**
+```bash
+npm run build:lite         # Build both architectures
+npm run build:lite:arm64   # Apple Silicon only
+npm run build:lite:x64     # Intel only
+```
+
+**Default (bundles by default):**
+```bash
+npm run build              # Same as build:fat
+```
+
+The app will automatically use bundled ffmpeg if included, or fall back to system-installed ffmpeg if not.
 
 ### Important: "App is Damaged" Error
 
