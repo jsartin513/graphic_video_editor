@@ -11,7 +11,7 @@ let allGood = true;
 // Check 1: Package.json scripts
 console.log('1. Checking package.json scripts...');
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-const requiredScripts = ['build:fat', 'build:lite', 'build:fat:arm64', 'build:lite:arm64'];
+const requiredScripts = ['build:fat', 'build:lite', 'build:fat:x64', 'build:lite:x64', 'build:fat:arm64', 'build:lite:arm64'];
 requiredScripts.forEach(script => {
   if (packageJson.scripts[script]) {
     console.log(`   ✅ ${script} exists`);

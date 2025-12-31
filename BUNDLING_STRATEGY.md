@@ -103,10 +103,14 @@ The app uses a **smart hybrid approach** that checks for bundled binaries first,
 
 ## Licensing Note
 
-If you bundle ffmpeg, ensure compliance with LGPL/GPL licensing:
+If you bundle ffmpeg, ensure compliance with the applicable FFmpeg licensing terms (LGPL or GPL):
 - Include license notices
 - Provide source code access if required
-- Consider your app's license compatibility
+- Carefully consider your app's license compatibility
 
-For most use cases, LGPL is fine for bundling in commercial apps as long as you follow the license terms.
+The `ffmpeg-static` package currently used for bundling is licensed under **GPL-3.0-or-later**, which is a strong copyleft license. Bundling this GPL-licensed binary may require that your application be GPL-compatible (for example, also under GPL-3.0-or-later or a compatible license).
+
+If you require more permissive licensing (e.g., commercial distribution under a non-GPL license), you should either:
+- (a) use a system-installed or separately built FFmpeg configured under LGPL terms, or
+- (b) consult with legal counsel to ensure your chosen approach is compliant.
 

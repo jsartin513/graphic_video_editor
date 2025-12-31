@@ -376,7 +376,7 @@ ipcMain.handle('check-ffmpeg', async () => {
 function getBundledBinaryPath(binaryName) {
   try {
     if (app.isPackaged) {
-      // Packaged app: binaries are in Contents/Resources/resources/
+      // Packaged app: binaries are typically under <app>.app/Contents/Resources/resources/ (note the nested resources directory)
       const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
       
