@@ -202,11 +202,21 @@ function getFileName(filePath) {
 }
 
 function getDirectoryName(filePath) {
-  const parts = filePath.split(/[/\\]/);
-  if (parts.length > 1) {
-    return parts[parts.length - 2]; // Get parent directory name
+  // Handle non-string or empty paths with a meaningful default
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    return 'root';
   }
-  return '';
+
+  // Split on both forward and back slashes and remove empty components
+  const parts = filePath.split(/[/\\]/).filter(part => part.length > 0);
+
+  // If there is no clear parent directory, return a sensible default
+  if (parts.length < 2) {
+    return 'root';
+  }
+
+  // Get parent directory name
+  return parts[parts.length - 2];
 }
 
 function escapeHtml(text) {
@@ -289,12 +299,15 @@ function showPreviewScreen() {
   // Check if we have multiple directories (for display purposes)
   // Extract directory from first file in each group if directory field not available
   const directories = new Set(videoGroups.map(g => {
-    if (g.directory) return g.directory;
-    if (g.files.length > 0) {
+    let dir = '';
+    if (g.directory) {
+      dir = g.directory;
+    } else if (g.files.length > 0) {
       const parts = g.files[0].split(/[/\\]/);
-      return parts.slice(0, -1).join('/'); // All parts except filename
+      dir = parts.slice(0, -1).join('/'); // All parts except filename
     }
-    return '';
+    // Normalize path separators so Set comparison is consistent across platforms
+    return dir.replace(/\\/g, '/');
   }));
   const hasMultipleDirectories = directories.size > 1;
   
@@ -321,9 +334,14 @@ function createPreviewItem(group, index, showDirectory = false) {
   let directoryName = '';
   if (showDirectory) {
     if (group.directory) {
-      // Extract just the directory name from the full path
-      const parts = group.directory.split(/[/\\]/);
-      directoryName = parts[parts.length - 1] || group.directory;
+      // Extract just the directory name from the full path, ignoring empty segments
+      const parts = group.directory.split(/[/\\]/).filter(Boolean);
+      if (parts.length > 0) {
+        directoryName = parts[parts.length - 1];
+      } else {
+        // Handle root or otherwise ambiguous directories with a short, friendly label
+        directoryName = 'root';
+      }
     } else if (group.files.length > 0) {
       directoryName = getDirectoryName(group.files[0]);
     }
@@ -333,7 +351,7 @@ function createPreviewItem(group, index, showDirectory = false) {
   item.innerHTML = `
     <div class="preview-item-header">
       <div class="preview-item-info">
-        <h3>Session ${group.sessionId}${directoryDisplay ? ` ${directoryDisplay}` : ''}</h3>
+        <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
         <span class="preview-item-meta">${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}</span>
       </div>
     </div>
