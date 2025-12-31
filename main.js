@@ -395,7 +395,9 @@ function getBundledBinaryPath(binaryName) {
         if (binaryName === 'ffmpeg') {
           return require('ffmpeg-static');
         } else if (binaryName === 'ffprobe') {
-          return require('ffprobe-static').path;
+          const ffprobeStatic = require('ffprobe-static');
+          // Handle both cases: path as string or object with .path property
+          return ffprobeStatic.path || ffprobeStatic;
         }
       } catch (e) {
         // Packages not installed or not found

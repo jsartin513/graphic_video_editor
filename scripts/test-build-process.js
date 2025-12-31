@@ -167,9 +167,21 @@ async function main() {
     }
   });
   
+  await test('build:fat:x64 script exists', () => {
+    if (!packageJson.scripts['build:fat:x64']) {
+      throw new Error('build:fat:x64 script not found');
+    }
+  });
+  
   await test('build:fat:arm64 script exists', () => {
     if (!packageJson.scripts['build:fat:arm64']) {
       throw new Error('build:fat:arm64 script not found');
+    }
+  });
+  
+  await test('build:lite:x64 script exists', () => {
+    if (!packageJson.scripts['build:lite:x64']) {
+      throw new Error('build:lite:x64 script not found');
     }
   });
   
