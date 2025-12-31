@@ -192,11 +192,21 @@ function getFileName(filePath) {
 }
 
 function getDirectoryName(filePath) {
-  const parts = filePath.split(/[/\\]/);
-  if (parts.length > 1) {
-    return parts[parts.length - 2]; // Get parent directory name
+  // Handle non-string or empty paths with a meaningful default
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    return 'root';
   }
-  return '';
+
+  // Split on both forward and back slashes and remove empty components
+  const parts = filePath.split(/[/\\]/).filter(part => part.length > 0);
+
+  // If there is no clear parent directory, return a sensible default
+  if (parts.length < 2) {
+    return 'root';
+  }
+
+  // Get parent directory name
+  return parts[parts.length - 2];
 }
 
 function escapeHtml(text) {
