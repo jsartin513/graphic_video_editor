@@ -141,4 +141,3 @@ export function initializeFileHandling(state, domElements) {
   // Export updateFileList so it can be called from other modules
   return { updateFileList, addFiles, removeFile };
 }
-

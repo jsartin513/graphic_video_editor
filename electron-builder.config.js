@@ -34,16 +34,37 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
   isValidExecutable(ffmpegPath) &&
   isValidExecutable(ffprobePath);
 
+// Try multiple possible icon paths
+const iconPaths = [
+  path.join(__dirname, 'build', 'icon.icns'),  // Standard location
+  path.join(__dirname, 'build', 'icons', 'icon.icns'),  // Our custom location
+];
+
+let iconPath = null;
+for (const testPath of iconPaths) {
+  if (fs.existsSync(testPath)) {
+    iconPath = testPath;
+    break;
+  }
+}
+
+if (!iconPath) {
+  console.warn('⚠️  Warning: Custom icon not found, using default Electron icon');
+}
+
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
   publish: null,
   mac: {
     category: "public.app-category.video",
+    icon: iconPath,
     target: [
       "dmg",
       "zip"
-    ]
+    ],
+    // Ensure app name is shown correctly in Finder/Dock
+    name: "Video Merger"
   },
   files: [
     "main.js",
