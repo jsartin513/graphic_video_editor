@@ -15,12 +15,21 @@ function isValidExecutable(filePath) {
     if (process.platform === 'win32') {
       return true;
     }
-    // On Unix-like systems, check if file has executable permissions
+    // When building macOS apps on non-macOS platforms (e.g., Linux in CI),
+    // we can't execute the binaries but we can still check if they're valid Mach-O files
+    // For now, just check size - a valid ffmpeg/ffprobe should be at least 50MB
+    if (stats.size < 50 * 1024 * 1024) {
+      console.warn(`Warning: Binary ${filePath} seems too small (${stats.size} bytes)`);
+      return false;
+    }
+    // On Unix-like systems building for same platform, check if file has executable permissions
     try {
       fs.accessSync(filePath, fs.constants.X_OK);
       return true;
     } catch (e) {
-      return false;
+      // If we can't check executable permission (e.g., cross-platform build),
+      // just verify the file exists and has reasonable size
+      return stats.size >= 50 * 1024 * 1024;
     }
   } catch (e) {
     return false;
