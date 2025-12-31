@@ -275,12 +275,15 @@ function showPreviewScreen() {
   // Check if we have multiple directories (for display purposes)
   // Extract directory from first file in each group if directory field not available
   const directories = new Set(videoGroups.map(g => {
-    if (g.directory) return g.directory;
-    if (g.files.length > 0) {
+    let dir = '';
+    if (g.directory) {
+      dir = g.directory;
+    } else if (g.files.length > 0) {
       const parts = g.files[0].split(/[/\\]/);
-      return parts.slice(0, -1).join('/'); // All parts except filename
+      dir = parts.slice(0, -1).join('/'); // All parts except filename
     }
-    return '';
+    // Normalize path separators so Set comparison is consistent across platforms
+    return dir.replace(/\\/g, '/');
   }));
   const hasMultipleDirectories = directories.size > 1;
   
