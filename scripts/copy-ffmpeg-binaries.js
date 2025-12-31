@@ -5,7 +5,6 @@ const https = require('https');
 
 // Binary versions - update these when upgrading ffmpeg/ffprobe
 const FFMPEG_RELEASE = 'b6.1.1';
-const FFPROBE_RELEASE = 'v0.3.4';
 
 // Check if bundling is enabled (default: true for backward compatibility)
 const BUNDLE_FFMPEG = process.env.BUNDLE_FFMPEG !== 'false';
@@ -181,8 +180,9 @@ async function copyBinaries() {
   }
 
   if (!success) {
-    console.error('\n⚠ Some binaries could not be obtained. Make sure ffmpeg-static and ffprobe-static are installed:');
-    console.error('   npm install');
+    console.error('\n⚠ Some binaries could not be obtained.');
+    console.error('   For development builds, ensure ffmpeg-static and ffprobe-static are installed: npm install');
+    console.error('   For distribution builds, binaries will be downloaded automatically from GitHub releases.');
     process.exit(1);
   }
 
