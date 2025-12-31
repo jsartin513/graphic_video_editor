@@ -244,7 +244,7 @@ ipcMain.handle('analyze-videos', async (event, filePaths) => {
   
   // Sort files within each group and create result objects
   const result = [];
-  for (const [groupKey, groupData] of groups.entries()) {
+  for (const groupData of groups.values()) {
     const sortedFiles = groupData.files.sort();
     
     // For display, use session ID. If multiple directories have the same session ID,
