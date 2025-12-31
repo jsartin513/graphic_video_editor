@@ -1,6 +1,6 @@
 // Video merging workflow functionality
 
-import { getFileName, escapeHtml, formatDuration } from './utils.js';
+import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
 
 export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo) {
   const {
@@ -74,17 +74,31 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     state.selectedOutputDestination = null;
     updateOutputDestinationDisplay();
     
+    // Check if we have multiple directories (for display purposes)
+    const directories = new Set(state.videoGroups.map(g => {
+      let dir = '';
+      if (g.directory) {
+        dir = g.directory;
+      } else if (g.files.length > 0) {
+        const parts = g.files[0].split(/[/\\]/);
+        dir = parts.slice(0, -1).join('/'); // All parts except filename
+      }
+      // Normalize path separators so Set comparison is consistent across platforms
+      return dir.replace(/\\/g, '/');
+    }));
+    const hasMultipleDirectories = directories.size > 1;
+    
     previewList.innerHTML = '';
     
     for (let i = 0; i < state.videoGroups.length; i++) {
       const group = state.videoGroups[i];
-      const previewItem = createPreviewItem(group, i);
+      const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
       previewList.appendChild(previewItem);
     }
   }
 
   // Create preview item
-  function createPreviewItem(group, index) {
+  function createPreviewItem(group, index, showDirectory = false) {
     const item = document.createElement('div');
     item.className = 'preview-item';
     
@@ -92,11 +106,29 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       const name = getFileName(f);
       return `<div class="input-file">${escapeHtml(name)}</div>`;
     }).join('');
+
+    // Get directory name for display (use group.directory if available, otherwise extract from first file)
+    let directoryName = '';
+    if (showDirectory) {
+      if (group.directory) {
+        // Extract just the directory name from the full path, ignoring empty segments
+        const parts = group.directory.split(/[/\\]/).filter(Boolean);
+        if (parts.length > 0) {
+          directoryName = parts[parts.length - 1];
+        } else {
+          // Handle root or otherwise ambiguous directories with a short, friendly label
+          directoryName = 'root';
+        }
+      } else if (group.files.length > 0) {
+        directoryName = getDirectoryName(group.files[0]);
+      }
+    }
+    const directoryDisplay = directoryName ? `<span class="preview-item-directory">📁 ${escapeHtml(directoryName)}</span>` : '';
     
     item.innerHTML = `
       <div class="preview-item-header">
         <div class="preview-item-info">
-          <h3>Session ${group.sessionId}</h3>
+          <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
           <span class="preview-item-meta">${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}</span>
         </div>
       </div>

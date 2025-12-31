@@ -53,5 +53,28 @@ const domElements = {
   installResult: document.getElementById('installResult'),
   ffmpegStatus: document.getElementById('ffmpegStatus'),
   ffprobeStatus: document.getElementById('ffprobeStatus'),
-  brewStatus: document.getElementById('brewStatus')
+  brewStatus: document.getElementById('brewStatus'),
+
+  // Split Video Modal
+  splitVideoModal: document.getElementById('splitVideoModal'),
+  closeSplitModalBtn: document.getElementById('closeSplitModalBtn'),
+  splitVideoName: document.getElementById('splitVideoName'),
+  splitVideoDuration: document.getElementById('splitVideoDuration'),
+  segmentMinutes: document.getElementById('segmentMinutes'),
+  splitPreview: document.getElementById('splitPreview'),
+  cancelSplitBtn: document.getElementById('cancelSplitBtn'),
+  executeSplitBtn: document.getElementById('executeSplitBtn'),
+  splitProgress: document.getElementById('splitProgress'),
+  splitProgressBar: document.getElementById('splitProgressBar'),
+  splitProgressText: document.getElementById('splitProgressText'),
+  splitResult: document.getElementById('splitResult')
 };
+
+// Initialize all modules
+const fileHandling = initializeFileHandling(state, domElements);
+const splitVideo = initializeSplitVideo(domElements, state);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
+const prerequisites = initializePrerequisites(domElements);
+
+// Make state accessible for debugging
+window.appState = state;
