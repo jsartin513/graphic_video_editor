@@ -10,7 +10,8 @@ describe('extractSessionId', () => {
   });
 
   test('extracts session ID from GP pattern', () => {
-    expect(extractSessionId('GP0100001.MP4')).toBe('0001');
+    // GP pattern: GP + 2 digits (sequence) + 4 digits (session ID)
+    expect(extractSessionId('GP010001.MP4')).toBe('0001');
     expect(extractSessionId('GP121234.MP4')).toBe('1234');
   });
 
