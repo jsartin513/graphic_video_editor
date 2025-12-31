@@ -820,6 +820,13 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('install-update', () => {
-  autoUpdater.quitAndInstall(false, true);
+  try {
+    autoUpdater.quitAndInstall(false, true);
+    // Note: This code won't execute as the app quits immediately
+    return { success: true };
+  } catch (error) {
+    console.error('Error installing update:', error);
+    return { success: false, error: error.message };
+  }
 });
 

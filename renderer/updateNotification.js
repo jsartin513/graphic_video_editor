@@ -38,6 +38,12 @@ export function initUpdateNotifications() {
 
 // Show update available notification
 function showUpdateNotification(info) {
+  // Remove any existing notification first
+  const existingNotification = document.getElementById('updateNotification');
+  if (existingNotification) {
+    existingNotification.remove();
+  }
+
   const notification = document.createElement('div');
   notification.id = 'updateNotification';
   notification.className = 'update-notification';
@@ -154,18 +160,32 @@ function showUpdateError(message) {
   const notification = document.getElementById('updateNotification');
   if (!notification) return;
 
-  notification.querySelector('.update-notification-content').innerHTML = `
-    <div class="update-notification-header">
-      <span class="update-icon">⚠️</span>
-      <h3>Update Error</h3>
-    </div>
-    <p class="update-message">${message}</p>
-    <div class="update-actions">
-      <button id="closeErrorBtn" class="btn btn-secondary btn-small">
-        Close
-      </button>
-    </div>
+  // Create the HTML structure safely
+  const content = notification.querySelector('.update-notification-content');
+  content.innerHTML = '';
+  
+  const header = document.createElement('div');
+  header.className = 'update-notification-header';
+  header.innerHTML = `
+    <span class="update-icon">⚠️</span>
+    <h3>Update Error</h3>
   `;
+  
+  const messageP = document.createElement('p');
+  messageP.className = 'update-message';
+  messageP.textContent = message; // Use textContent to prevent XSS
+  
+  const actions = document.createElement('div');
+  actions.className = 'update-actions';
+  const closeBtn = document.createElement('button');
+  closeBtn.id = 'closeErrorBtn';
+  closeBtn.className = 'btn btn-secondary btn-small';
+  closeBtn.textContent = 'Close';
+  actions.appendChild(closeBtn);
+  
+  content.appendChild(header);
+  content.appendChild(messageP);
+  content.appendChild(actions);
 
   document.getElementById('closeErrorBtn').addEventListener('click', () => {
     dismissUpdateNotification();
@@ -207,6 +227,12 @@ export async function checkForUpdates() {
 
 // Show "up to date" message
 function showUpToDateMessage() {
+  // Remove any existing notification first
+  const existingNotification = document.getElementById('updateNotification');
+  if (existingNotification) {
+    existingNotification.remove();
+  }
+
   const notification = document.createElement('div');
   notification.id = 'updateNotification';
   notification.className = 'update-notification';
