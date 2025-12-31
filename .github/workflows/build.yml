@@ -14,7 +14,26 @@ on:
       - master
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
   build-x64-fat:
+    needs: test
     runs-on: macos-14  # Apple Silicon runner (can build x64 via Rosetta 2)
     steps:
       - name: Checkout code
@@ -58,6 +77,7 @@ jobs:
           retention-days: 30
 
   build-x64-lite:
+    needs: test
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -101,6 +121,7 @@ jobs:
           retention-days: 30
 
   build-arm64-fat:
+    needs: test
     runs-on: macos-14  # Apple Silicon runner
     steps:
       - name: Checkout code
@@ -145,6 +166,7 @@ jobs:
           retention-days: 30
 
   build-arm64-lite:
+    needs: test
     runs-on: macos-14
     steps:
       - name: Checkout code
