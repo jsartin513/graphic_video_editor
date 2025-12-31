@@ -172,7 +172,9 @@ jobs:
           cd dist
           for file in *arm64*.dmg *arm64*.zip; do
             if [[ -f "$file" && "$file" != *"fat"* && "$file" != *"lite"* ]]; then
-              newname="${file/arm64/arm64-lite}"
+              base="${file%.*}"
+              ext="${file##*.}"
+              newname="${base}-lite.${ext}"
               mv "$file" "$newname" || true
               echo "Renamed $file to $newname"
             fi
