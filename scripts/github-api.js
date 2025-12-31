@@ -5,8 +5,6 @@
  */
 
 const { Octokit } = require('@octokit/rest');
-const fs = require('fs');
-const path = require('path');
 
 // Load environment variables
 require('dotenv').config();
@@ -28,8 +26,12 @@ function getGitHubToken() {
 function getRepoInfo() {
   // Try environment variable first
   if (process.env.GITHUB_REPO) {
-    const [owner, repo] = process.env.GITHUB_REPO.split('/');
-    return { owner, repo };
+    const repoEnv = process.env.GITHUB_REPO;
+    const parts = repoEnv.split('/');
+    if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+      return { owner: parts[0].trim(), repo: parts[1].trim() };
+    }
+    // If GITHUB_REPO is set but malformed, fall through to git remote detection
   }
 
   // Try to get from git remote
