@@ -361,6 +361,28 @@ ipcMain.handle('get-output-directory', async (event, inputPath) => {
   }
 });
 
+// Select output destination folder
+ipcMain.handle('select-output-destination', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Select Output Destination Folder'
+  });
+
+  if (result.canceled) {
+    return { canceled: true, path: null };
+  }
+
+  const selectedPath = result.filePaths[0];
+  
+  try {
+    // Ensure the directory exists
+    await fs.mkdir(selectedPath, { recursive: true });
+    return { canceled: false, path: selectedPath };
+  } catch (error) {
+    throw new Error(`Failed to access output directory: ${error.message}`);
+  }
+});
+
 // Open folder in Finder
 ipcMain.handle('open-folder', async (event, folderPath) => {
   const { shell } = require('electron');
