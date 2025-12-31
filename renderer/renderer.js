@@ -322,7 +322,7 @@ function createPreviewItem(group, index, showDirectory = false) {
   item.innerHTML = `
     <div class="preview-item-header">
       <div class="preview-item-info">
-        <h3>Session ${group.sessionId}${directoryDisplay ? ` ${directoryDisplay}` : ''}</h3>
+        <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
         <span class="preview-item-meta">${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}</span>
       </div>
     </div>
