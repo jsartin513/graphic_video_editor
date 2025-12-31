@@ -2,10 +2,36 @@
 const fs = require('fs');
 const path = require('path');
 
+// Validate that a binary exists and is executable
+function isValidExecutable(filePath) {
+  try {
+    // Check if file exists and is not empty
+    const stats = fs.statSync(filePath);
+    if (!stats.isFile() || stats.size === 0) {
+      return false;
+    }
+    // Check if file has executable permissions (on Unix-like systems)
+    try {
+      fs.accessSync(filePath, fs.constants.X_OK);
+    } catch (e) {
+      // On Windows, accessSync with X_OK might not work as expected
+      // so we just check if we can read it
+      if (process.platform !== 'win32') {
+        return false;
+      }
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 const resourcesDir = path.join(__dirname, 'resources');
+const ffmpegPath = path.join(resourcesDir, 'ffmpeg');
+const ffprobePath = path.join(resourcesDir, 'ffprobe');
 const resourcesExist = fs.existsSync(resourcesDir) && 
-  fs.existsSync(path.join(resourcesDir, 'ffmpeg')) &&
-  fs.existsSync(path.join(resourcesDir, 'ffprobe'));
+  isValidExecutable(ffmpegPath) &&
+  isValidExecutable(ffprobePath);
 
 const baseConfig = {
   appId: "com.videoeditor.app",
