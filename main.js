@@ -385,7 +385,7 @@ function getBundledBinaryPath(binaryName) {
         try {
           fsSync.chmodSync(binaryPath, 0o755);
         } catch (e) {
-          // Ignore chmod errors
+          console.warn(`Failed to set executable permissions on "${binaryPath}":`, e);
         }
         return binaryPath;
       }
