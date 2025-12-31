@@ -452,7 +452,7 @@ function showMergeResults(results, outputDir) {
       <div class="results-summary">
         <div class="summary-stat">
           <span class="stat-value">${successCount}</span>
-          <span class="stat-label">Success${successCount !== 1 ? 'ful' : ''}</span>
+          <span class="stat-label">Succeeded</span>
         </div>
         ${failCount > 0 ? `
         <div class="summary-stat error-stat">
