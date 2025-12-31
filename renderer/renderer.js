@@ -320,9 +320,14 @@ function createPreviewItem(group, index, showDirectory = false) {
   let directoryName = '';
   if (showDirectory) {
     if (group.directory) {
-      // Extract just the directory name from the full path
-      const parts = group.directory.split(/[/\\]/);
-      directoryName = parts[parts.length - 1] || group.directory;
+      // Extract just the directory name from the full path, ignoring empty segments
+      const parts = group.directory.split(/[/\\]/).filter(Boolean);
+      if (parts.length > 0) {
+        directoryName = parts[parts.length - 1];
+      } else {
+        // Handle root or otherwise ambiguous directories with a short, friendly label
+        directoryName = 'root';
+      }
     } else if (group.files.length > 0) {
       directoryName = getDirectoryName(group.files[0]);
     }
