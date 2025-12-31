@@ -49,7 +49,11 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
-  publish: null,
+  publish: {
+    provider: "github",
+    owner: "jsartin513",
+    repo: "graphic_video_editor"
+  },
   mac: {
     category: "public.app-category.video",
     target: [
@@ -61,7 +65,9 @@ const baseConfig = {
     "main.js",
     "preload.js",
     "renderer/**/*",
-    "package.json"
+    "src/**/*",
+    "package.json",
+    "node_modules/electron-updater/**/*"
   ],
   directories: {
     buildResources: "build",

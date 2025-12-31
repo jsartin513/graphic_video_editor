@@ -3,10 +3,15 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
+
+// Configure auto-updater
+autoUpdater.autoDownload = false; // Don't auto-download, ask user first
+autoUpdater.autoInstallOnAppQuit = true;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,6 +36,49 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for updates...');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-checking');
+  }
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', info);
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('No updates available');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-not-available', info);
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Auto-updater error:', err);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', err.message);
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  console.log(`Download progress: ${progressObj.percent}%`);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-download-progress', progressObj);
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', info);
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
   
@@ -38,6 +86,15 @@ app.whenReady().then(() => {
   setTimeout(() => {
     checkPrerequisites();
   }, 500);
+
+  // Check for updates after window is ready (only in production)
+  if (app.isPackaged) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(err => {
+        console.error('Failed to check for updates:', err);
+      });
+    }, 3000); // Wait 3 seconds to let the app fully load
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -729,5 +786,50 @@ ipcMain.handle('install-prerequisites', async () => {
       });
     });
   });
+});
+
+// Auto-update IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) {
+    return { 
+      available: false, 
+      message: 'Updates are only available in production builds' 
+    };
+  }
+  
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { 
+      available: result && result.updateInfo, 
+      updateInfo: result ? result.updateInfo : null 
+    };
+  } catch (error) {
+    console.error('Error checking for updates:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    console.error('Error downloading update:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  try {
+    // Note: quitAndInstall will quit the app, so code after this won't execute
+    // But we wrap it for consistency and in case the behavior changes
+    setImmediate(() => {
+      autoUpdater.quitAndInstall(false, true);
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error installing update:', error);
+    throw error;
+  }
 });
 

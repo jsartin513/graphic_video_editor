@@ -5,6 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
+import { initUpdateNotifications } from './updateNotification.js';
 
 // Shared application state
 const state = {
@@ -75,6 +76,9 @@ const fileHandling = initializeFileHandling(state, domElements);
 const splitVideo = initializeSplitVideo(domElements, state);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
+
+// Initialize update notifications
+initUpdateNotifications();
 
 // Make state accessible for debugging
 window.appState = state;
