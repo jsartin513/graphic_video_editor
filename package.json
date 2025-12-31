@@ -30,6 +30,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@octokit/rest": "^20.0.2",
+    "dotenv": "^16.4.5",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0"
   },
