@@ -714,6 +714,22 @@ body {
   word-break: break-word;
 }
 
+.btn-split-video {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: #007aff;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: background 0.2s ease;
+}
+
+.btn-split-video:hover {
+  background: #0051d5;
+}
+
 .results-actions {
   display: flex;
   gap: 16px;
