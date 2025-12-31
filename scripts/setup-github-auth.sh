@@ -52,7 +52,7 @@ if [ -z "$token" ]; then
     exit 1
 fi
 
-# Escape special characters for sed (including /, &, \, [, ], and other metacharacters)
+# Escape special characters for sed (/, &, and \)
 escaped_token=$(printf '%s\n' "$token" | sed 's/[\/&\\]/\\&/g')
 
 # Update .env file
