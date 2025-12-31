@@ -65,6 +65,7 @@ const baseConfig = {
     "main.js",
     "preload.js",
     "renderer/**/*",
+    "src/**/*",
     "package.json",
     "node_modules/electron-updater/**/*"
   ],

@@ -9,6 +9,7 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - Drag and drop video files or folders directly into the app
 - View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
+- **Automatic updates** - get notified when new versions are available and install them with one click
 
 ## Getting Started
 
@@ -56,6 +57,17 @@ npm start
 - AVI
 - MKV
 - M4V
+
+## Auto-Updates
+
+The app includes automatic update checking and installation:
+
+- **Automatic Check**: On startup, the app checks for new versions from the GitHub releases
+- **Update Notification**: When an update is available, a notification appears at the top of the window
+- **Easy Installation**: Download and install updates with a single click
+- **Flexible Options**: Choose to install immediately or on next app quit
+
+Updates are only checked in production builds (installed apps). Development builds skip the update check.
 
 ## Project Structure
 
