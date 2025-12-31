@@ -333,6 +333,87 @@ ipcMain.handle('get-output-directory', async (event, inputPath) => {
   }
 });
 
+// Split video at specific timestamps
+// splits: Array of {startTime: number (seconds), duration: number (seconds), filename: string}
+ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Ensure output directory exists
+      await fs.mkdir(outputDir, { recursive: true });
+      
+      const results = [];
+      const ffmpegCmd = getFFmpegPath();
+      
+      // Process each split
+      for (let i = 0; i < splits.length; i++) {
+        const split = splits[i];
+        const outputPath = path.join(outputDir, split.filename);
+        
+        // Convert seconds to HH:MM:SS format for ffmpeg
+        const formatTime = (seconds) => {
+          const hours = Math.floor(seconds / 3600);
+          const minutes = Math.floor((seconds % 3600) / 60);
+          const secs = Math.floor(seconds % 60);
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+        
+        const startTime = formatTime(split.startTime);
+        const duration = formatTime(split.duration);
+        
+        try {
+          await new Promise((splitResolve, splitReject) => {
+            const ffmpeg = spawn(ffmpegCmd, [
+              '-i', videoPath,
+              '-ss', startTime,
+              '-t', duration,
+              '-c', 'copy', // Use copy to avoid re-encoding (faster)
+              '-avoid_negative_ts', 'make_zero',
+              outputPath
+            ], {
+              shell: true,
+              env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+            });
+            
+            let errorOutput = '';
+            
+            ffmpeg.stderr.on('data', (data) => {
+              errorOutput += data.toString();
+            });
+            
+            ffmpeg.on('error', (error) => {
+              if (error.code === 'ENOENT') {
+                splitReject(new Error('ffmpeg not found'));
+              } else {
+                splitReject(error);
+              }
+            });
+            
+            ffmpeg.on('close', (code) => {
+              if (code === 0) {
+                results.push({ success: true, filename: split.filename, outputPath });
+                splitResolve();
+              } else {
+                results.push({ success: false, filename: split.filename, error: errorOutput });
+                splitReject(new Error(`ffmpeg failed: ${errorOutput}`));
+              }
+            });
+          });
+        } catch (error) {
+          // Continue with next split even if one fails
+          console.error(`Error splitting segment ${i + 1}:`, error);
+          if (!results.find(r => r.filename === split.filename)) {
+            results.push({ success: false, filename: split.filename, error: error.message });
+          }
+        }
+      }
+      
+      resolve({ success: true, results });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});
+
 // Select output destination folder
 ipcMain.handle('select-output-destination', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
