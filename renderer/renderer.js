@@ -438,7 +438,7 @@ function showMergeResults(results, outputDir) {
   // Build results HTML with improved design
   let resultsHtml = `
     <div class="completion-summary">
-      <div class="completion-icon">${failCount === 0 ? '✅' : '⚠️'}</div>
+      <div class="completion-icon" role="img" aria-label="${failCount === 0 ? 'Success' : 'Warning'}">${failCount === 0 ? '✅' : '⚠️'}</div>
       <h3 class="completion-title">${failCount === 0 ? 'Workflow Complete!' : 'Merge Finished'}</h3>
       <p class="completion-description">
         ${failCount === 0 
