@@ -187,6 +187,7 @@ jobs:
             dist/*arm64*lite*.dmg
             dist/*arm64*lite*.zip
           retention-days: 30
+          if-no-files-found: error
 
   release:
     needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
