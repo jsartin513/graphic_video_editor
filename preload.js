@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVideoDuration: (filePath) => ipcRenderer.invoke('get-video-duration', filePath),
   mergeVideos: (filePaths, outputPath) => ipcRenderer.invoke('merge-videos', filePaths, outputPath),
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
+  selectOutputDestination: () => ipcRenderer.invoke('select-output-destination'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   checkFFmpeg: () => ipcRenderer.invoke('check-ffmpeg'),
   installPrerequisites: () => ipcRenderer.invoke('install-prerequisites'),
