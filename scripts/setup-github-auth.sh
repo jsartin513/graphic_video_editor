@@ -53,7 +53,7 @@ if [ -z "$token" ]; then
 fi
 
 # Escape special characters for sed (including /, &, \, [, ], and other metacharacters)
-escaped_token=$(printf '%s\n' "$token" | sed 's/[\/&\]/\\&/g')
+escaped_token=$(printf '%s\n' "$token" | sed 's/[\/&\\]/\\&/g')
 
 # Update .env file
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -70,7 +70,7 @@ echo ""
 # Optional: Set repository
 read -p "Enter repository (owner/repo) or press Enter to auto-detect from git: " repo
 if [ -n "$repo" ]; then
-    escaped_repo=$(printf '%s\n' "$repo" | sed 's/[\/&\]/\\&/g')
+    escaped_repo=$(printf '%s\n' "$repo" | sed 's/[\/&\\]/\\&/g')
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s/GITHUB_REPO=.*/GITHUB_REPO=$escaped_repo/" .env
     else
