@@ -19,6 +19,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removePrerequisitesListener: () => {
     ipcRenderer.removeAllListeners('prerequisites-missing');
-  }
+  },
+  // Preferences API
+  loadPreferences: () => ipcRenderer.invoke('load-preferences'),
+  savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
+  saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
+  setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
+  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
 });
 
