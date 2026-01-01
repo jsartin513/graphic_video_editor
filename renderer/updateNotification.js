@@ -1,6 +1,7 @@
 // Update notification handling
 
 let updateInfo = null;
+let userInitiatedCheck = false;
 
 // Initialize update listeners
 export function initUpdateNotifications() {
@@ -19,10 +20,13 @@ export function initUpdateNotifications() {
     console.log('No updates available');
     updateInfo = null;
   });
-
+  
   window.electronAPI.onUpdateError((error) => {
     console.error('Update error:', error);
-    // Don't show error to user unless they manually checked for updates
+    // Only show errors if user manually checked for updates
+    if (userInitiatedCheck) {
+      showUpdateError(error);
+    }
   });
 
   window.electronAPI.onUpdateDownloadProgress((progress) => {
@@ -127,10 +131,18 @@ async function downloadUpdate() {
   `;
 
   try {
-    await window.electronAPI.downloadUpdate();
+    const result = await window.electronAPI.downloadUpdate();
+    if (result && result.error) {
+      showUpdateError(result.error);
+    }
   } catch (error) {
     console.error('Failed to download update:', error);
-    showUpdateError('Failed to download update. Please try again later.');
+    const errorMessage = error.message || String(error);
+    if (errorMessage.includes('network') || errorMessage.includes('ENOTFOUND')) {
+      showUpdateError('Download failed. Please check your internet connection and try again.');
+    } else {
+      showUpdateError('Failed to download update. Please try again later.');
+    }
   }
 }
 
@@ -180,12 +192,18 @@ function showUpdateReadyNotification(info) {
 
 // Show update error
 function showUpdateError(message) {
-  const notification = document.getElementById('updateNotification');
-  if (!notification) return;
+  // Remove any existing notification first
+  const existingNotification = document.getElementById('updateNotification');
+  if (existingNotification) {
+    existingNotification.remove();
+  }
 
-  // Create the HTML structure safely
-  const content = notification.querySelector('.update-notification-content');
-  content.innerHTML = '';
+  const notification = document.createElement('div');
+  notification.id = 'updateNotification';
+  notification.className = 'update-notification';
+  
+  const content = document.createElement('div');
+  content.className = 'update-notification-content';
   
   const header = document.createElement('div');
   header.className = 'update-notification-header';
@@ -201,18 +219,23 @@ function showUpdateError(message) {
   const actions = document.createElement('div');
   actions.className = 'update-actions';
   const closeBtn = document.createElement('button');
-  closeBtn.id = 'closeErrorBtn';
   closeBtn.className = 'btn btn-secondary btn-small';
   closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', () => {
+    dismissUpdateNotification();
+  });
   actions.appendChild(closeBtn);
   
   content.appendChild(header);
   content.appendChild(messageP);
   content.appendChild(actions);
+  
+  notification.appendChild(content);
+  document.body.appendChild(notification);
 
-  document.getElementById('closeErrorBtn').addEventListener('click', () => {
-    dismissUpdateNotification();
-  });
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 100);
 }
 
 // Dismiss update notification
@@ -237,14 +260,26 @@ function formatBytes(bytes) {
 
 // Manual check for updates (can be triggered by user)
 export async function checkForUpdates() {
+  userInitiatedCheck = true;
   try {
     const result = await window.electronAPI.checkForUpdates();
+    if (result && result.error) {
+      // Show error message
+      showUpdateError(result.message || 'Failed to check for updates');
+      return;
+    }
     if (result && !result.available) {
       // Show a brief message that app is up to date
       showUpToDateMessage();
     }
   } catch (error) {
     console.error('Failed to check for updates:', error);
+    showUpdateError('Failed to check for updates. Please try again later.');
+  } finally {
+    // Reset after a delay so errors from background checks don't show
+    setTimeout(() => {
+      userInitiatedCheck = false;
+    }, 5000);
   }
 }
 

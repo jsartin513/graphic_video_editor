@@ -37,3 +37,4 @@ To avoid this issue for users, you would need to:
 
 For now, the right-click method works perfectly and only needs to be done once per user.
 
+

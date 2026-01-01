@@ -134,3 +134,4 @@ export function initializePrerequisites(domElements) {
   return { showPrerequisitesModal };
 }
 
+

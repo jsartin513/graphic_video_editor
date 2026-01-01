@@ -95,3 +95,4 @@ The build system is correctly configured with:
 - Test actual builds to confirm file sizes differ between fat/lite
 - Verify the app uses bundled binaries when included
 
+

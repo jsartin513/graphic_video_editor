@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cameraGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#007aff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0051d5;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Transparent background - no background circle -->
+  
+  <!-- Camera body (rounded rectangle) - darker gray/blue -->
+  <rect x="140" y="180" width="232" height="152" rx="20" fill="#4a90e2" opacity="0.95"/>
+  
+  <!-- Camera lens (outer circle) -->
+  <circle cx="256" cy="240" r="52" fill="#2c2c2e"/>
+  
+  <!-- Camera lens (middle circle) -->
+  <circle cx="256" cy="240" r="42" fill="#1d1d1f"/>
+  
+  <!-- Camera lens (inner highlight) -->
+  <circle cx="256" cy="232" r="28" fill="#4a4a4c" opacity="0.6"/>
+  <circle cx="256" cy="232" r="24" fill="#1d1d1f"/>
+  <circle cx="260" cy="228" r="8" fill="#ffffff" opacity="0.3"/>
+  
+  <!-- Viewfinder (top rectangle) -->
+  <rect x="210" y="160" width="92" height="32" rx="6" fill="#2c2c2e"/>
+  <rect x="216" y="166" width="80" height="20" rx="4" fill="#1d1d1f"/>
+  
+  <!-- Flash (small circle) - lighter highlight -->
+  <circle cx="350" cy="210" r="12" fill="#ffffff" opacity="0.9"/>
+  
+  <!-- Merge indicator (two arrows converging) -->
+  <g transform="translate(256, 320)">
+    <!-- Left arrow -->
+    <path d="M -30 -10 L -50 -10 L -40 0 L -50 10 L -30 10 L -20 0 Z" fill="#007aff"/>
+    <!-- Right arrow -->
+    <path d="M 30 -10 L 50 -10 L 40 0 L 50 10 L 30 10 L 20 0 Z" fill="#007aff"/>
+    <!-- Center merge symbol -->
+    <circle cx="0" cy="0" r="8" fill="#007aff"/>
+  </g>
+</svg>

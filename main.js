@@ -805,21 +805,63 @@ ipcMain.handle('check-for-updates', async () => {
     };
   } catch (error) {
     console.error('Error checking for updates:', error);
-    throw error;
+    // Provide user-friendly error message
+    const errorMessage = error.message || String(error);
+    let userMessage = 'Failed to check for updates.';
+    
+    if (errorMessage.includes('network') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
+      userMessage = 'Cannot check for updates. Please check your internet connection.';
+    } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+      userMessage = 'Update server not found. This may be a new release.';
+    }
+    
+    return {
+      available: false,
+      error: true,
+      message: userMessage
+    };
   }
 });
 
 ipcMain.handle('download-update', async () => {
+  if (!app.isPackaged) {
+    return { 
+      success: false, 
+      error: 'Updates can only be downloaded in production builds' 
+    };
+  }
+  
   try {
     await autoUpdater.downloadUpdate();
     return { success: true };
   } catch (error) {
     console.error('Error downloading update:', error);
-    throw error;
+    const errorMessage = error.message || String(error);
+    let userMessage = 'Failed to download update.';
+    
+    if (errorMessage.includes('network') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
+      userMessage = 'Download failed. Please check your internet connection and try again.';
+    } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+      userMessage = 'Update file not found. Please try again later.';
+    } else if (errorMessage.includes('space') || errorMessage.includes('ENOSPC')) {
+      userMessage = 'Not enough disk space to download the update.';
+    }
+    
+    return {
+      success: false,
+      error: userMessage
+    };
   }
 });
 
 ipcMain.handle('install-update', async () => {
+  if (!app.isPackaged) {
+    return { 
+      success: false, 
+      error: 'Updates can only be installed in production builds' 
+    };
+  }
+  
   try {
     // Note: quitAndInstall will quit the app, so code after this won't execute
     // But we wrap it for consistency and in case the behavior changes
@@ -829,7 +871,10 @@ ipcMain.handle('install-update', async () => {
     return { success: true };
   } catch (error) {
     console.error('Error installing update:', error);
-    throw error;
+    return {
+      success: false,
+      error: 'Failed to install update. The app will install the update on the next quit.'
+    };
   }
 });
 

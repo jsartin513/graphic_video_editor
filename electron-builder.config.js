@@ -46,14 +46,19 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
   isValidExecutable(ffmpegPath) &&
   isValidExecutable(ffprobePath);
 
+// Configure publish for auto-updates
+// Note: We use --publish never in builds and let GitHub Actions handle releases
+// The publish config is needed so electron-builder generates latest-mac.yml for auto-updates
+const publishConfig = process.env.PUBLISH_TO_GITHUB === 'true' ? {
+  provider: "github",
+  owner: "jsartin513",
+  repo: "graphic_video_editor"
+} : null;
+
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
-  publish: {
-    provider: "github",
-    owner: "jsartin513",
-    repo: "graphic_video_editor"
-  },
+  publish: publishConfig,
   mac: {
     category: "public.app-category.video",
     target: [

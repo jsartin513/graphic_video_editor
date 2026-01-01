@@ -67,3 +67,4 @@ After merging:
 2. Users can choose fat (bundled) or lite (smaller) builds
 3. Releases will include all variants
 
+
