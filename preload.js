@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
   selectOutputDestination: () => ipcRenderer.invoke('select-output-destination'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+  getTestVideosPath: () => ipcRenderer.invoke('get-test-videos-path'),
   checkFFmpeg: () => ipcRenderer.invoke('check-ffmpeg'),
   installPrerequisites: () => ipcRenderer.invoke('install-prerequisites'),
   onPrerequisitesMissing: (callback) => {

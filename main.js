@@ -487,14 +487,32 @@ function getBundledBinaryPath(binaryName) {
       const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
       
+      console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
+      console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
+      
       if (fsSync.existsSync(binaryPath)) {
         // Make sure it's executable
         try {
           fsSync.chmodSync(binaryPath, 0o755);
+          const stats = fsSync.statSync(binaryPath);
+          console.log(`[getBundledBinaryPath] Found ${binaryName}: ${binaryPath} (${stats.size} bytes)`);
         } catch (e) {
           console.warn(`Failed to set executable permissions on "${binaryPath}":`, e);
         }
         return binaryPath;
+      } else {
+        console.log(`[getBundledBinaryPath] ${binaryName} not found at ${binaryPath}`);
+        // Try alternative locations for debugging
+        const altPaths = [
+          path.join(resourcesPath, binaryName),
+          path.join(process.resourcesPath, '..', 'resources', binaryName),
+        ];
+        for (const altPath of altPaths) {
+          if (fsSync.existsSync(altPath)) {
+            console.log(`[getBundledBinaryPath] Found ${binaryName} at alternative location: ${altPath}`);
+            return altPath;
+          }
+        }
       }
     } else {
       // Development: use the packages directly

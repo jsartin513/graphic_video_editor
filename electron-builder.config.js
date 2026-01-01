@@ -91,19 +91,31 @@ const baseConfig = {
 };
 
 // Conditionally include ffmpeg binaries if they exist
+const extraResourcesList = [];
+
 if (resourcesExist) {
-  baseConfig.extraResources = [
-    {
-      from: "resources",
-      to: "resources",
-      filter: ["**/*"]
-    }
-  ];
+  extraResourcesList.push({
+    from: "resources",
+    to: "resources",
+    filter: ["**/*"]
+  });
   console.log('✓ Electron Builder: Including bundled ffmpeg binaries');
 } else {
-  baseConfig.extraResources = [];
   console.log('✓ Electron Builder: Excluding bundled ffmpeg binaries (using system ffmpeg)');
 }
+
+// Include test videos if the directory exists
+const testVideosDir = path.join(__dirname, 'test-videos');
+if (fs.existsSync(testVideosDir)) {
+  extraResourcesList.push({
+    from: "test-videos",
+    to: "test-videos",
+    filter: ["**/*.mp4"]
+  });
+  console.log('✓ Electron Builder: Including test video files');
+}
+
+baseConfig.extraResources = extraResourcesList;
 
 module.exports = baseConfig;
 
