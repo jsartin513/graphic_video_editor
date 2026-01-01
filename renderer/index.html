@@ -60,7 +60,7 @@
         <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
         
         <div class="output-destination-section">
-          <label class="output-destination-label" for="outputDestinationPath">Output Destination:</label>
+          <label class="output-destination-label">Output Destination:</label>
           <div class="output-destination-controls">
             <div id="outputDestinationDisplay" class="output-destination-display">
               <span id="outputDestinationPath" class="output-destination-path">Using default location (merged_videos subfolder)</span>
@@ -117,7 +117,7 @@
         <fieldset class="split-mode-selector">
           <legend class="sr-only">Split mode</legend>
           <label>
-            <input type="radio" name="splitMode" value="uniform" checked aria-label="Split into segments of equal duration">
+            <input type="radio" name="splitMode" value="uniform" checked>
             Simple: Split into segments of equal duration
           </label>
         </fieldset>
@@ -126,7 +126,7 @@
           <div class="form-group">
             <label for="segmentMinutes">Duration per segment:</label>
             <div class="duration-input-group">
-              <input type="number" id="segmentMinutes" min="1" max="120" value="20" class="duration-input" aria-label="Segment duration in minutes">
+              <input type="number" id="segmentMinutes" min="1" max="120" value="20" class="duration-input">
               <span class="duration-label">minutes</span>
             </div>
             <p class="form-hint">The video will be split into segments of this duration</p>
