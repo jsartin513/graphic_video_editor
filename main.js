@@ -479,6 +479,16 @@ ipcMain.handle('check-ffmpeg', async () => {
   return await checkFFmpeg();
 });
 
+// Get path to test videos directory
+ipcMain.handle('get-test-videos-path', async () => {
+  if (app.isPackaged) {
+    const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+    return path.join(resourcesPath, 'test-videos');
+  } else {
+    return path.join(__dirname, 'test-videos');
+  }
+});
+
 // Get the path to bundled ffmpeg/ffprobe binaries
 function getBundledBinaryPath(binaryName) {
   try {
