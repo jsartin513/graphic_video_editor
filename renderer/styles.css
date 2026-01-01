@@ -35,6 +35,10 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
   
   --focus-ring: 0 0 0 3px rgba(0, 122, 255, 0.3);
+  
+  /* Success and error backgrounds */
+  --success-bg: rgba(52, 199, 89, 0.25);
+  --error-bg: rgba(255, 59, 48, 0.25);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -69,6 +73,10 @@
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
     
     --focus-ring: 0 0 0 3px rgba(10, 132, 255, 0.4);
+    
+    /* Success and error backgrounds for dark mode */
+    --success-bg: rgba(48, 209, 88, 0.3);
+    --error-bg: rgba(255, 69, 58, 0.3);
   }
 }
 
@@ -822,25 +830,15 @@ body {
 }
 
 .result-item.success {
-  background: rgba(52, 199, 89, 0.25);
+  background: var(--success-bg);
   color: var(--text-primary);
   border: 1px solid var(--accent-secondary);
 }
 
 .result-item.error {
-  background: rgba(255, 59, 48, 0.25);
+  background: var(--error-bg);
   color: var(--text-primary);
   border: 1px solid var(--accent-danger);
-}
-
-@media (prefers-color-scheme: dark) {
-  .result-item.success {
-    background: rgba(48, 209, 88, 0.3);
-  }
-  
-  .result-item.error {
-    background: rgba(255, 69, 58, 0.3);
-  }
 }
 
 .result-icon {
@@ -1178,12 +1176,19 @@ body {
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   :root {
-    --border-primary: currentColor;
-    --border-secondary: currentColor;
+    --border-primary: #000000;
+    --border-secondary: #000000;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --border-primary: #ffffff;
+      --border-secondary: #ffffff;
+    }
   }
 
   .btn {
-    border: 2px solid currentColor;
+    border: 2px solid;
   }
 }
 
