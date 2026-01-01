@@ -2,6 +2,7 @@
 
 let updateInfo = null;
 let userInitiatedCheck = false;
+let isDownloading = false;
 
 // Initialize update listeners
 export function initUpdateNotifications() {
@@ -36,6 +37,7 @@ export function initUpdateNotifications() {
 
   window.electronAPI.onUpdateDownloaded((info) => {
     console.log('Update downloaded, ready to install');
+    isDownloading = false; // Reset download state
     showUpdateReadyNotification(info);
   });
 }
@@ -63,10 +65,12 @@ function showUpdateNotification(info) {
     <h3>Update Available</h3>
   `;
   
-  // Message with safe version text
+  // Message with safe version text (defensive check for missing version info)
   const message = document.createElement('p');
   message.className = 'update-message';
-  message.textContent = `Version ${info.version} is now available. You're currently using version ${info.currentVersion || '1.0.0'}.`;
+  const newVersion = info?.version || 'a new version';
+  const currentVersion = info?.currentVersion || '1.0.0';
+  message.textContent = `Version ${newVersion} is now available. You're currently using version ${currentVersion}.`;
   
   // Actions
   const actions = document.createElement('div');
@@ -112,8 +116,16 @@ function showUpdateNotification(info) {
 
 // Download update
 async function downloadUpdate() {
+  // Prevent multiple simultaneous downloads
+  if (isDownloading) {
+    console.log('Download already in progress');
+    return;
+  }
+
   const notification = document.getElementById('updateNotification');
   if (!notification) return;
+
+  isDownloading = true;
 
   // Update UI to show downloading state
   notification.querySelector('.update-notification-content').innerHTML = `
@@ -134,9 +146,12 @@ async function downloadUpdate() {
     const result = await window.electronAPI.downloadUpdate();
     if (result && result.error) {
       showUpdateError(result.error);
+      isDownloading = false;
     }
+    // Note: isDownloading will be reset when update-downloaded event fires
   } catch (error) {
     console.error('Failed to download update:', error);
+    isDownloading = false;
     const errorMessage = error.message || String(error);
     if (errorMessage.includes('network') || errorMessage.includes('ENOTFOUND')) {
       showUpdateError('Download failed. Please check your internet connection and try again.');
@@ -151,10 +166,18 @@ function updateDownloadProgress(progress) {
   const progressBar = document.getElementById('updateProgressBar');
   const progressText = document.getElementById('updateProgressText');
   
-  if (progressBar && progressText) {
-    const percent = Math.round(progress.percent);
+  if (progressBar && progressText && progress) {
+    // Defensive checks for progress object
+    const percent = Math.round(progress.percent || 0);
+    const transferred = progress.transferred || 0;
+    const total = progress.total || 0;
+    
     progressBar.style.width = `${percent}%`;
-    progressText.textContent = `${percent}% (${formatBytes(progress.transferred)} / ${formatBytes(progress.total)})`;
+    if (total > 0) {
+      progressText.textContent = `${percent}% (${formatBytes(transferred)} / ${formatBytes(total)})`;
+    } else {
+      progressText.textContent = `${percent}%`;
+    }
   }
 }
 
@@ -251,7 +274,7 @@ function dismissUpdateNotification() {
 
 // Format bytes to human-readable format
 function formatBytes(bytes) {
-  if (bytes === 0) return '0 Bytes';
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0 Bytes';
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -259,8 +282,18 @@ function formatBytes(bytes) {
 }
 
 // Manual check for updates (can be triggered by user)
+let isCheckingForUpdates = false;
+
 export async function checkForUpdates() {
+  // Prevent multiple simultaneous checks
+  if (isCheckingForUpdates) {
+    console.log('Update check already in progress');
+    return;
+  }
+
+  isCheckingForUpdates = true;
   userInitiatedCheck = true;
+  
   try {
     const result = await window.electronAPI.checkForUpdates();
     if (result && result.error) {
@@ -276,6 +309,7 @@ export async function checkForUpdates() {
     console.error('Failed to check for updates:', error);
     showUpdateError('Failed to check for updates. Please try again later.');
   } finally {
+    isCheckingForUpdates = false;
     // Reset after a delay so errors from background checks don't show
     setTimeout(() => {
       userInitiatedCheck = false;

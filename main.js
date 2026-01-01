@@ -47,7 +47,13 @@ autoUpdater.on('checking-for-update', () => {
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info);
   if (mainWindow) {
-    mainWindow.webContents.send('update-available', info);
+    // Include current version from package.json for display
+    const packageJson = require('./package.json');
+    const updateInfo = {
+      ...info,
+      currentVersion: packageJson.version || '1.0.0'
+    };
+    mainWindow.webContents.send('update-available', updateInfo);
   }
 });
 
@@ -75,7 +81,13 @@ autoUpdater.on('download-progress', (progressObj) => {
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded');
   if (mainWindow) {
-    mainWindow.webContents.send('update-downloaded', info);
+    // Include current version for consistency
+    const packageJson = require('./package.json');
+    const updateInfo = {
+      ...info,
+      currentVersion: packageJson.version || '1.0.0'
+    };
+    mainWindow.webContents.send('update-downloaded', updateInfo);
   }
 });
 
