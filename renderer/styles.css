@@ -357,7 +357,7 @@ body {
 
 .filename-edit {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -365,7 +365,12 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: #1d1d1f;
-  min-width: 120px;
+}
+
+.filename-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .filename-input {
@@ -388,6 +393,20 @@ body {
 .filename-hint {
   font-size: 14px;
   color: #86868b;
+}
+
+.filename-help {
+  font-size: 12px;
+  color: #86868b;
+  padding-left: 4px;
+}
+
+.filename-help small {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #f0f8ff;
+  border-radius: 4px;
+  color: #007aff;
 }
 
 .input-files {
