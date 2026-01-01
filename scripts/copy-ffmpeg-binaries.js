@@ -5,7 +5,6 @@ const https = require('https');
 
 // Binary versions - update these when upgrading ffmpeg/ffprobe
 const FFMPEG_RELEASE = 'b6.1.1';
-const FFPROBE_RELEASE = 'v0.3.4';
 
 // Check if bundling is enabled (default: true for backward compatibility)
 const BUNDLE_FFMPEG = process.env.BUNDLE_FFMPEG !== 'false';
@@ -100,8 +99,9 @@ function getBinaryUrl(binaryName, arch) {
     // URL format: https://github.com/eugeneware/ffmpeg-static/releases/download/{release}/ffmpeg-{platform}-{arch}.gz
     return `https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_RELEASE}/ffmpeg-darwin-${arch}.gz`;
   } else if (binaryName === 'ffprobe') {
-    // URL format: https://github.com/ffprobe-static/ffprobe-static/releases/download/{release}/ffprobe-{platform}-{arch}.gz
-    return `https://github.com/ffprobe-static/ffprobe-static/releases/download/${FFPROBE_RELEASE}/ffprobe-darwin-${arch}.gz`;
+    // Use ffmpeg-static releases for ffprobe as well (ffprobe-static has incorrect arm64 binary in v3.1.0)
+    // URL format: https://github.com/eugeneware/ffmpeg-static/releases/download/{release}/ffprobe-{platform}-{arch}.gz
+    return `https://github.com/eugeneware/ffmpeg-static/releases/download/${FFMPEG_RELEASE}/ffprobe-darwin-${arch}.gz`;
   }
   return null;
 }
@@ -149,17 +149,22 @@ async function copyBinaries() {
   try {
     const ffprobeDest = path.join(resourcesDir, 'ffprobe');
     
-    // ffprobe-static bundles all architectures in the npm package
-    // So we can always copy from the bundled binaries
-    const ffprobeBasePath = path.join(__dirname, '..', 'node_modules', 'ffprobe-static', 'bin', 'darwin', targetArch, 'ffprobe');
-    
-    if (fs.existsSync(ffprobeBasePath)) {
-      console.log(`Copying ${targetArch} ffprobe binary from npm package`);
-      fs.copyFileSync(ffprobeBasePath, ffprobeDest);
+    if (isCrossCompiling) {
+      // When cross-compiling, download the correct binary for target architecture
+      // Note: ffprobe-static v3.1.0 has incorrect arm64 binary, so we download from ffmpeg-static releases
+      const reason = process.platform !== 'darwin' 
+        ? `non-macOS platform (${process.platform})`
+        : `cross-architecture build (host: ${process.arch}, target: ${targetArch})`;
+      console.log(`Downloading ${targetArch} ffprobe binary (${reason})`);
+      const ffprobeUrl = getBinaryUrl('ffprobe', targetArch);
+      if (!ffprobeUrl) {
+        throw new Error(`No ffprobe binary URL for architecture: ${targetArch}`);
+      }
+      await downloadFile(ffprobeUrl, ffprobeDest);
       fs.chmodSync(ffprobeDest, 0o755);
-      console.log(`✓ Copied ffprobe for ${targetArch} to ${ffprobeDest}`);
-    } else if (!isCrossCompiling) {
-      // Fallback to the default method for non-cross-compile scenarios
+      console.log(`✓ Downloaded ffprobe for ${targetArch} to ${ffprobeDest}`);
+    } else {
+      // Use the locally installed binary
       const ffprobeStatic = require('ffprobe-static');
       const ffprobePath = ffprobeStatic.path || ffprobeStatic;
       if (!ffprobePath) {
@@ -168,8 +173,6 @@ async function copyBinaries() {
       fs.copyFileSync(ffprobePath, ffprobeDest);
       fs.chmodSync(ffprobeDest, 0o755);
       console.log(`✓ Copied ffprobe to ${ffprobeDest}`);
-    } else {
-      throw new Error(`ffprobe binary not found for architecture: ${targetArch}`);
     }
   } catch (e) {
     console.error('✗ Error getting ffprobe:', e.message);
@@ -177,8 +180,9 @@ async function copyBinaries() {
   }
 
   if (!success) {
-    console.error('\n⚠ Some binaries could not be obtained. Make sure ffmpeg-static and ffprobe-static are installed:');
-    console.error('   npm install');
+    console.error('\n⚠ Some binaries could not be obtained.');
+    console.error('   For development builds, ensure ffmpeg-static and ffprobe-static are installed: npm install');
+    console.error('   For distribution builds, binaries will be downloaded automatically from GitHub releases.');
     process.exit(1);
   }
 
