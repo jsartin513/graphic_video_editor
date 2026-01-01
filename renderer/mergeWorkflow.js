@@ -199,6 +199,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       // Remove .MP4 if present
       value = value.replace(/\.MP4$/i, '');
       
+      // Store the original pattern before token replacement for preferences
+      const originalPattern = value;
+      
       // Apply date tokens if any
       if (value.includes('{')) {
         try {
@@ -212,14 +215,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         }
       }
       
-      // Remove invalid characters and spaces
+      // Remove invalid characters but preserve hyphens and underscores
+      // This happens after date token replacement to preserve date formatting
       value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
       state.videoGroups[index].outputFilename = value + '.MP4';
       e.target.value = value;
       
-      // Save pattern to preferences
+      // Save the original pattern (with tokens) to preferences, not the replaced value
+      // This allows users to reuse patterns with date tokens
       try {
-        await window.electronAPI.saveFilenamePattern(value);
+        await window.electronAPI.saveFilenamePattern(originalPattern);
         // Reload preferences to get updated list
         await loadUserPreferences();
       } catch (error) {

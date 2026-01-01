@@ -123,13 +123,14 @@ function formatDate(date, format) {
   const month = date.getMonth() + 1; // 0-indexed
   const day = date.getDate();
   
+  // Replace longer patterns first to avoid partial replacements
   return format
-    .replace('YYYY', year.toString())
-    .replace('YY', year.toString().slice(-2))
-    .replace('MM', month.toString().padStart(2, '0'))
-    .replace('M', month.toString())
-    .replace('DD', day.toString().padStart(2, '0'))
-    .replace('D', day.toString());
+    .replace(/YYYY/g, year.toString())
+    .replace(/YY/g, year.toString().slice(-2))
+    .replace(/MM/g, month.toString().padStart(2, '0'))
+    .replace(/DD/g, day.toString().padStart(2, '0'))
+    .replace(/M/g, month.toString())
+    .replace(/D/g, day.toString());
 }
 
 /**
