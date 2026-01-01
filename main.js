@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -8,13 +8,42 @@ let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
 
+// Icon path constant (used in both development and production)
+const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
+
+// Set app icon for development (will be overridden by electron-builder in production)
+function setupAppIcon() {
+  const iconPath = ICON_PATH;
+  if (fsSync.existsSync(iconPath)) {
+    try {
+      const icon = nativeImage.createFromPath(iconPath);
+      app.dock.setIcon(icon); // macOS Dock icon
+      // Note: BrowserWindow icon is set in createWindow
+    } catch (error) {
+      console.warn('Could not set app icon:', error.message);
+    }
+  }
+}
+
 function createWindow() {
+  // Set window icon if available
+  let windowIcon = null;
+  const iconPath = ICON_PATH;
+  if (fsSync.existsSync(iconPath)) {
+    try {
+      windowIcon = nativeImage.createFromPath(iconPath);
+    } catch (error) {
+      console.warn('Could not load window icon:', error.message);
+    }
+  }
+
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
     minWidth: 800,
     minHeight: 600,
     title: 'Video Merger',
+    icon: windowIcon, // Set window icon
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -32,6 +61,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Set up app icon (for development - production uses electron-builder config)
+  setupAppIcon();
+  
   createWindow();
   
   // Check prerequisites after window is ready
