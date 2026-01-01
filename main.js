@@ -512,6 +512,10 @@ function getBundledBinaryPath(binaryName) {
         return binaryPath;
       } else {
         console.log(`[getBundledBinaryPath] ${binaryName} not found at ${binaryPath}`);
+        console.log(`[getBundledBinaryPath] Checking if resources directory exists: ${fsSync.existsSync(resourcesPath)}`);
+        if (fsSync.existsSync(resourcesPath)) {
+          console.log(`[getBundledBinaryPath] Contents of resourcesPath:`, fsSync.readdirSync(resourcesPath));
+        }
         // Try alternative locations for debugging
         const altPaths = [
           path.join(resourcesPath, binaryName),
@@ -520,9 +524,11 @@ function getBundledBinaryPath(binaryName) {
         for (const altPath of altPaths) {
           if (fsSync.existsSync(altPath)) {
             console.log(`[getBundledBinaryPath] Found ${binaryName} at alternative location: ${altPath}`);
+            fsSync.chmodSync(altPath, 0o755);
             return altPath;
           }
         }
+        console.log(`[getBundledBinaryPath] ${binaryName} not found in any location`);
       }
     } else {
       // Development: use the packages directly
