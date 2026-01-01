@@ -479,6 +479,16 @@ ipcMain.handle('check-ffmpeg', async () => {
   return await checkFFmpeg();
 });
 
+// Get path to test videos directory
+ipcMain.handle('get-test-videos-path', async () => {
+  if (app.isPackaged) {
+    const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+    return path.join(resourcesPath, 'test-videos');
+  } else {
+    return path.join(__dirname, 'test-videos');
+  }
+});
+
 // Get the path to bundled ffmpeg/ffprobe binaries
 function getBundledBinaryPath(binaryName) {
   try {
@@ -487,14 +497,38 @@ function getBundledBinaryPath(binaryName) {
       const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
       
+      console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
+      console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
+      
       if (fsSync.existsSync(binaryPath)) {
         // Make sure it's executable
         try {
           fsSync.chmodSync(binaryPath, 0o755);
+          const stats = fsSync.statSync(binaryPath);
+          console.log(`[getBundledBinaryPath] Found ${binaryName}: ${binaryPath} (${stats.size} bytes)`);
         } catch (e) {
           console.warn(`Failed to set executable permissions on "${binaryPath}":`, e);
         }
         return binaryPath;
+      } else {
+        console.log(`[getBundledBinaryPath] ${binaryName} not found at ${binaryPath}`);
+        console.log(`[getBundledBinaryPath] Checking if resources directory exists: ${fsSync.existsSync(resourcesPath)}`);
+        if (fsSync.existsSync(resourcesPath)) {
+          console.log(`[getBundledBinaryPath] Contents of resourcesPath:`, fsSync.readdirSync(resourcesPath));
+        }
+        // Try alternative locations for debugging
+        const altPaths = [
+          path.join(resourcesPath, binaryName),
+          path.join(process.resourcesPath, '..', 'resources', binaryName),
+        ];
+        for (const altPath of altPaths) {
+          if (fsSync.existsSync(altPath)) {
+            console.log(`[getBundledBinaryPath] Found ${binaryName} at alternative location: ${altPath}`);
+            fsSync.chmodSync(altPath, 0o755);
+            return altPath;
+          }
+        }
+        console.log(`[getBundledBinaryPath] ${binaryName} not found in any location`);
       }
     } else {
       // Development: use the packages directly
@@ -600,9 +634,15 @@ async function checkFFmpeg() {
     const bundledFFmpeg = getBundledBinaryPath('ffmpeg');
     const bundledFFprobe = getBundledBinaryPath('ffprobe');
     
+    console.log('[checkFFmpeg] Bundled ffmpeg:', bundledFFmpeg);
+    console.log('[checkFFmpeg] Bundled ffprobe:', bundledFFprobe);
+    
     // Then check system binaries
     const foundFFmpegPath = bundledFFmpeg || findSystemExecutablePath('ffmpeg');
     const foundFFprobePath = bundledFFprobe || findSystemExecutablePath('ffprobe');
+    
+    console.log('[checkFFmpeg] Found ffmpeg path:', foundFFmpegPath);
+    console.log('[checkFFmpeg] Found ffprobe path:', foundFFprobePath);
     
     ffmpegPath = foundFFmpegPath;
     ffprobePath = foundFFprobePath;
@@ -617,6 +657,7 @@ async function checkFFmpeg() {
     function checkComplete() {
       checksDone++;
       if (checksDone === 3 && versionCheckDone) {
+        console.log('[checkFFmpeg] Final result - ffmpegFound:', ffmpegFound, 'ffprobeFound:', ffprobeFound, 'installed:', ffmpegFound && ffprobeFound);
         resolve({
           installed: ffmpegFound && ffprobeFound,
           ffmpegFound,
@@ -627,6 +668,80 @@ async function checkFFmpeg() {
       }
     }
     
+    // If we have bundled binaries, test them directly instead of using 'which'
+    if (bundledFFmpeg && bundledFFprobe) {
+      console.log('[checkFFmpeg] Testing bundled binaries directly...');
+      // Test bundled ffmpeg
+      try {
+        const testFFmpeg = spawn(bundledFFmpeg, ['-version'], { timeout: 5000 });
+        let ffmpegOutput = '';
+        testFFmpeg.stdout.on('data', (data) => {
+          ffmpegOutput += data.toString();
+        });
+        testFFmpeg.on('close', (code) => {
+          ffmpegFound = code === 0;
+          if (ffmpegFound) {
+            const match = ffmpegOutput.match(/ffmpeg version (\S+)/);
+            if (match) {
+              ffmpegVersion = match[1];
+            }
+          } else {
+            console.log('[checkFFmpeg] Bundled ffmpeg test failed with code:', code);
+          }
+          
+          // Test bundled ffprobe
+          try {
+            const testFFprobe = spawn(bundledFFprobe, ['-version'], { timeout: 5000 });
+            testFFprobe.on('close', (code) => {
+              ffprobeFound = code === 0;
+              if (!ffprobeFound) {
+                console.log('[checkFFmpeg] Bundled ffprobe test failed with code:', code);
+              }
+              
+              // Check for brew (still needed for install message)
+              const brewCheck = spawn('which', ['brew'], { 
+                shell: true,
+                env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+              });
+              brewCheck.on('close', (code) => {
+                brewFound = code === 0;
+                versionCheckDone = true;
+                checkComplete();
+              });
+              brewCheck.on('error', () => {
+                versionCheckDone = true;
+                checkComplete();
+              });
+            });
+            testFFprobe.on('error', (err) => {
+              console.error('[checkFFmpeg] Error testing bundled ffprobe:', err);
+              ffprobeFound = false;
+              versionCheckDone = true;
+              checkComplete();
+            });
+          } catch (err) {
+            console.error('[checkFFmpeg] Error spawning bundled ffprobe test:', err);
+            ffprobeFound = false;
+            versionCheckDone = true;
+            checkComplete();
+          }
+        });
+        testFFmpeg.on('error', (err) => {
+          console.error('[checkFFmpeg] Error testing bundled ffmpeg:', err);
+          ffmpegFound = false;
+          versionCheckDone = true;
+          checkComplete();
+        });
+      } catch (err) {
+        console.error('[checkFFmpeg] Error spawning bundled ffmpeg test:', err);
+        ffmpegFound = false;
+        versionCheckDone = true;
+        checkComplete();
+      }
+      return; // Exit early, we're testing bundled binaries
+    }
+    
+    // Fallback to system check (only if no bundled binaries)
     // Check ffmpeg
     const ffmpegCheck = spawn('which', ['ffmpeg'], { 
       shell: true,
