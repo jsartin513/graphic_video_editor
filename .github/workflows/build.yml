@@ -52,6 +52,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'x64'
         run: npm run build:x64
 
       - name: Rename x64 files to include architecture suffix
@@ -59,7 +60,9 @@ jobs:
           cd dist
           for file in *.dmg *.zip; do
             if [[ -f "$file" && "$file" != *"arm64"* && "$file" != *"x64"* && "$file" != *"fat"* && "$file" != *"lite"* ]]; then
-              newname="${file%.*}-x64-fat.${file##*.}"
+              ext="${file##*.}"
+              basename="${file%.*}"
+              newname="${basename}-x64-fat.${ext}"
               mv "$file" "$newname" || true
               echo "Renamed $file to $newname"
             fi
@@ -96,6 +99,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
+          TARGET_ARCH: 'x64'
         run: npm run build:x64
 
       - name: Rename x64 files to include architecture suffix
@@ -140,6 +144,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'arm64'
         run: npm run build:arm64
 
       - name: Rename arm64 files to include variant suffix
@@ -185,6 +190,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
+          TARGET_ARCH: 'arm64'
         run: npm run build:arm64
 
       - name: Rename arm64 files to include variant suffix
