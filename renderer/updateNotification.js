@@ -1,4 +1,5 @@
 // Update notification handling
+import { formatBytes } from './utils.js';
 
 let updateInfo = null;
 let userInitiatedCheck = false;
@@ -270,15 +271,6 @@ function dismissUpdateNotification() {
       notification.remove();
     }, 300);
   }
-}
-
-// Format bytes to human-readable format
-function formatBytes(bytes) {
-  if (!bytes || bytes === 0 || isNaN(bytes)) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
 // Manual check for updates (can be triggered by user)

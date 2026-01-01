@@ -46,3 +46,7 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
+// Re-export formatBytes from CommonJS module for use in ES6 modules
+const { formatBytes: formatBytesCommonJS } = require('../src/format-utils');
+export const formatBytes = formatBytesCommonJS;
+
