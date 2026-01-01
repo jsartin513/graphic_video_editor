@@ -2,6 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// Minimum expected size for ffmpeg/ffprobe binaries (50MB)
+const MIN_BINARY_SIZE_BYTES = 50 * 1024 * 1024;
+
 // Validate that a binary exists and is executable
 function isValidExecutable(filePath) {
   try {
@@ -15,12 +18,21 @@ function isValidExecutable(filePath) {
     if (process.platform === 'win32') {
       return true;
     }
-    // On Unix-like systems, check if file has executable permissions
+    // When building macOS apps on non-macOS platforms (e.g., Linux in CI),
+    // we can't execute the binaries but we can still check if they're valid Mach-O files
+    // For now, just check size - a valid ffmpeg/ffprobe should be at least 50MB
+    if (stats.size < MIN_BINARY_SIZE_BYTES) {
+      console.warn(`Warning: Binary ${filePath} seems too small (${stats.size} bytes)`);
+      return false;
+    }
+    // On Unix-like systems building for same platform, check if file has executable permissions
     try {
       fs.accessSync(filePath, fs.constants.X_OK);
       return true;
     } catch (e) {
-      return false;
+      // If we can't check executable permission (e.g., cross-platform build),
+      // just verify the file exists and has reasonable size
+      return stats.size >= MIN_BINARY_SIZE_BYTES;
     }
   } catch (e) {
     return false;
@@ -34,16 +46,37 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
   isValidExecutable(ffmpegPath) &&
   isValidExecutable(ffprobePath);
 
+// Try multiple possible icon paths
+const iconPaths = [
+  path.join(__dirname, 'build', 'icon.icns'),  // Standard location
+  path.join(__dirname, 'build', 'icons', 'icon.icns'),  // Our custom location
+];
+
+let iconPath = null;
+for (const testPath of iconPaths) {
+  if (fs.existsSync(testPath)) {
+    iconPath = testPath;
+    break;
+  }
+}
+
+if (!iconPath) {
+  console.warn('⚠️  Warning: Custom icon not found, using default Electron icon');
+}
+
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
   publish: null,
   mac: {
     category: "public.app-category.video",
+    ...(iconPath && { icon: iconPath }), // Only set icon property if iconPath exists
     target: [
       "dmg",
       "zip"
-    ]
+    ],
+    // Ensure app name is shown correctly in Finder/Dock
+    name: "Video Merger"
   },
   files: [
     "main.js",

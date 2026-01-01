@@ -3,50 +3,46 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const zlib = require('zlib');
-const { pipeline } = require('stream/promises');
 
 // Check if bundling is enabled (default: true for backward compatibility)
 const BUNDLE_FFMPEG = process.env.BUNDLE_FFMPEG !== 'false';
 
-// Detect target architecture from environment or npm script name
-// Environment variable takes precedence, then try to detect from npm script
-function getTargetArch() {
-  // Check for explicit target architecture
-  if (process.env.TARGET_ARCH) {
-    return process.env.TARGET_ARCH;
-  }
+// Determine target architecture from npm lifecycle event or environment variable
+// npm_lifecycle_event will be 'prebuild:x64', 'prebuild:arm64', or 'prebuild'
+const lifecycleEvent = process.env.npm_lifecycle_event || '';
+const targetArch = process.env.TARGET_ARCH || 
+  (lifecycleEvent.includes(':x64') ? 'x64' : 
+   lifecycleEvent.includes(':arm64') ? 'arm64' : 
+   process.arch);
+
+const resourcesDir = path.join(__dirname, '..', 'resources');
+
+if (!BUNDLE_FFMPEG) {
+  console.log('BUNDLE_FFMPEG=false - Skipping ffmpeg bundling');
+  console.log('App will use system-installed ffmpeg if available');
   
-  // Detect from npm script name (e.g., prebuild:x64, prebuild:arm64)
-  const npmConfigArgv = process.env.npm_config_argv;
-  if (npmConfigArgv) {
+  // Clean up resources directory if it exists
+  if (fs.existsSync(resourcesDir)) {
     try {
-      const argv = JSON.parse(npmConfigArgv);
-      const script = argv.original?.[0];
-      if (script?.includes('x64')) return 'x64';
-      if (script?.includes('arm64')) return 'arm64';
+      fs.rmSync(resourcesDir, { recursive: true, force: true });
+      console.log('✓ Removed existing resources directory');
     } catch (e) {
-      // Ignore parse errors
+      console.warn('Could not remove resources directory:', e.message);
     }
   }
-  
-  // Fall back to host architecture
-  const hostArch = process.arch;
-  if (hostArch === 'arm64') return 'arm64';
-  if (hostArch === 'x64') return 'x64';
-  
-  // Default to host architecture
-  return hostArch;
+  process.exit(0);
 }
 
-// Get architecture name for ffmpeg-static releases
-function getFFmpegArchName(arch) {
-  if (arch === 'arm64') return 'arm64';
-  if (arch === 'x64' || arch === 'x86_64') return 'x64';
-  return arch;
+console.log(`BUNDLE_FFMPEG=true - Bundling ffmpeg binaries for ${targetArch}`);
+console.log(`Host platform: ${process.platform} ${process.arch}, Target: ${targetArch}`);
+
+// Create resources directory
+if (!fs.existsSync(resourcesDir)) {
+  fs.mkdirSync(resourcesDir, { recursive: true });
 }
 
-// Download and decompress gzipped file from URL
-async function downloadFile(url, dest, isGzipped = null) {
+// Helper function to download and decompress gzipped file from URL
+function downloadFile(url, destPath, isGzipped = null) {
   // Track if original URL was gzipped (redirects might lose .gz extension)
   if (isGzipped === null) {
     isGzipped = url.endsWith('.gz');
@@ -56,16 +52,21 @@ async function downloadFile(url, dest, isGzipped = null) {
     https.get(url, (response) => {
       if (response.statusCode === 302 || response.statusCode === 301) {
         // Follow redirect, preserve gzip flag
-        return downloadFile(response.headers.location, dest, isGzipped).then(resolve).catch(reject);
+        const redirectUrl = response.headers.location;
+        if (!redirectUrl) {
+          reject(new Error('Redirect response missing location header'));
+          return;
+        }
+        return downloadFile(redirectUrl, destPath, isGzipped).then(resolve).catch(reject);
       }
+      
       if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download: ${response.statusCode}`));
+        reject(new Error(`Failed to download: HTTP ${response.statusCode}`));
         return;
       }
       
       // Use tracked gzip flag (original URL had .gz)
       // The file content itself is gzipped, we need to decompress it
-      
       if (isGzipped) {
         // Collect all data first, then decompress synchronously
         // (This is more reliable than streaming decompression for gzipped files)
@@ -75,28 +76,29 @@ async function downloadFile(url, dest, isGzipped = null) {
           try {
             const gzippedData = Buffer.concat(chunks);
             const decompressed = zlib.gunzipSync(gzippedData);
-            fs.writeFileSync(dest, decompressed);
-            fs.chmodSync(dest, 0o755);
+            fs.writeFileSync(destPath, decompressed);
+            fs.chmodSync(destPath, 0o755);
             resolve();
           } catch (err) {
-            try { fs.unlinkSync(dest); } catch (e) {}
+            try { fs.unlinkSync(destPath); } catch (e) {}
             reject(new Error(`Failed to decompress: ${err.message}`));
           }
         });
         response.on('error', (err) => {
-          try { fs.unlinkSync(dest); } catch (e) {}
+          try { fs.unlinkSync(destPath); } catch (e) {}
           reject(err);
         });
       } else {
-        // Direct download
-        const file = fs.createWriteStream(dest);
+        // Direct download (not gzipped)
+        const file = fs.createWriteStream(destPath);
         response.pipe(file);
         file.on('finish', () => {
           file.close();
+          fs.chmodSync(destPath, 0o755);
           resolve();
         });
         file.on('error', (err) => {
-          fs.unlinkSync(dest).catch(() => {});
+          try { fs.unlinkSync(destPath); } catch (e) {}
           reject(err);
         });
       }
@@ -106,12 +108,8 @@ async function downloadFile(url, dest, isGzipped = null) {
   });
 }
 
-// Get binary URL for specific architecture
-// ffmpeg-static releases: https://github.com/eugeneware/ffmpeg-static/releases
+// Get the appropriate binary URL based on target architecture
 function getBinaryUrl(binaryName, arch) {
-  const archName = getFFmpegArchName(arch);
-  const platform = 'darwin'; // macOS
-  
   // Get release tag from package.json (e.g., "b6.1.1")
   let releaseTag;
   try {
@@ -134,141 +132,99 @@ function getBinaryUrl(binaryName, arch) {
     releaseTag = 'b6.1.1';
   }
   
-  const baseUrl = 'https://github.com/eugeneware/ffmpeg-static/releases/download';
-  
   if (binaryName === 'ffmpeg') {
-    // ffmpeg-static: b{version}/ffmpeg-darwin-{arch}.gz
-    return `${baseUrl}/${releaseTag}/${binaryName}-${platform}-${archName}.gz`;
+    // URL format: https://github.com/eugeneware/ffmpeg-static/releases/download/{release}/ffmpeg-{platform}-{arch}.gz
+    return `https://github.com/eugeneware/ffmpeg-static/releases/download/${releaseTag}/ffmpeg-darwin-${arch}.gz`;
   } else if (binaryName === 'ffprobe') {
-    // Try ffmpeg-static releases first (some versions bundle ffprobe)
-    // Note: ffprobe might not be in ffmpeg-static releases, so we'll need to handle that
-    return `${baseUrl}/${releaseTag}/${binaryName}-${platform}-${archName}.gz`;
+    // Use ffmpeg-static releases for ffprobe as well (ffprobe-static has incorrect arm64 binary in v3.1.0)
+    return `https://github.com/eugeneware/ffmpeg-static/releases/download/${releaseTag}/ffprobe-darwin-${arch}.gz`;
   }
-  
   return null;
 }
 
-// Copy or download binary for specific architecture
-async function copyOrDownloadBinary(binaryName, targetArch, resourcesDir) {
-  const hostArch = process.arch === 'arm64' ? 'arm64' : 'x64';
-  const dest = path.join(resourcesDir, binaryName);
-  
-  // Normalize architectures for comparison
-  const normalizedTarget = targetArch === 'x86_64' ? 'x64' : targetArch;
-  const normalizedHost = hostArch === 'x86_64' ? 'x64' : hostArch;
-  
-  // If target matches host, use npm package (faster, no download needed)
-  if (normalizedTarget === normalizedHost || (!targetArch && hostArch)) {
-    try {
-      let sourcePath;
-      if (binaryName === 'ffmpeg') {
-        sourcePath = require('ffmpeg-static');
-      } else if (binaryName === 'ffprobe') {
-        const ffprobeStatic = require('ffprobe-static');
-        sourcePath = ffprobeStatic.path || ffprobeStatic;
-      }
-      
-      if (sourcePath && fs.existsSync(sourcePath)) {
-        fs.copyFileSync(sourcePath, dest);
-        fs.chmodSync(dest, 0o755);
-        console.log(`✓ Copied ${binaryName} (${hostArch}) to ${dest}`);
-        return true;
-      }
-    } catch (e) {
-      console.warn(`⚠ Could not use npm package for ${binaryName}, will download:`, e.message);
-    }
-  }
-  
-  // Cross-compilation: download the target architecture binary
-  console.log(`📥 Downloading ${binaryName} for ${targetArch} architecture...`);
-  const url = getBinaryUrl(binaryName, targetArch);
-  
-  if (!url) {
-    throw new Error(`No download URL available for ${binaryName} on ${targetArch}`);
-  }
-  
+let success = true;
+
+// Check if we're cross-compiling or on a non-macOS platform
+// Cross-compiling: building for different arch than host on macOS
+// Non-macOS: building macOS binaries on Linux (e.g., in CI)
+const isCrossCompiling = (process.platform === 'darwin' && targetArch !== process.arch) || process.platform !== 'darwin';
+
+async function copyBinaries() {
+  // Copy or download ffmpeg
   try {
-    await downloadFile(url, dest);
-    fs.chmodSync(dest, 0o755);
-    console.log(`✓ Downloaded ${binaryName} (${targetArch}) to ${dest}`);
+    const ffmpegDest = path.join(resourcesDir, 'ffmpeg');
     
-    // Verify the downloaded file is valid (non-zero size)
-    const stats = fs.statSync(dest);
-    if (stats.size === 0) {
-      throw new Error('Downloaded file is empty');
-    }
-    
-    return true;
-  } catch (e) {
-    // If download fails, provide helpful error message
-    const errorMsg = e.message || String(e);
-    if (errorMsg.includes('404')) {
-      console.error(`✗ Download URL not found (404): ${url}`);
-      console.error(`  This may mean the binary for ${targetArch} is not available in this version.`);
-      throw new Error(`Binary for ${targetArch} architecture not available. Try building on a ${targetArch} machine, or use the lite build (BUNDLE_FFMPEG=false).`);
+    if (isCrossCompiling) {
+      const reason = process.platform !== 'darwin' 
+        ? `non-macOS platform (${process.platform})`
+        : `cross-architecture build (host: ${process.arch}, target: ${targetArch})`;
+      console.log(`Downloading ${targetArch} ffmpeg binary (${reason})`);
+      const ffmpegUrl = getBinaryUrl('ffmpeg', targetArch);
+      if (!ffmpegUrl) {
+        throw new Error(`No ffmpeg binary URL for architecture: ${targetArch}`);
+      }
+      await downloadFile(ffmpegUrl, ffmpegDest);
+      console.log(`✓ Downloaded ffmpeg for ${targetArch} to ${ffmpegDest}`);
     } else {
-      console.error(`✗ Download failed: ${errorMsg}`);
-      throw new Error(`Failed to download ${binaryName} for ${targetArch}: ${errorMsg}`);
+      // Use the locally installed binary
+      const ffmpegPath = require('ffmpeg-static');
+      if (!ffmpegPath) {
+        throw new Error('ffmpeg-static returned null path');
+      }
+      fs.copyFileSync(ffmpegPath, ffmpegDest);
+      fs.chmodSync(ffmpegDest, 0o755);
+      console.log(`✓ Copied ffmpeg to ${ffmpegDest}`);
     }
-  }
-}
-
-const resourcesDir = path.join(__dirname, '..', 'resources');
-
-if (!BUNDLE_FFMPEG) {
-  console.log('BUNDLE_FFMPEG=false - Skipping ffmpeg bundling');
-  console.log('App will use system-installed ffmpeg if available');
-  
-  // Clean up resources directory if it exists
-  if (fs.existsSync(resourcesDir)) {
-    try {
-      fs.rmSync(resourcesDir, { recursive: true, force: true });
-      console.log('✓ Removed existing resources directory');
-    } catch (e) {
-      console.warn('Could not remove resources directory:', e.message);
-    }
-  }
-  process.exit(0);
-}
-
-console.log('BUNDLE_FFMPEG=true - Bundling ffmpeg binaries');
-
-// Detect target architecture
-const targetArch = getTargetArch();
-const hostArch = process.arch === 'arm64' ? 'arm64' : 'x64';
-console.log(`Host architecture: ${hostArch}`);
-console.log(`Target architecture: ${targetArch}`);
-
-// Create resources directory
-if (!fs.existsSync(resourcesDir)) {
-  fs.mkdirSync(resourcesDir, { recursive: true });
-}
-
-// Copy or download binaries
-(async () => {
-  let success = true;
-  
-  try {
-    await copyOrDownloadBinary('ffmpeg', targetArch, resourcesDir);
   } catch (e) {
     console.error('✗ Error getting ffmpeg:', e.message);
     success = false;
   }
-  
+
+  // Copy or download ffprobe
   try {
-    await copyOrDownloadBinary('ffprobe', targetArch, resourcesDir);
+    const ffprobeDest = path.join(resourcesDir, 'ffprobe');
+    
+    if (isCrossCompiling) {
+      // When cross-compiling, download the correct binary for target architecture
+      // Note: ffprobe-static v3.1.0 has incorrect arm64 binary, so we download from ffmpeg-static releases
+      const reason = process.platform !== 'darwin' 
+        ? `non-macOS platform (${process.platform})`
+        : `cross-architecture build (host: ${process.arch}, target: ${targetArch})`;
+      console.log(`Downloading ${targetArch} ffprobe binary (${reason})`);
+      const ffprobeUrl = getBinaryUrl('ffprobe', targetArch);
+      if (!ffprobeUrl) {
+        throw new Error(`No ffprobe binary URL for architecture: ${targetArch}`);
+      }
+      await downloadFile(ffprobeUrl, ffprobeDest);
+      console.log(`✓ Downloaded ffprobe for ${targetArch} to ${ffprobeDest}`);
+    } else {
+      // Use the locally installed binary
+      const ffprobeStatic = require('ffprobe-static');
+      const ffprobePath = ffprobeStatic.path || ffprobeStatic;
+      if (!ffprobePath) {
+        throw new Error('ffprobe-static returned null path');
+      }
+      fs.copyFileSync(ffprobePath, ffprobeDest);
+      fs.chmodSync(ffprobeDest, 0o755);
+      console.log(`✓ Copied ffprobe to ${ffprobeDest}`);
+    }
   } catch (e) {
     console.error('✗ Error getting ffprobe:', e.message);
     success = false;
   }
-  
+
   if (!success) {
     console.error('\n⚠ Some binaries could not be obtained.');
     console.error('   For development builds, ensure ffmpeg-static and ffprobe-static are installed: npm install');
-    console.error('   For distribution builds, binaries will be downloaded automatically.');
+    console.error('   For distribution builds, binaries will be downloaded automatically from GitHub releases.');
     process.exit(1);
   }
-  
-  console.log('\n✓ All binaries copied successfully');
-})();
 
+  console.log('\n✓ All binaries copied successfully');
+}
+
+// Run the main function
+copyBinaries().catch(err => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
