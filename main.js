@@ -8,9 +8,12 @@ let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
 
+// Icon path constant (used in both development and production)
+const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
+
 // Set app icon for development (will be overridden by electron-builder in production)
 function setupAppIcon() {
-  const iconPath = path.join(__dirname, 'build', 'icons', 'icon.icns');
+  const iconPath = ICON_PATH;
   if (fsSync.existsSync(iconPath)) {
     try {
       const icon = nativeImage.createFromPath(iconPath);
@@ -25,7 +28,7 @@ function setupAppIcon() {
 function createWindow() {
   // Set window icon if available
   let windowIcon = null;
-  const iconPath = path.join(__dirname, 'build', 'icons', 'icon.icns');
+  const iconPath = ICON_PATH;
   if (fsSync.existsSync(iconPath)) {
     try {
       windowIcon = nativeImage.createFromPath(iconPath);

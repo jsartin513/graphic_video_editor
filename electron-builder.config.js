@@ -58,7 +58,7 @@ const baseConfig = {
   publish: null,
   mac: {
     category: "public.app-category.video",
-    icon: iconPath,
+    ...(iconPath && { icon: iconPath }), // Only set icon property if iconPath exists
     target: [
       "dmg",
       "zip"

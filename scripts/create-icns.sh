@@ -11,6 +11,7 @@ ICONS_DIR="$PROJECT_ROOT/build/icons"
 declare -a SIZES=(
   "16"
   "32"
+  "64"
   "128"
   "256"
   "512"

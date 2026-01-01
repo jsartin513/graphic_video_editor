@@ -77,6 +77,7 @@ try {
   } catch (rsvgError) {
     // Fallback to qlmanage (may not preserve transparency perfectly)
     console.log('⚠️  rsvg-convert not found, trying qlmanage...');
+    console.log('   Error details:', rsvgError.message || 'rsvg-convert command failed');
     execSync(`qlmanage -t -s 512 -o "${iconsDir}" "${svgPath}"`, { stdio: 'ignore' });
     
     // qlmanage creates a file with a .png extension but keeps original name
@@ -89,13 +90,15 @@ try {
         execSync(`sips -s format png --deleteColorManagementProperties "${png512Path}"`, { stdio: 'ignore' });
       } catch (sipsError) {
         // Ignore if sips command fails
+        console.log('   Warning: Could not optimize PNG with sips:', sipsError.message || 'sips command failed');
       }
       console.log('✅ Created PNG 512x512:', png512Path);
       console.log('   Note: If background is not transparent, install rsvg-convert: brew install librsvg');
     }
   }
 } catch (error) {
-  console.log('⚠️  Could not auto-convert SVG to PNG. You may need to:');
+  console.log('⚠️  Could not auto-convert SVG to PNG. Error:', error.message || 'Unknown error');
+  console.log('   You may need to:');
   console.log('   1. Install rsvg-convert: brew install librsvg');
   console.log('   2. Or manually convert using online tools');
   console.log('   3. Or use the SVG directly (electron-builder can handle SVG)');
@@ -104,5 +107,5 @@ try {
 console.log('\n📝 Next steps:');
 console.log('   1. Review the SVG icon at:', svgPath);
 console.log('   2. If needed, create PNG files at sizes: 512, 256, 128, 64, 32, 16');
-console.log('   3. Create .icns file using: iconutil -c icns build/icons/icon.iconset');
+console.log('   3. Create .icns file using the helper script: ./scripts/create-icns.sh');
 
