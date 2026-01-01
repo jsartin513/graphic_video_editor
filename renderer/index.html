@@ -3,31 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Video Merger - Merge and manage GoPro video files">
+  <meta name="color-scheme" content="light dark">
   <title>Video Merger</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a href="#main-content" class="skip-to-main">Skip to main content</a>
   <div class="app-container">
-    <header class="app-header">
+    <header class="app-header" role="banner">
       <h1>Video Merger</h1>
       <p class="subtitle">Select GoPro video files to merge</p>
     </header>
 
-    <div class="main-content">
+    <main id="main-content" class="main-content" role="main">
       <div class="selection-controls">
-        <button id="selectFilesBtn" class="btn btn-primary">
-          <span class="btn-icon">📁</span>
+        <button id="selectFilesBtn" class="btn btn-primary" aria-label="Select video files">
+          <span class="btn-icon" aria-hidden="true">📁</span>
           Select Files
         </button>
-        <button id="selectFolderBtn" class="btn btn-secondary">
-          <span class="btn-icon">📂</span>
+        <button id="selectFolderBtn" class="btn btn-secondary" aria-label="Select folder containing videos">
+          <span class="btn-icon" aria-hidden="true">📂</span>
           Select Folder
         </button>
       </div>
 
-      <div id="dropZone" class="drop-zone">
+      <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drop zone for video files and folders">
         <div class="drop-zone-content">
-          <div class="drop-zone-icon">📤</div>
+          <div class="drop-zone-icon" aria-hidden="true">📤</div>
           <p class="drop-zone-text">Drag and drop video files or folders here</p>
           <p class="drop-zone-hint">or use the buttons above</p>
         </div>
@@ -36,12 +39,12 @@
       <div id="fileListContainer" class="file-list-container" style="display: none;">
         <div class="file-list-header">
           <h2>Selected Videos</h2>
-          <span id="fileCount" class="file-count">0 files</span>
+          <span id="fileCount" class="file-count" aria-live="polite">0 files</span>
         </div>
-        <div id="fileList" class="file-list"></div>
+        <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">
-          <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;">
-            <span class="btn-icon">▶</span>
+          <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Prepare merge of selected videos">
+            <span class="btn-icon" aria-hidden="true">▶</span>
             Prepare Merge
           </button>
         </div>
@@ -54,7 +57,7 @@
           <p class="preview-subtitle">Review and edit output filenames before merging</p>
         </div>
         
-        <div id="previewList" class="preview-list"></div>
+        <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
         
         <div class="output-destination-section">
           <label class="output-destination-label">Output Destination:</label>
@@ -62,23 +65,23 @@
             <div id="outputDestinationDisplay" class="output-destination-display">
               <span id="outputDestinationPath" class="output-destination-path">Using default location (merged_videos subfolder)</span>
             </div>
-            <button id="selectOutputDestinationBtn" class="btn btn-secondary btn-small">
-              <span class="btn-icon">📁</span>
+            <button id="selectOutputDestinationBtn" class="btn btn-secondary btn-small" aria-label="Choose output folder">
+              <span class="btn-icon" aria-hidden="true">📁</span>
               Choose Folder
             </button>
-            <button id="useDefaultDestinationBtn" class="btn btn-text btn-small" style="display: none;">
+            <button id="useDefaultDestinationBtn" class="btn btn-text btn-small" style="display: none;" aria-label="Use default output destination">
               Use Default
             </button>
           </div>
         </div>
         
         <div class="preview-actions">
-          <button id="backBtn" class="btn btn-secondary">
-            <span class="btn-icon">←</span>
+          <button id="backBtn" class="btn btn-secondary" aria-label="Go back to file selection">
+            <span class="btn-icon" aria-hidden="true">←</span>
             Back
           </button>
-          <button id="mergeBtn" class="btn btn-primary">
-            <span class="btn-icon">🎬</span>
+          <button id="mergeBtn" class="btn btn-primary" aria-label="Start merging videos">
+            <span class="btn-icon" aria-hidden="true">🎬</span>
             Merge Videos
           </button>
         </div>
@@ -88,22 +91,22 @@
       <div id="progressScreen" class="progress-screen" style="display: none;">
         <div class="progress-content">
           <h2>Merging Videos</h2>
-          <div class="progress-bar-container">
+          <div class="progress-bar-container" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Merge progress">
             <div id="progressBar" class="progress-bar"></div>
           </div>
-          <p id="progressText" class="progress-text">Preparing...</p>
-          <div id="progressDetails" class="progress-details"></div>
+          <p id="progressText" class="progress-text" aria-live="polite">Preparing...</p>
+          <div id="progressDetails" class="progress-details" aria-live="polite"></div>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 
   <!-- Split Video Modal -->
-  <div id="splitVideoModal" class="modal-overlay" style="display: none;">
+  <div id="splitVideoModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="splitModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Split Video</h2>
-        <button id="closeSplitModalBtn" class="modal-close-btn">×</button>
+        <h2 id="splitModalTitle">Split Video</h2>
+        <button id="closeSplitModalBtn" class="modal-close-btn" aria-label="Close split video dialog">×</button>
       </div>
       <div class="modal-body">
         <div class="split-video-info">
@@ -111,16 +114,17 @@
           <p><strong>Duration:</strong> <span id="splitVideoDuration"></span></p>
         </div>
         
-        <div class="split-mode-selector">
+        <fieldset class="split-mode-selector">
+          <legend class="sr-only">Split mode</legend>
           <label>
             <input type="radio" name="splitMode" value="uniform" checked>
             Simple: Split into segments of equal duration
           </label>
-        </div>
+        </fieldset>
 
         <div id="uniformSplitSettings" class="split-settings">
           <div class="form-group">
-            <label for="segmentDuration">Duration per segment:</label>
+            <label for="segmentMinutes">Duration per segment:</label>
             <div class="duration-input-group">
               <input type="number" id="segmentMinutes" min="1" max="120" value="20" class="duration-input">
               <span class="duration-label">minutes</span>
@@ -129,23 +133,23 @@
           </div>
           
           <div class="split-preview">
-            <p><strong>Preview:</strong> <span id="splitPreview">Calculating...</span></p>
+            <p><strong>Preview:</strong> <span id="splitPreview" aria-live="polite">Calculating...</span></p>
           </div>
         </div>
 
-        <div id="splitProgress" class="split-progress" style="display: none;">
+        <div id="splitProgress" class="split-progress" style="display: none;" role="status" aria-live="polite">
           <div class="progress-bar-container">
             <div id="splitProgressBar" class="progress-bar"></div>
           </div>
           <p id="splitProgressText" class="progress-text">Splitting...</p>
         </div>
 
-        <div id="splitResult" class="split-result" style="display: none;"></div>
+        <div id="splitResult" class="split-result" style="display: none;" aria-live="polite"></div>
       </div>
       <div class="modal-footer">
-        <button id="cancelSplitBtn" class="btn btn-secondary">Cancel</button>
-        <button id="executeSplitBtn" class="btn btn-primary">
-          <span class="btn-icon">✂️</span>
+        <button id="cancelSplitBtn" class="btn btn-secondary" aria-label="Cancel split operation">Cancel</button>
+        <button id="executeSplitBtn" class="btn btn-primary" aria-label="Execute video split">
+          <span class="btn-icon" aria-hidden="true">✂️</span>
           Split Video
         </button>
       </div>
@@ -153,25 +157,25 @@
   </div>
 
   <!-- Prerequisites Modal -->
-  <div id="prerequisitesModal" class="modal-overlay" style="display: none;">
+  <div id="prerequisitesModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="prerequisitesModalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>⚠️ Prerequisites Required</h2>
+        <h2 id="prerequisitesModalTitle">⚠️ Prerequisites Required</h2>
       </div>
       <div class="modal-body">
         <p>Video Merger requires <strong>ffmpeg</strong> to merge videos, but it's not installed on your system.</p>
         
-        <div id="prerequisitesStatus" class="prerequisites-status">
+        <div id="prerequisitesStatus" class="prerequisites-status" role="status" aria-live="polite">
           <div class="status-item">
-            <span id="ffmpegStatus" class="status-icon">❌</span>
+            <span id="ffmpegStatus" class="status-icon" aria-label="ffmpeg status">❌</span>
             <span>ffmpeg</span>
           </div>
           <div class="status-item">
-            <span id="ffprobeStatus" class="status-icon">❌</span>
+            <span id="ffprobeStatus" class="status-icon" aria-label="ffprobe status">❌</span>
             <span>ffprobe</span>
           </div>
           <div class="status-item">
-            <span id="brewStatus" class="status-icon">❌</span>
+            <span id="brewStatus" class="status-icon" aria-label="Homebrew status">❌</span>
             <span>Homebrew</span>
           </div>
         </div>
@@ -181,8 +185,8 @@
           <div class="install-option">
             <h4>Option 1: Automatic Installation (Recommended)</h4>
             <p>Click the button below to automatically install ffmpeg using Homebrew.</p>
-            <button id="installBtn" class="btn btn-primary">
-              <span class="btn-icon">⬇</span>
+            <button id="installBtn" class="btn btn-primary" aria-label="Install ffmpeg automatically using Homebrew">
+              <span class="btn-icon" aria-hidden="true">⬇</span>
               Install ffmpeg Automatically
             </button>
           </div>
@@ -191,7 +195,7 @@
             <h4>Option 2: Manual Installation</h4>
             <p>Open Terminal and run:</p>
             <code class="install-code">brew install ffmpeg</code>
-            <p class="install-note">If you don't have Homebrew, install it from <a href="https://brew.sh" target="_blank">brew.sh</a></p>
+            <p class="install-note">If you don't have Homebrew, install it from <a href="https://brew.sh" target="_blank" rel="noopener noreferrer">brew.sh</a></p>
           </div>
 
           <div class="install-option">
@@ -201,20 +205,20 @@
           </div>
         </div>
 
-        <div id="installProgress" class="install-progress" style="display: none;">
+        <div id="installProgress" class="install-progress" style="display: none;" role="status" aria-live="polite">
           <div class="progress-bar-container">
             <div id="installProgressBar" class="progress-bar"></div>
           </div>
           <p id="installProgressText" class="progress-text">Installing...</p>
         </div>
 
-        <div id="installResult" class="install-result" style="display: none;"></div>
+        <div id="installResult" class="install-result" style="display: none;" aria-live="polite"></div>
       </div>
       <div class="modal-footer">
-        <button id="checkAgainBtn" class="btn btn-secondary" style="display: none;">
+        <button id="checkAgainBtn" class="btn btn-secondary" style="display: none;" aria-label="Check prerequisites again">
           Check Again
         </button>
-        <button id="closeModalBtn" class="btn btn-secondary">
+        <button id="closeModalBtn" class="btn btn-secondary" aria-label="Close prerequisites dialog and continue anyway">
           Continue Anyway
         </button>
       </div>
