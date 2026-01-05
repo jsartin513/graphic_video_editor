@@ -96,8 +96,7 @@ const extraResourcesList = [];
 if (resourcesExist) {
   extraResourcesList.push({
     from: "resources",
-    to: "resources",
-    filter: ["**/*"]
+    to: "resources"
   });
   console.log('✓ Electron Builder: Including bundled ffmpeg binaries');
 } else {
@@ -116,6 +115,12 @@ if (fs.existsSync(testVideosDir)) {
 }
 
 baseConfig.extraResources = extraResourcesList;
+
+// Workaround: Manually copy resources using afterPack hook
+// This ensures binaries are copied even if extraResources fails
+if (resourcesExist) {
+  baseConfig.afterPack = 'scripts/after-pack.js';
+}
 
 module.exports = baseConfig;
 
