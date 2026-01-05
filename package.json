@@ -22,7 +22,8 @@
     "build:lite:x64": "BUNDLE_FFMPEG=false npm run build:x64",
     "dist": "npm run build",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "verify-build": "node scripts/verify-fat-build.js"
   },
   "keywords": [
     "video",
