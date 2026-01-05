@@ -53,7 +53,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
           TARGET_ARCH: 'x64'
-        run: npm run build:x64
+        run: npm run build:fat:x64
 
       - name: Rename x64 files to include architecture suffix
         run: |
@@ -145,7 +145,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
           TARGET_ARCH: 'arm64'
-        run: npm run build:arm64
+        run: npm run build:fat:arm64
 
       - name: Rename arm64 files to include variant suffix
         run: |
