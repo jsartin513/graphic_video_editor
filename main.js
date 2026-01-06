@@ -521,7 +521,11 @@ function getBundledBinaryPath(binaryName) {
       console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
       console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
       console.log(`[getBundledBinaryPath] process.resourcesPath: ${process.resourcesPath || 'undefined'}`);
-      console.log(`[getBundledBinaryPath] app.getPath('resources'): ${app.getPath('resources')}`);
+      try {
+        console.log(`[getBundledBinaryPath] app.getPath('resources'): ${app.getPath('resources')}`);
+      } catch (e) {
+        console.log(`[getBundledBinaryPath] app.getPath('resources'): Error - ${e.message}`);
+      }
       
       if (fsSync.existsSync(binaryPath)) {
         // Make sure it's executable
@@ -550,11 +554,17 @@ function getBundledBinaryPath(binaryName) {
         // Try alternative locations for debugging
         const altPaths = [
           path.join(resourcesPath, binaryName), // Direct in Resources
-          path.join(app.getPath('resources'), 'resources', binaryName), // Using app.getPath
           process.resourcesPath ? path.join(process.resourcesPath, 'resources', binaryName) : null, // Using process.resourcesPath
-        ].filter(p => p !== null);
+        ];
+        // Try app.getPath('resources') if available
+        try {
+          altPaths.push(path.join(app.getPath('resources'), 'resources', binaryName));
+        } catch (e) {
+          // app.getPath('resources') not available, skip
+        }
+        const validAltPaths = altPaths.filter(p => p !== null);
         
-        for (const altPath of altPaths) {
+        for (const altPath of validAltPaths) {
           if (fsSync.existsSync(altPath)) {
             console.log(`[getBundledBinaryPath] ✅ Found ${binaryName} at alternative location: ${altPath}`);
             try {
