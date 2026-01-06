@@ -162,6 +162,12 @@ ipcMain.handle('select-folder', async () => {
 
 // Handle getting file metadata
 ipcMain.handle('get-file-metadata', async (event, filePath) => {
+  // Validate filePath before processing
+  if (!filePath || typeof filePath !== 'string') {
+    console.error(`Error getting file metadata: invalid filePath (received: ${typeof filePath})`);
+    return null;
+  }
+  
   try {
     const stats = await fs.stat(filePath);
     return {
@@ -304,13 +310,40 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
+    // Filter out macOS metadata files (starting with ._)
+    const validFilePaths = filePaths.filter(filePath => {
+      const filename = path.basename(filePath);
+      return !filename.startsWith('._');
+    });
+    
+    if (validFilePaths.length === 0) {
+      reject(new Error('No valid video files found (all files appear to be macOS metadata files)'));
+      return;
+    }
+    
     // Create temporary file list
     const tempFileList = path.join(path.dirname(outputPath), `filelist_${Date.now()}.txt`);
-    const fileListContent = filePaths.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
+    const fileListContent = validFilePaths.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
     
     fs.writeFile(tempFileList, fileListContent, 'utf8')
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
+        console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        
+        // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
+        const env = { ...process.env };
+        if (ffmpegCmd.includes('.app/Contents/Resources')) {
+          // Bundled binary - remove system PATH to avoid confusion
+          env.PATH = '/usr/bin:/bin';
+        } else {
+          // System binary - keep original PATH
+          env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+        }
+        
+        console.log(`[merge-videos] File list content (first 500 chars):\n${fileListContent.substring(0, 500)}`);
+        console.log(`[merge-videos] Output path: ${outputPath}`);
+        console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
+        
         const ffmpeg = spawn(ffmpegCmd, [
           '-f', 'concat',
           '-safe', '0',
@@ -318,17 +351,36 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           '-c', 'copy',
           outputPath
         ], { 
-          env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+          env
         });
         
         let errorOutput = '';
+        let stdoutOutput = '';
+        let hasTimedOut = false;
+        
+        // Set a timeout for the merge operation (5 minutes max)
+        const timeout = setTimeout(() => {
+          hasTimedOut = true;
+          ffmpeg.kill('SIGTERM');
+          console.error(`[merge-videos] ⚠️  FFmpeg operation timed out after 5 minutes`);
+          reject(new Error('FFmpeg operation timed out. The merge may have failed or is taking too long.'));
+        }, 5 * 60 * 1000);
+        
+        ffmpeg.stdout.on('data', (data) => {
+          stdoutOutput += data.toString();
+        });
         
         ffmpeg.stderr.on('data', (data) => {
-          errorOutput += data.toString();
+          const output = data.toString();
+          errorOutput += output;
+          // Log stderr in real-time for debugging
+          console.log(`[merge-videos] FFmpeg stderr: ${output.trim()}`);
         });
         
         ffmpeg.on('error', (error) => {
+          clearTimeout(timeout);
           fs.unlink(tempFileList).catch(() => {});
+          console.error(`[merge-videos] ⚠️  FFmpeg spawn error:`, error);
           // Handle case where ffmpeg is not found
           if (error.code === 'ENOENT') {
             reject(new Error('ffmpeg not found. Please install ffmpeg using the prerequisites installer or run: brew install ffmpeg'));
@@ -338,12 +390,22 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         });
         
         ffmpeg.on('close', (code) => {
+          clearTimeout(timeout);
           // Clean up temp file
           fs.unlink(tempFileList).catch(() => {});
           
+          if (hasTimedOut) {
+            return; // Already rejected in timeout handler
+          }
+          
+          console.log(`[merge-videos] FFmpeg exited with code: ${code}`);
+          
           if (code === 0) {
+            console.log(`[merge-videos] ✅ Merge completed successfully: ${outputPath}`);
             resolve({ success: true, outputPath });
           } else {
+            console.error(`[merge-videos] ❌ FFmpeg failed with code ${code}`);
+            console.error(`[merge-videos] Error output:\n${errorOutput}`);
             reject(new Error(`ffmpeg failed: ${errorOutput}`));
           }
         });
@@ -479,22 +541,96 @@ ipcMain.handle('check-ffmpeg', async () => {
   return await checkFFmpeg();
 });
 
+// Get path to test videos directory
+ipcMain.handle('get-test-videos-path', async () => {
+  if (app.isPackaged) {
+    const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+    return path.join(resourcesPath, 'test-videos');
+  } else {
+    return path.join(__dirname, 'test-videos');
+  }
+});
+
 // Get the path to bundled ffmpeg/ffprobe binaries
 function getBundledBinaryPath(binaryName) {
   try {
     if (app.isPackaged) {
-      // Packaged app: binaries are typically under <app>.app/Contents/Resources/resources/ (note the nested resources directory)
-      const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+      // Packaged app: binaries are under <app>.app/Contents/Resources/resources/
+      // Use process.resourcesPath which is set by Electron
+      let resourcesPath = process.resourcesPath;
+      
+      // Fallback if process.resourcesPath is not set
+      if (!resourcesPath) {
+        try {
+          resourcesPath = app.getPath('resources');
+        } catch (e) {
+          try {
+            const exePath = app.getPath('exe');
+            resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
+          } catch (exeError) {
+            console.error('[getBundledBinaryPath] Error getting resources path:', e, exeError);
+            resourcesPath = path.join(__dirname, '..');
+          }
+        }
+      }
+      
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
       
+      console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
+      console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
+      console.log(`[getBundledBinaryPath] process.resourcesPath: ${process.resourcesPath || 'undefined'}`);
+      
+      // Check if the binary exists
       if (fsSync.existsSync(binaryPath)) {
         // Make sure it's executable
         try {
           fsSync.chmodSync(binaryPath, 0o755);
+          const stats = fsSync.statSync(binaryPath);
+          console.log(`[getBundledBinaryPath] ✅ Found ${binaryName}: ${binaryPath} (${stats.size} bytes)`);
+          return binaryPath;
         } catch (e) {
-          console.warn(`Failed to set executable permissions on "${binaryPath}":`, e);
+          console.warn(`[getBundledBinaryPath] Failed to set executable permissions on "${binaryPath}":`, e);
+          // Still return the path even if chmod fails
+          return binaryPath;
         }
-        return binaryPath;
+      } else {
+        console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found at ${binaryPath}`);
+        console.log(`[getBundledBinaryPath] Checking if resources directory exists: ${fsSync.existsSync(resourcesPath)}`);
+        if (fsSync.existsSync(resourcesPath)) {
+          const contents = fsSync.readdirSync(resourcesPath);
+          console.log(`[getBundledBinaryPath] Contents of resourcesPath:`, contents);
+          // Check if 'resources' subdirectory exists
+          const resourcesSubdir = path.join(resourcesPath, 'resources');
+          if (fsSync.existsSync(resourcesSubdir)) {
+            console.log(`[getBundledBinaryPath] Found 'resources' subdirectory, contents:`, fsSync.readdirSync(resourcesSubdir));
+          }
+        }
+        // Try alternative locations for debugging
+        const altPaths = [
+          path.join(resourcesPath, binaryName), // Direct in Resources
+          process.resourcesPath ? path.join(process.resourcesPath, 'resources', binaryName) : null, // Using process.resourcesPath
+        ];
+        // Try app.getPath('resources') if available
+        try {
+          altPaths.push(path.join(app.getPath('resources'), 'resources', binaryName));
+        } catch (e) {
+          // app.getPath('resources') not available, skip
+        }
+        const validAltPaths = altPaths.filter(p => p !== null);
+        
+        for (const altPath of validAltPaths) {
+          if (fsSync.existsSync(altPath)) {
+            console.log(`[getBundledBinaryPath] ✅ Found ${binaryName} at alternative location: ${altPath}`);
+            try {
+              fsSync.chmodSync(altPath, 0o755);
+            } catch (e) {
+              console.warn(`[getBundledBinaryPath] Failed to chmod ${altPath}:`, e);
+            }
+            return altPath;
+          }
+        }
+        console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found in any location`);
+        return null;
       }
     } else {
       // Development: use the packages directly
@@ -600,9 +736,15 @@ async function checkFFmpeg() {
     const bundledFFmpeg = getBundledBinaryPath('ffmpeg');
     const bundledFFprobe = getBundledBinaryPath('ffprobe');
     
+    console.log('[checkFFmpeg] Bundled ffmpeg:', bundledFFmpeg);
+    console.log('[checkFFmpeg] Bundled ffprobe:', bundledFFprobe);
+    
     // Then check system binaries
     const foundFFmpegPath = bundledFFmpeg || findSystemExecutablePath('ffmpeg');
     const foundFFprobePath = bundledFFprobe || findSystemExecutablePath('ffprobe');
+    
+    console.log('[checkFFmpeg] Found ffmpeg path:', foundFFmpegPath);
+    console.log('[checkFFmpeg] Found ffprobe path:', foundFFprobePath);
     
     ffmpegPath = foundFFmpegPath;
     ffprobePath = foundFFprobePath;
@@ -617,6 +759,7 @@ async function checkFFmpeg() {
     function checkComplete() {
       checksDone++;
       if (checksDone === 3 && versionCheckDone) {
+        console.log('[checkFFmpeg] Final result - ffmpegFound:', ffmpegFound, 'ffprobeFound:', ffprobeFound, 'installed:', ffmpegFound && ffprobeFound);
         resolve({
           installed: ffmpegFound && ffprobeFound,
           ffmpegFound,
@@ -627,6 +770,80 @@ async function checkFFmpeg() {
       }
     }
     
+    // If we have bundled binaries, test them directly instead of using 'which'
+    if (bundledFFmpeg && bundledFFprobe) {
+      console.log('[checkFFmpeg] Testing bundled binaries directly...');
+      // Test bundled ffmpeg
+      try {
+        const testFFmpeg = spawn(bundledFFmpeg, ['-version'], { timeout: 5000 });
+        let ffmpegOutput = '';
+        testFFmpeg.stdout.on('data', (data) => {
+          ffmpegOutput += data.toString();
+        });
+        testFFmpeg.on('close', (code) => {
+          ffmpegFound = code === 0;
+          if (ffmpegFound) {
+            const match = ffmpegOutput.match(/ffmpeg version (\S+)/);
+            if (match) {
+              ffmpegVersion = match[1];
+            }
+          } else {
+            console.log('[checkFFmpeg] Bundled ffmpeg test failed with code:', code);
+          }
+          
+          // Test bundled ffprobe
+          try {
+            const testFFprobe = spawn(bundledFFprobe, ['-version'], { timeout: 5000 });
+            testFFprobe.on('close', (code) => {
+              ffprobeFound = code === 0;
+              if (!ffprobeFound) {
+                console.log('[checkFFmpeg] Bundled ffprobe test failed with code:', code);
+              }
+              
+              // Check for brew (still needed for install message)
+              const brewCheck = spawn('which', ['brew'], { 
+                shell: true,
+                env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+              });
+              brewCheck.on('close', (code) => {
+                brewFound = code === 0;
+                versionCheckDone = true;
+                checkComplete();
+              });
+              brewCheck.on('error', () => {
+                versionCheckDone = true;
+                checkComplete();
+              });
+            });
+            testFFprobe.on('error', (err) => {
+              console.error('[checkFFmpeg] Error testing bundled ffprobe:', err);
+              ffprobeFound = false;
+              versionCheckDone = true;
+              checkComplete();
+            });
+          } catch (err) {
+            console.error('[checkFFmpeg] Error spawning bundled ffprobe test:', err);
+            ffprobeFound = false;
+            versionCheckDone = true;
+            checkComplete();
+          }
+        });
+        testFFmpeg.on('error', (err) => {
+          console.error('[checkFFmpeg] Error testing bundled ffmpeg:', err);
+          ffmpegFound = false;
+          versionCheckDone = true;
+          checkComplete();
+        });
+      } catch (err) {
+        console.error('[checkFFmpeg] Error spawning bundled ffmpeg test:', err);
+        ffmpegFound = false;
+        versionCheckDone = true;
+        checkComplete();
+      }
+      return; // Exit early, we're testing bundled binaries
+    }
+    
+    // Fallback to system check (only if no bundled binaries)
     // Check ffmpeg
     const ffmpegCheck = spawn('which', ['ffmpeg'], { 
       shell: true,

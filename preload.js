@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFiles: () => ipcRenderer.invoke('select-files'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
-  getFileMetadata: (filePath) => ipcRenderer.invoke('get-file-metadata'),
+  getFileMetadata: (filePath) => ipcRenderer.invoke('get-file-metadata', filePath),
   processDroppedPaths: (paths) => ipcRenderer.invoke('process-dropped-paths', paths),
   analyzeVideos: (filePaths) => ipcRenderer.invoke('analyze-videos', filePaths),
   getVideoDuration: (filePath) => ipcRenderer.invoke('get-video-duration', filePath),
@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
   selectOutputDestination: () => ipcRenderer.invoke('select-output-destination'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+  getTestVideosPath: () => ipcRenderer.invoke('get-test-videos-path'),
   checkFFmpeg: () => ipcRenderer.invoke('check-ffmpeg'),
   installPrerequisites: () => ipcRenderer.invoke('install-prerequisites'),
   onPrerequisitesMissing: (callback) => {

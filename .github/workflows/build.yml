@@ -48,18 +48,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'x64'
+        run: npm run prebuild:x64
+
+      - name: Verify binaries exist
+        run: |
+          if [ ! -f resources/ffmpeg ] || [ ! -f resources/ffprobe ]; then
+            echo "❌ Error: FFmpeg binaries not found in resources/ directory"
+            ls -la resources/ || echo "resources/ directory does not exist"
+            exit 1
+          fi
+          echo "✅ FFmpeg binaries found:"
+          ls -lh resources/ffmpeg resources/ffprobe
+          file resources/ffmpeg resources/ffprobe
+
       - name: Build for x64 (Intel) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
-        run: npm run build:x64
+          TARGET_ARCH: 'x64'
+        run: npm run build:fat:x64
 
       - name: Rename x64 files to include architecture suffix
         run: |
           cd dist
           for file in *.dmg *.zip; do
             if [[ -f "$file" && "$file" != *"arm64"* && "$file" != *"x64"* && "$file" != *"fat"* && "$file" != *"lite"* ]]; then
-              newname="${file%.*}-x64-fat.${file##*.}"
+              ext="${file##*.}"
+              basename="${file%.*}"
+              newname="${basename}-x64-fat.${ext}"
               mv "$file" "$newname" || true
               echo "Renamed $file to $newname"
             fi
@@ -96,6 +117,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
+          TARGET_ARCH: 'x64'
         run: npm run build:x64
 
       - name: Rename x64 files to include architecture suffix
@@ -136,11 +158,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'arm64'
+        run: npm run prebuild:arm64
+
+      - name: Verify binaries exist
+        run: |
+          if [ ! -f resources/ffmpeg ] || [ ! -f resources/ffprobe ]; then
+            echo "❌ Error: FFmpeg binaries not found in resources/ directory"
+            ls -la resources/ || echo "resources/ directory does not exist"
+            exit 1
+          fi
+          echo "✅ FFmpeg binaries found:"
+          ls -lh resources/ffmpeg resources/ffprobe
+          file resources/ffmpeg resources/ffprobe
+
       - name: Build for arm64 (Apple Silicon) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
-        run: npm run build:arm64
+          TARGET_ARCH: 'arm64'
+        run: npm run build:fat:arm64
 
       - name: Rename arm64 files to include variant suffix
         run: |
@@ -185,6 +226,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
+          TARGET_ARCH: 'arm64'
         run: npm run build:arm64
 
       - name: Rename arm64 files to include variant suffix
