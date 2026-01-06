@@ -493,42 +493,73 @@ ipcMain.handle('get-test-videos-path', async () => {
 function getBundledBinaryPath(binaryName) {
   try {
     if (app.isPackaged) {
-      // Packaged app: binaries are typically under <app>.app/Contents/Resources/resources/ (note the nested resources directory)
-      const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+      // Packaged app: binaries are under <app>.app/Contents/Resources/resources/
+      // Try multiple methods to get the Resources path
+      let resourcesPath;
+      try {
+        // Method 1: Use process.resourcesPath (most reliable)
+        if (process.resourcesPath) {
+          resourcesPath = process.resourcesPath;
+        } else {
+          // Method 2: Use app.getPath('resources') (Electron's recommended way)
+          resourcesPath = app.getPath('resources');
+        }
+      } catch (e) {
+        // Method 3: Fallback to manual path construction
+        const exePath = app.getPath('exe');
+        resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
+      }
+      
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
       
       console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
       console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
+      console.log(`[getBundledBinaryPath] process.resourcesPath: ${process.resourcesPath || 'undefined'}`);
+      console.log(`[getBundledBinaryPath] app.getPath('resources'): ${app.getPath('resources')}`);
       
       if (fsSync.existsSync(binaryPath)) {
         // Make sure it's executable
         try {
           fsSync.chmodSync(binaryPath, 0o755);
           const stats = fsSync.statSync(binaryPath);
-          console.log(`[getBundledBinaryPath] Found ${binaryName}: ${binaryPath} (${stats.size} bytes)`);
+          console.log(`[getBundledBinaryPath] ✅ Found ${binaryName}: ${binaryPath} (${stats.size} bytes)`);
+          return binaryPath;
         } catch (e) {
-          console.warn(`Failed to set executable permissions on "${binaryPath}":`, e);
+          console.warn(`[getBundledBinaryPath] Failed to set executable permissions on "${binaryPath}":`, e);
+          // Still return the path even if chmod fails
+          return binaryPath;
         }
-        return binaryPath;
       } else {
-        console.log(`[getBundledBinaryPath] ${binaryName} not found at ${binaryPath}`);
+        console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found at ${binaryPath}`);
         console.log(`[getBundledBinaryPath] Checking if resources directory exists: ${fsSync.existsSync(resourcesPath)}`);
         if (fsSync.existsSync(resourcesPath)) {
-          console.log(`[getBundledBinaryPath] Contents of resourcesPath:`, fsSync.readdirSync(resourcesPath));
+          const contents = fsSync.readdirSync(resourcesPath);
+          console.log(`[getBundledBinaryPath] Contents of resourcesPath:`, contents);
+          // Check if 'resources' subdirectory exists
+          const resourcesSubdir = path.join(resourcesPath, 'resources');
+          if (fsSync.existsSync(resourcesSubdir)) {
+            console.log(`[getBundledBinaryPath] Found 'resources' subdirectory, contents:`, fsSync.readdirSync(resourcesSubdir));
+          }
         }
         // Try alternative locations for debugging
         const altPaths = [
-          path.join(resourcesPath, binaryName),
-          path.join(process.resourcesPath, '..', 'resources', binaryName),
-        ];
+          path.join(resourcesPath, binaryName), // Direct in Resources
+          path.join(app.getPath('resources'), 'resources', binaryName), // Using app.getPath
+          process.resourcesPath ? path.join(process.resourcesPath, 'resources', binaryName) : null, // Using process.resourcesPath
+        ].filter(p => p !== null);
+        
         for (const altPath of altPaths) {
           if (fsSync.existsSync(altPath)) {
-            console.log(`[getBundledBinaryPath] Found ${binaryName} at alternative location: ${altPath}`);
-            fsSync.chmodSync(altPath, 0o755);
+            console.log(`[getBundledBinaryPath] ✅ Found ${binaryName} at alternative location: ${altPath}`);
+            try {
+              fsSync.chmodSync(altPath, 0o755);
+            } catch (e) {
+              console.warn(`[getBundledBinaryPath] Failed to chmod ${altPath}:`, e);
+            }
             return altPath;
           }
         }
-        console.log(`[getBundledBinaryPath] ${binaryName} not found in any location`);
+        console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found in any location`);
       }
     } else {
       // Development: use the packages directly
