@@ -257,6 +257,9 @@ jobs:
     needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write  # Required to create releases
+      id-token: write  # Required for OIDC token
     
     steps:
       - name: Download x64 fat artifacts
@@ -283,20 +286,32 @@ jobs:
           name: Video-Merger-arm64-lite
           path: artifacts/arm64-lite
 
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Artifacts structure ==="
+          find artifacts -type f -name "*" || echo "No artifacts found"
+          echo ""
+          echo "=== x64-fat ==="
+          ls -la artifacts/x64-fat/ || echo "x64-fat directory not found"
+          echo ""
+          echo "=== x64-lite ==="
+          ls -la artifacts/x64-lite/ || echo "x64-lite directory not found"
+          echo ""
+          echo "=== arm64-fat ==="
+          ls -la artifacts/arm64-fat/ || echo "arm64-fat directory not found"
+          echo ""
+          echo "=== arm64-lite ==="
+          ls -la artifacts/arm64-lite/ || echo "arm64-lite directory not found"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/x64-fat/*.dmg
-            artifacts/x64-fat/*.zip
-            artifacts/x64-lite/*.dmg
-            artifacts/x64-lite/*.zip
-            artifacts/arm64-fat/*.dmg
-            artifacts/arm64-fat/*.zip
-            artifacts/arm64-lite/*.dmg
-            artifacts/arm64-lite/*.zip
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false  # Don't fail if some files are missing
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
