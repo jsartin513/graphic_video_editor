@@ -340,6 +340,10 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
         }
         
+        console.log(`[merge-videos] File list content (first 500 chars):\n${fileListContent.substring(0, 500)}`);
+        console.log(`[merge-videos] Output path: ${outputPath}`);
+        console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
+        
         const ffmpeg = spawn(ffmpegCmd, [
           '-f', 'concat',
           '-safe', '0',
@@ -351,13 +355,32 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         });
         
         let errorOutput = '';
+        let stdoutOutput = '';
+        let hasTimedOut = false;
+        
+        // Set a timeout for the merge operation (5 minutes max)
+        const timeout = setTimeout(() => {
+          hasTimedOut = true;
+          ffmpeg.kill('SIGTERM');
+          console.error(`[merge-videos] ⚠️  FFmpeg operation timed out after 5 minutes`);
+          reject(new Error('FFmpeg operation timed out. The merge may have failed or is taking too long.'));
+        }, 5 * 60 * 1000);
+        
+        ffmpeg.stdout.on('data', (data) => {
+          stdoutOutput += data.toString();
+        });
         
         ffmpeg.stderr.on('data', (data) => {
-          errorOutput += data.toString();
+          const output = data.toString();
+          errorOutput += output;
+          // Log stderr in real-time for debugging
+          console.log(`[merge-videos] FFmpeg stderr: ${output.trim()}`);
         });
         
         ffmpeg.on('error', (error) => {
+          clearTimeout(timeout);
           fs.unlink(tempFileList).catch(() => {});
+          console.error(`[merge-videos] ⚠️  FFmpeg spawn error:`, error);
           // Handle case where ffmpeg is not found
           if (error.code === 'ENOENT') {
             reject(new Error('ffmpeg not found. Please install ffmpeg using the prerequisites installer or run: brew install ffmpeg'));
@@ -367,12 +390,22 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         });
         
         ffmpeg.on('close', (code) => {
+          clearTimeout(timeout);
           // Clean up temp file
           fs.unlink(tempFileList).catch(() => {});
           
+          if (hasTimedOut) {
+            return; // Already rejected in timeout handler
+          }
+          
+          console.log(`[merge-videos] FFmpeg exited with code: ${code}`);
+          
           if (code === 0) {
+            console.log(`[merge-videos] ✅ Merge completed successfully: ${outputPath}`);
             resolve({ success: true, outputPath });
           } else {
+            console.error(`[merge-videos] ❌ FFmpeg failed with code ${code}`);
+            console.error(`[merge-videos] Error output:\n${errorOutput}`);
             reject(new Error(`ffmpeg failed: ${errorOutput}`));
           }
         });
