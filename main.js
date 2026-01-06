@@ -496,18 +496,24 @@ function getBundledBinaryPath(binaryName) {
       // Packaged app: binaries are under <app>.app/Contents/Resources/resources/
       // Try multiple methods to get the Resources path
       let resourcesPath;
-      try {
-        // Method 1: Use process.resourcesPath (most reliable)
-        if (process.resourcesPath) {
-          resourcesPath = process.resourcesPath;
-        } else {
+      // Method 1: Use process.resourcesPath (most reliable)
+      if (process.resourcesPath) {
+        resourcesPath = process.resourcesPath;
+      } else {
+        try {
           // Method 2: Use app.getPath('resources') (Electron's recommended way)
           resourcesPath = app.getPath('resources');
+        } catch (e) {
+          // Method 3: Fallback to manual path construction
+          try {
+            const exePath = app.getPath('exe');
+            resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
+          } catch (exeError) {
+            console.error('[getBundledBinaryPath] Error getting paths:', e, exeError);
+            // Last resort: use __dirname (not ideal but might work)
+            resourcesPath = path.join(__dirname, '..');
+          }
         }
-      } catch (e) {
-        // Method 3: Fallback to manual path construction
-        const exePath = app.getPath('exe');
-        resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
       }
       
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
