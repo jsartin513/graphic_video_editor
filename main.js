@@ -162,6 +162,12 @@ ipcMain.handle('select-folder', async () => {
 
 // Handle getting file metadata
 ipcMain.handle('get-file-metadata', async (event, filePath) => {
+  // Validate filePath before processing
+  if (!filePath || typeof filePath !== 'string') {
+    console.error(`Error getting file metadata: invalid filePath (received: ${typeof filePath})`);
+    return null;
+  }
+  
   try {
     const stats = await fs.stat(filePath);
     return {
