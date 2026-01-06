@@ -256,7 +256,8 @@ jobs:
   release:
     needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Run on tag pushes OR pushes to main/master
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch')
     permissions:
       contents: write  # Required to create releases
       id-token: write  # Required for OIDC token
@@ -303,14 +304,37 @@ jobs:
           echo "=== arm64-lite ==="
           ls -la artifacts/arm64-lite/ || echo "arm64-lite directory not found"
 
+      - name: Determine release tag and name
+        id: release
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Use the tag as the release tag
+            TAG_NAME="${{ github.ref_name }}"
+            RELEASE_NAME="Release ${{ github.ref_name }}"
+            IS_PRERELEASE="false"
+          else
+            # Use commit SHA for push to main
+            TAG_NAME="v${{ github.run_number }}-${{ github.sha }}"
+            RELEASE_NAME="Build from main (${{ github.sha }} - Run #${{ github.run_number }})"
+            IS_PRERELEASE="true"
+          fi
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+          echo "prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          echo "Tag: ${TAG_NAME}"
+          echo "Release name: ${RELEASE_NAME}"
+          echo "Prerelease: ${IS_PRERELEASE}"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.release.outputs.tag_name }}
+          name: ${{ steps.release.outputs.release_name }}
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.zip
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.release.outputs.prerelease }}
           fail_on_unmatched_files: false  # Don't fail if some files are missing
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
