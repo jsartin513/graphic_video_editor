@@ -25,12 +25,27 @@ exports.default = async function(context) {
   const resourcesDest = path.join(appOutDir, appBundle, 'Contents', 'Resources', 'resources');
   
   console.log(`[afterPack] Copying resources from ${resourcesSrc} to ${resourcesDest}`);
+  console.log(`[afterPack] projectDir: ${projectDir}`);
+  console.log(`[afterPack] appOutDir: ${appOutDir}`);
   
   // Check if source exists
   if (!fs.existsSync(resourcesSrc)) {
-    console.warn(`[afterPack] Warning: resources directory not found at ${resourcesSrc}`);
-    return;
+    console.error(`[afterPack] ❌ ERROR: resources directory not found at ${resourcesSrc}`);
+    console.error(`[afterPack] Current working directory: ${process.cwd()}`);
+    console.error(`[afterPack] Listing projectDir contents:`, fs.existsSync(projectDir) ? fs.readdirSync(projectDir) : 'projectDir does not exist');
+    throw new Error(`Resources directory not found at ${resourcesSrc}. Make sure prebuild script ran successfully.`);
   }
+  
+  // Verify binaries exist before copying
+  const ffmpegSrc = path.join(resourcesSrc, 'ffmpeg');
+  const ffprobeSrc = path.join(resourcesSrc, 'ffprobe');
+  if (!fs.existsSync(ffmpegSrc)) {
+    throw new Error(`FFmpeg binary not found at ${ffmpegSrc}`);
+  }
+  if (!fs.existsSync(ffprobeSrc)) {
+    throw new Error(`FFprobe binary not found at ${ffprobeSrc}`);
+  }
+  console.log(`[afterPack] ✅ Source binaries verified`);
   
   // Create destination directory
   if (!fs.existsSync(resourcesDest)) {

@@ -48,6 +48,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'x64'
+        run: npm run prebuild:x64
+
+      - name: Verify binaries exist
+        run: |
+          if [ ! -f resources/ffmpeg ] || [ ! -f resources/ffprobe ]; then
+            echo "❌ Error: FFmpeg binaries not found in resources/ directory"
+            ls -la resources/ || echo "resources/ directory does not exist"
+            exit 1
+          fi
+          echo "✅ FFmpeg binaries found:"
+          ls -lh resources/ffmpeg resources/ffprobe
+          file resources/ffmpeg resources/ffprobe
+
       - name: Build for x64 (Intel) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -139,6 +157,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'arm64'
+        run: npm run prebuild:arm64
+
+      - name: Verify binaries exist
+        run: |
+          if [ ! -f resources/ffmpeg ] || [ ! -f resources/ffprobe ]; then
+            echo "❌ Error: FFmpeg binaries not found in resources/ directory"
+            ls -la resources/ || echo "resources/ directory does not exist"
+            exit 1
+          fi
+          echo "✅ FFmpeg binaries found:"
+          ls -lh resources/ffmpeg resources/ffprobe
+          file resources/ffmpeg resources/ffprobe
 
       - name: Build for arm64 (Apple Silicon) - Fat Build
         env:
