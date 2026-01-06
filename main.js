@@ -304,13 +304,36 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
+    // Filter out macOS metadata files (starting with ._)
+    const validFilePaths = filePaths.filter(filePath => {
+      const filename = path.basename(filePath);
+      return !filename.startsWith('._');
+    });
+    
+    if (validFilePaths.length === 0) {
+      reject(new Error('No valid video files found (all files appear to be macOS metadata files)'));
+      return;
+    }
+    
     // Create temporary file list
     const tempFileList = path.join(path.dirname(outputPath), `filelist_${Date.now()}.txt`);
-    const fileListContent = filePaths.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
+    const fileListContent = validFilePaths.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
     
     fs.writeFile(tempFileList, fileListContent, 'utf8')
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
+        console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        
+        // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
+        const env = { ...process.env };
+        if (ffmpegCmd.includes('.app/Contents/Resources')) {
+          // Bundled binary - remove system PATH to avoid confusion
+          env.PATH = '/usr/bin:/bin';
+        } else {
+          // System binary - keep original PATH
+          env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+        }
+        
         const ffmpeg = spawn(ffmpegCmd, [
           '-f', 'concat',
           '-safe', '0',
@@ -318,7 +341,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           '-c', 'copy',
           outputPath
         ], { 
-          env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+          env
         });
         
         let errorOutput = '';
@@ -568,6 +591,7 @@ function getBundledBinaryPath(binaryName) {
           }
         }
         console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found in any location`);
+        return null;
       }
     } else {
       // Development: use the packages directly
