@@ -8,8 +8,10 @@ This document captures important lessons learned about building and releasing th
 2. [FAT Builds and Cross-Compilation](#fat-builds-and-cross-compilation)
 3. [FFmpeg Binary Bundling](#ffmpeg-binary-bundling)
 4. [GitHub Actions Release Workflow](#github-actions-release-workflow)
-5. [Troubleshooting](#troubleshooting)
-6. [Best Practices](#best-practices)
+5. [Testing Strategy](#testing-strategy)
+6. [Auto-Update Configuration](#auto-update-configuration)
+7. [Troubleshooting](#troubleshooting)
+8. [Best Practices](#best-practices)
 
 ## Build Types
 
@@ -184,6 +186,315 @@ Releases from pushes vs tags need different naming:
       IS_PRERELEASE="true"
     fi
 ```
+
+## Testing Strategy
+
+### Jest Setup
+
+The project uses Jest for unit testing. Tests are located in `__tests__/` directory.
+
+**Configuration**: Jest is configured in `package.json` with defaults that work well for Node.js modules.
+
+**Test Scripts**:
+```json
+"test": "jest",
+"test:watch": "jest --watch"
+```
+
+### Test Structure
+
+Tests are organized in the `__tests__/` directory:
+
+```
+__tests__/
+  └── video-grouping.test.js   # Tests for src/video-grouping.js
+```
+
+**Note**: Additional test files can be added as needed (e.g., `format-utils.test.js` for formatting utilities).
+
+### Writing Tests
+
+**Example Test File** (`__tests__/video-grouping.test.js`):
+
+```javascript
+const { extractSessionId, analyzeAndGroupVideos } = require('../src/video-grouping');
+const path = require('path');
+
+describe('extractSessionId', () => {
+  test('extracts session ID from GX pattern', () => {
+    expect(extractSessionId('GX010001.MP4')).toBe('0001');
+  });
+
+  test('returns null for non-GoPro files', () => {
+    expect(extractSessionId('video.mp4')).toBeNull();
+  });
+});
+
+describe('analyzeAndGroupVideos', () => {
+  test('groups files by session ID from same directory', () => {
+    const filePaths = [
+      '/videos/folder1/GX010001.MP4',
+      '/videos/folder1/GX020001.MP4',
+    ];
+    const result = analyzeAndGroupVideos(filePaths);
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0001');
+  });
+});
+```
+
+### Testing Patterns
+
+1. **Test Pure Functions**: Focus on pure functions that are easy to test
+   - Example: `extractSessionId`, `formatBytes`, `analyzeAndGroupVideos`
+
+2. **Extract Testable Code**: Extract business logic from Electron-specific code
+   - `src/video-grouping.js` - extracted from `main.js` for testability
+   - `src/format-utils.js` - extracted for reusability and testing
+
+3. **Test Edge Cases**: Cover edge cases and error conditions
+   - Invalid inputs (null, undefined, empty strings)
+   - Boundary conditions
+   - Different file naming patterns
+
+4. **Use Descriptive Test Names**: Test names should clearly describe what they're testing
+   - ✅ Good: `'groups files by session ID from same directory'`
+   - ❌ Bad: `'test 1'`
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (reruns on file changes)
+npm run test:watch
+
+# Run specific test file
+npm test video-grouping.test.js
+
+# Run with coverage
+npm test -- --coverage
+```
+
+### What to Test
+
+**✅ Good candidates for testing:**
+- Pure functions (no side effects)
+- Business logic (video grouping, session ID extraction)
+- Utility functions (formatting, validation)
+- Data transformations
+
+**❌ Harder to test (avoid initially):**
+- Electron IPC handlers (requires mocking Electron APIs)
+- File system operations (requires test fixtures)
+- UI interactions (requires rendering tests)
+
+### Test Best Practices
+
+1. **Keep tests simple and focused** - One assertion per test when possible
+2. **Use descriptive names** - Test names should read like documentation
+3. **Test behavior, not implementation** - Test what the function does, not how
+4. **Mock external dependencies** - Don't rely on actual file system or network
+5. **Test edge cases** - Null, undefined, empty strings, boundary values
+6. **Run tests before commits** - Catch issues early
+
+### Example: Testing Format Utilities
+
+```javascript
+const { formatBytes } = require('../src/format-utils');
+
+describe('formatBytes', () => {
+  test('formats zero bytes', () => {
+    expect(formatBytes(0)).toBe('0 Bytes');
+  });
+
+  test('formats bytes', () => {
+    expect(formatBytes(500)).toBe('500 Bytes');
+  });
+
+  test('formats kilobytes', () => {
+    expect(formatBytes(1024)).toBe('1 KB');
+  });
+
+  test('handles invalid input', () => {
+    expect(formatBytes(null)).toBe('0 Bytes');
+    expect(formatBytes(undefined)).toBe('0 Bytes');
+    expect(formatBytes(NaN)).toBe('0 Bytes');
+  });
+});
+```
+
+## Auto-Update Configuration
+
+### Overview
+
+The app has `electron-updater` installed and basic infrastructure, but auto-updates are currently disabled in production builds. This section explains how to enable them.
+
+### Current Status
+
+- ✅ `electron-updater` package installed
+- ✅ Basic IPC handlers in place
+- ✅ UI notification system ready
+- ❌ Auto-updates disabled (`app.isPackaged` check prevents running in production)
+- ❌ Release metadata not being generated
+
+### Prerequisites
+
+1. **GitHub Releases**: Auto-updates require GitHub Releases with proper metadata
+2. **Code Signing** (Recommended): Unsigned apps may have issues on macOS
+3. **Release Metadata**: Electron Builder needs to generate `latest-mac.yml` files
+
+### Enabling Auto-Updates
+
+#### Step 1: Update `electron-builder.config.js`
+
+```javascript
+const baseConfig = {
+  // ... existing config ...
+  publish: {
+    provider: 'github',
+    owner: 'jsartin513',
+    repo: 'graphic_video_editor',
+    releaseType: 'release'
+  }
+};
+```
+
+**Note**: You can make this conditional:
+```javascript
+publish: process.env.PUBLISH_TO_GITHUB === 'true' ? {
+  provider: 'github',
+  // ... config ...
+} : null
+```
+
+#### Step 2: Generate Update Metadata
+
+Electron Builder automatically generates `latest-mac.yml` when publishing. Ensure your GitHub Actions workflow:
+
+1. Uploads `latest-mac.yml` files as artifacts
+2. Includes them in the release
+
+Example workflow step:
+```yaml
+- name: Upload update metadata
+  uses: actions/upload-artifact@v4
+  with:
+    name: latest-mac-yml
+    path: dist/latest-mac.yml
+```
+
+#### Step 3: Enable in `main.js`
+
+Remove or modify the `app.isPackaged` check:
+
+```javascript
+// Current (disabled):
+if (app.isPackaged) {
+  autoUpdater.checkForUpdatesAndNotify();
+}
+
+// To enable:
+autoUpdater.checkForUpdatesAndNotify();
+```
+
+#### Step 4: Configure Update Checks
+
+```javascript
+const { autoUpdater } = require('electron-updater');
+
+// Check for updates on app startup (if enabled)
+if (app.isPackaged && process.env.NODE_ENV === 'production') {
+  // Check immediately
+  autoUpdater.checkForUpdatesAndNotify();
+  
+  // Then check every 4 hours
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify();
+  }, 4 * 60 * 60 * 1000);
+}
+```
+
+### Update Flow
+
+1. **Check for Updates**: App calls `autoUpdater.checkForUpdatesAndNotify()`
+2. **Download**: If update available, downloads in background
+3. **Notify User**: Shows notification when download completes
+4. **Install**: User clicks "Install Update" → App quits and installs
+5. **Restart**: App restarts with new version
+
+### IPC Handlers (Already Implemented)
+
+The app already has IPC handlers for manual update checks:
+
+```javascript
+// In main.js
+ipcMain.handle('check-for-updates', async () => {
+  return await autoUpdater.checkForUpdatesAndNotify();
+});
+
+// In preload.js
+checkForUpdates: () => ipcRenderer.invoke('check-for-updates')
+```
+
+### UI Integration
+
+The renderer has `updateNotification.js` module that:
+- Shows update available notifications
+- Displays download progress
+- Provides install/restart buttons
+
+### Security Considerations
+
+1. **Code Signing**: Required for auto-updates on macOS
+   - Get Apple Developer account ($99/year)
+   - Sign app with Developer ID certificate
+   - Notarize with Apple
+
+2. **HTTPS Only**: Updates must be served over HTTPS (GitHub Releases provides this)
+
+3. **Verify Updates**: Electron-updater verifies update signatures automatically
+
+### Testing Auto-Updates
+
+**Option 1: Local Testing**
+1. Build app with version 1.0.0
+2. Create release on GitHub
+3. Build app with version 1.0.1
+4. Install 1.0.0 version
+5. It should detect and download 1.0.1
+
+**Option 2: Beta Channel**
+- Use prereleases for testing
+- Configure auto-updater to check prereleases
+
+### Troubleshooting
+
+**Updates not detected:**
+- Check `latest-mac.yml` is in release
+- Verify publish configuration in `electron-builder.config.js`
+- Check network connectivity
+- Review console logs for errors
+
+**"Update not available" when it should be:**
+- Check version numbers (must be higher)
+- Verify release is published (not draft)
+- Check `latest-mac.yml` format is correct
+
+**Download fails:**
+- Check file permissions
+- Verify disk space
+- Check network connectivity
+
+### Current Recommendation
+
+**Keep auto-updates disabled** until:
+1. App is code-signed
+2. Release process is stable
+3. You want automatic distribution
+
+**For now**: Users can manually download from GitHub Releases page.
 
 ## Troubleshooting
 
