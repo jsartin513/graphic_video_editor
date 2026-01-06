@@ -494,23 +494,19 @@ function getBundledBinaryPath(binaryName) {
   try {
     if (app.isPackaged) {
       // Packaged app: binaries are under <app>.app/Contents/Resources/resources/
-      // Try multiple methods to get the Resources path
-      let resourcesPath;
-      // Method 1: Use process.resourcesPath (most reliable)
-      if (process.resourcesPath) {
-        resourcesPath = process.resourcesPath;
-      } else {
+      // Use process.resourcesPath which is set by Electron
+      let resourcesPath = process.resourcesPath;
+      
+      // Fallback if process.resourcesPath is not set
+      if (!resourcesPath) {
         try {
-          // Method 2: Use app.getPath('resources') (Electron's recommended way)
           resourcesPath = app.getPath('resources');
         } catch (e) {
-          // Method 3: Fallback to manual path construction
           try {
             const exePath = app.getPath('exe');
             resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
           } catch (exeError) {
-            console.error('[getBundledBinaryPath] Error getting paths:', e, exeError);
-            // Last resort: use __dirname (not ideal but might work)
+            console.error('[getBundledBinaryPath] Error getting resources path:', e, exeError);
             resourcesPath = path.join(__dirname, '..');
           }
         }
@@ -521,12 +517,8 @@ function getBundledBinaryPath(binaryName) {
       console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
       console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
       console.log(`[getBundledBinaryPath] process.resourcesPath: ${process.resourcesPath || 'undefined'}`);
-      try {
-        console.log(`[getBundledBinaryPath] app.getPath('resources'): ${app.getPath('resources')}`);
-      } catch (e) {
-        console.log(`[getBundledBinaryPath] app.getPath('resources'): Error - ${e.message}`);
-      }
       
+      // Check if the binary exists
       if (fsSync.existsSync(binaryPath)) {
         // Make sure it's executable
         try {
