@@ -305,12 +305,24 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     // Show progress screen
     showProgressScreen();
     
+    // Set up real-time progress listener (will be used during merge)
+    let currentGroupIndex = 0;
+    let currentGroup = null;
+    const progressListener = (progressData) => {
+      if (currentGroup) {
+        updateRealTimeProgress(currentGroupIndex, state.videoGroups.length, currentGroup, progressData);
+      }
+    };
+    window.electronAPI.onMergeProgress(progressListener);
+    
     const results = [];
     let completed = 0;
     
     for (let i = 0; i < state.videoGroups.length; i++) {
       const group = state.videoGroups[i];
       const outputPath = outputDir + '/' + group.outputFilename;
+      currentGroupIndex = i;
+      currentGroup = group;
       
       updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
       
@@ -326,6 +338,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       }
     }
     
+    // Clean up progress listener
+    currentGroup = null;
+    window.electronAPI.removeMergeProgressListener();
+    
     updateProgress(state.videoGroups.length, state.videoGroups.length, 'All videos processed');
     
     // Show results
@@ -340,10 +356,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressBar.style.width = '0%';
   }
 
-  // Update progress
+  // Update progress (group-level)
   function updateProgress(current, total, message) {
-    const percentage = Math.min((current / total) * 100, 100);
-    progressBar.style.width = `${percentage}%`;
+    // Base progress: percentage of groups completed
+    const basePercentage = Math.min((current / total) * 100, 100);
+    progressBar.style.width = `${basePercentage}%`;
     progressText.textContent = message;
     
     const details = [];
@@ -354,6 +371,52 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     if (details.length > 0) {
       progressDetails.innerHTML = details.join('<br>');
     }
+  }
+  
+  // Update real-time progress during current merge
+  function updateRealTimeProgress(currentGroupIndex, totalGroups, group, progressData) {
+    if (!progressData) return;
+    
+    // Base progress: percentage of groups completed
+    const baseProgress = currentGroupIndex / totalGroups;
+    
+    // Current merge progress: percentage within current group (if we have percent)
+    let mergeProgress = 0;
+    if (progressData.percent !== null && progressData.percent !== undefined) {
+      mergeProgress = progressData.percent / 100;
+    }
+    
+    // Combined progress
+    const totalProgress = (baseProgress + (mergeProgress / totalGroups)) * 100;
+    progressBar.style.width = `${Math.min(totalProgress, 100)}%`;
+    
+    // Update progress text with real-time info
+    let progressMessage = `Merging Session ${group.sessionId}...`;
+    if (progressData.timeStr) {
+      progressMessage = `Merging Session ${group.sessionId} (${progressData.timeStr}`;
+      if (progressData.totalDuration > 0) {
+        const totalHours = Math.floor(progressData.totalDuration / 3600);
+        const totalMinutes = Math.floor((progressData.totalDuration % 3600) / 60);
+        const totalSeconds = Math.floor(progressData.totalDuration % 60);
+        let totalTimeStr;
+        if (totalHours > 0) {
+          totalTimeStr = `${totalHours}:${totalMinutes.toString().padStart(2, '0')}:${totalSeconds.toString().padStart(2, '0')}`;
+        } else {
+          totalTimeStr = `${totalMinutes}:${totalSeconds.toString().padStart(2, '0')}`;
+        }
+        progressMessage += ` / ${totalTimeStr}`;
+        
+        if (progressData.percent !== null) {
+          progressMessage += ` - ${Math.round(progressData.percent)}%`;
+        }
+        
+        if (progressData.etaStr) {
+          progressMessage += ` - ETA: ${progressData.etaStr}`;
+        }
+      }
+      progressMessage += ')';
+    }
+    progressText.textContent = progressMessage;
   }
 
   // Show merge results
