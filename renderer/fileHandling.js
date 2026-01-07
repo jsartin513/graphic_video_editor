@@ -62,12 +62,64 @@ export function initializeFileHandling(state, domElements) {
   }
 
   function addFiles(newFiles) {
+    const duplicates = [];
+    const added = [];
+    const fileNameMap = new Map(); // filename -> full path
+    
+    // Build map of existing filenames
+    for (const existingFile of state.selectedFiles) {
+      const fileName = getFileName(existingFile);
+      if (!fileNameMap.has(fileName)) {
+        fileNameMap.set(fileName, []);
+      }
+      fileNameMap.get(fileName).push(existingFile);
+    }
+    
+    // Check for duplicates and add new files
     for (const file of newFiles) {
-      if (!state.selectedFiles.includes(file)) {
+      // Skip if exact path already exists
+      if (state.selectedFiles.includes(file)) {
+        continue;
+      }
+      
+      const fileName = getFileName(file);
+      const existingPaths = fileNameMap.get(fileName) || [];
+      
+      if (existingPaths.length > 0) {
+        // Duplicate filename detected
+        duplicates.push({
+          newFile: file,
+          fileName: fileName,
+          existingFiles: existingPaths
+        });
+      } else {
+        // No duplicate, add file
         state.selectedFiles.push(file);
+        if (!fileNameMap.has(fileName)) {
+          fileNameMap.set(fileName, []);
+        }
+        fileNameMap.get(fileName).push(file);
+        added.push(file);
       }
     }
-    updateFileList();
+    
+    // Show error if duplicates found
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map(d => d.fileName).join(', ');
+      const message = duplicates.length === 1
+        ? `File "${duplicateNames}" is already in the list. Each file must have a unique name.`
+        : `Files with duplicate names detected: ${duplicateNames}. Each file must have a unique name.`;
+      
+      alert(message);
+      
+      // Optionally still add files with a suffix to make them unique
+      // For now, we'll just show the error and not add duplicates
+    }
+    
+    // Update UI only if files were added
+    if (added.length > 0 || duplicates.length === 0) {
+      updateFileList();
+    }
   }
 
   function removeFile(filePath) {
