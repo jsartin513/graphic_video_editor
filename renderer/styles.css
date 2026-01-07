@@ -210,6 +210,28 @@ body {
   font-size: 18px;
 }
 
+/* Keyboard shortcut hints in buttons */
+.btn kbd,
+.btn .keyboard-hint {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-left: 4px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Courier New', monospace;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  opacity: 0.8;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn kbd,
+  .btn .keyboard-hint {
+    background: rgba(255, 255, 255, 0.15);
+  }
+}
+
 .drop-zone {
   border: 3px dashed var(--border-tertiary);
   border-radius: 12px;
