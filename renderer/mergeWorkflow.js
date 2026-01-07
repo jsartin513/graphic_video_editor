@@ -25,6 +25,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   async function loadUserPreferences() {
     try {
       userPreferences = await window.electronAPI.loadPreferences();
+      if (userPreferences && userPreferences.preferredQuality) {
+        selectedQuality = userPreferences.preferredQuality;
+      }
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
@@ -32,6 +35,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   
   // Initialize preferences
   loadUserPreferences();
+  
+  // Quality selection state
+  let selectedQuality = 'copy'; // Default to copy (fastest)
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -71,6 +77,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       
       // Show preview screen
       showPreviewScreen();
+      
+      // Load and set quality preference
+      if (userPreferences && userPreferences.preferredQuality) {
+        const qualitySelect = document.getElementById('qualitySelect');
+        if (qualitySelect) {
+          qualitySelect.value = userPreferences.preferredQuality;
+          selectedQuality = userPreferences.preferredQuality;
+        }
+      }
     } catch (error) {
       console.error('Error preparing merge:', error);
       alert('Error analyzing videos: ' + error.message);
@@ -315,7 +330,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
@@ -525,6 +540,20 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     });
   }
 
+  // Quality selector change handler
+  const qualitySelect = document.getElementById('qualitySelect');
+  if (qualitySelect) {
+    qualitySelect.addEventListener('change', async (e) => {
+      selectedQuality = e.target.value;
+      // Save preference
+      try {
+        await window.electronAPI.setPreferredQuality(selectedQuality);
+      } catch (error) {
+        console.error('Error saving quality preference:', error);
+      }
+    });
+  }
+  
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);

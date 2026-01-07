@@ -260,6 +260,7 @@ const {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredQuality,
   applyDateTokens
 } = require('./src/preferences');
 
@@ -317,7 +318,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy') => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
@@ -352,14 +353,41 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         console.log(`[merge-videos] File list content (first 500 chars):\n${fileListContent.substring(0, 500)}`);
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
+        console.log(`[merge-videos] Quality option: ${qualityOption}`);
         
-        const ffmpeg = spawn(ffmpegCmd, [
+        // Build ffmpeg command based on quality option
+        const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
-          '-i', tempFileList,
-          '-c', 'copy',
-          outputPath
-        ], { 
+          '-i', tempFileList
+        ];
+        
+        if (qualityOption === 'copy') {
+          // Fast copy mode (no re-encoding)
+          ffmpegArgs.push('-c', 'copy');
+        } else {
+          // Re-encode with quality settings
+          const qualitySettings = {
+            'high': { crf: '18', preset: 'slow' },
+            'medium': { crf: '23', preset: 'medium' },
+            'low': { crf: '28', preset: 'fast' }
+          };
+          
+          const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
+          
+          // Video codec settings
+          ffmpegArgs.push(
+            '-c:v', 'libx264',
+            '-crf', settings.crf,
+            '-preset', settings.preset,
+            '-c:a', 'aac',
+            '-b:a', '192k'
+          );
+        }
+        
+        ffmpegArgs.push(outputPath);
+        
+        const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
         });
         
