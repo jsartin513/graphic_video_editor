@@ -206,10 +206,7 @@ function handleKeyboardEvent(event, domElements, handlers, platform) {
     }
   }
   
-  if (handled) {
-    // Provide feedback that shortcut was triggered (for debugging)
-    console.log(`Keyboard shortcut triggered: ${key}`);
-  }
+  // Note: Keyboard shortcut feedback could be added here for debugging if needed
 }
 
 /**

@@ -111,7 +111,7 @@ const keyboardHandlers = {
   },
   savePreferences: () => {
     // Placeholder for future preferences saving functionality
-    console.log('Save preferences shortcut triggered (not yet implemented)');
+    // This shortcut is reserved but not yet implemented
   }
 };
 
