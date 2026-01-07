@@ -301,10 +301,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   }
 
-  // Handle Merge button (merge all groups)
+  // Handle Merge button (merge selected groups)
   async function handleMerge() {
-    // Merge all groups
-    await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
+    // Merge selected groups from state
+    await handleBatchMerge();
   }
   
   // Handle Merge Selected button (batch merge)
@@ -352,22 +352,22 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       const group = state.videoGroups[index];
       const outputPath = outputDir + '/' + group.outputFilename;
       
-      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
+      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       
       try {
         await window.electronAPI.mergeVideos(group.files, outputPath);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
-        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
         results.push({ success: false, sessionId: group.sessionId, error: error.message });
         failed++;
-        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
         
         // Stop on error if configured
         if (state.stopOnError) {
-          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`);
+          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`, indicesToMerge);
           break;
         }
       }
@@ -376,7 +376,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     const statusText = failed > 0 
       ? `Batch complete: ${completed} succeeded, ${failed} failed`
       : `All ${completed} videos processed successfully`;
-    updateProgress(indicesToMerge.length, indicesToMerge.length, statusText);
+    updateProgress(indicesToMerge.length, indicesToMerge.length, statusText, indicesToMerge);
     
     // Show results
     showMergeResults(results, outputDir);
@@ -387,25 +387,18 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     const selectedCount = state.selectedGroups.size;
     const totalCount = state.videoGroups.length;
     
-    // Update merge button text
+    // Update merge button text and state
     const mergeBtn = document.getElementById('mergeBtn');
     if (mergeBtn) {
-      if (selectedCount === totalCount) {
-        mergeBtn.textContent = 'Merge All Videos';
-      } else if (selectedCount > 0) {
-        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
-      } else {
+      if (selectedCount === 0) {
         mergeBtn.textContent = 'Merge Videos';
-      }
-    }
-    
-    // Show/hide merge selected button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      if (selectedCount > 0 && selectedCount < totalCount) {
-        mergeSelectedBtn.style.display = 'inline-flex';
+        mergeBtn.disabled = true;
+      } else if (selectedCount === totalCount) {
+        mergeBtn.textContent = 'Merge All Videos';
+        mergeBtn.disabled = false;
       } else {
-        mergeSelectedBtn.style.display = 'none';
+        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
+        mergeBtn.disabled = false;
       }
     }
   }
@@ -419,18 +412,22 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   }
 
   // Update progress
-  function updateProgress(current, total, message) {
+  function updateProgress(current, total, message, indicesToMerge = []) {
     const percentage = Math.min((current / total) * 100, 100);
     progressBar.style.width = `${percentage}%`;
     progressText.textContent = message;
     
-    const details = [];
-    for (let i = 0; i < current && i < state.videoGroups.length; i++) {
-      const status = i < current - 1 ? '✓' : '⏳';
-      details.push(`${status} Session ${state.videoGroups[i].sessionId}`);
-    }
-    if (details.length > 0) {
-      progressDetails.innerHTML = details.join('<br>');
+    // Show progress details for the groups being merged
+    if (indicesToMerge.length > 0) {
+      const details = [];
+      for (let i = 0; i < current && i < indicesToMerge.length; i++) {
+        const groupIndex = indicesToMerge[i];
+        const status = i < current - 1 ? '✓' : '⏳';
+        details.push(`${status} Session ${state.videoGroups[groupIndex].sessionId}`);
+      }
+      if (details.length > 0) {
+        progressDetails.innerHTML = details.join('<br>');
+      }
     }
   }
 
@@ -606,21 +603,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
-    mergeBtn.addEventListener('click', handleMerge);
-    
-    // Batch merge button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      mergeSelectedBtn.addEventListener('click', () => handleBatchMerge());
-    }
-    
-    // Stop on error checkbox
-    const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
-    if (stopOnErrorCheckbox) {
-      stopOnErrorCheckbox.addEventListener('change', (e) => {
-        state.stopOnError = e.target.checked;
-      });
-    }
+  mergeBtn.addEventListener('click', handleMerge);
+  
+  // Stop on error checkbox
+  const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
+  if (stopOnErrorCheckbox) {
+    stopOnErrorCheckbox.addEventListener('change', (e) => {
+      state.stopOnError = e.target.checked;
+    });
+  }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
 
