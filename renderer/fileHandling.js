@@ -1,6 +1,6 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate } from './utils.js';
+import { getFileName, formatDate } from './utils.js';
 
 // Metadata cache to avoid redundant IPC calls
 const metadataCache = new Map();
