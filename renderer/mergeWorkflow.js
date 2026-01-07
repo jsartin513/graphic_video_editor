@@ -101,6 +101,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }));
     const hasMultipleDirectories = directories.size > 1;
     
+    renderPreviewList(hasMultipleDirectories);
+  }
+
+  // Render preview list
+  function renderPreviewList(hasMultipleDirectories = false) {
     previewList.innerHTML = '';
     
     for (let i = 0; i < state.videoGroups.length; i++) {
@@ -110,10 +115,82 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   }
 
+  // Drag and drop state
+  let draggedIndex = null;
+  
+  // Handle drag start
+  function handleDragStart(e, index) {
+    draggedIndex = index;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index);
+  }
+  
+  // Handle drag over
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    const draggingItem = document.querySelector('.preview-item.dragging');
+    const afterElement = getDragAfterElement(previewList, e.clientY);
+    
+    if (afterElement == null) {
+      previewList.appendChild(draggingItem);
+    } else {
+      previewList.insertBefore(draggingItem, afterElement);
+    }
+  }
+  
+  // Handle drag end
+  function handleDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    
+    // Get the new order from DOM
+    const items = Array.from(previewList.querySelectorAll('.preview-item'));
+    const newOrder = items.map(item => parseInt(item.dataset.index));
+    
+    // Reorder the state.videoGroups array based on new order
+    const reorderedGroups = newOrder.map(oldIndex => state.videoGroups[oldIndex]);
+    state.videoGroups = reorderedGroups;
+    
+    // Re-render to update indices and order numbers
+    const hasMultipleDirectories = new Set(state.videoGroups.map(g => {
+      let dir = '';
+      if (g.directory) {
+        dir = g.directory;
+      } else if (g.files.length > 0) {
+        const parts = g.files[0].split(/[/\\]/);
+        dir = parts.slice(0, -1).join('/');
+      }
+      return dir.replace(/\\/g, '/');
+    })).size > 1;
+    
+    renderPreviewList(hasMultipleDirectories);
+    draggedIndex = null;
+  }
+  
+  // Get element after current drag position
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.preview-item:not(.dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
   // Create preview item
   function createPreviewItem(group, index, showDirectory = false) {
     const item = document.createElement('div');
     item.className = 'preview-item';
+    item.draggable = true;
+    item.dataset.index = index;
     
     const inputFilesList = group.files.map(f => {
       const name = getFileName(f);
@@ -149,6 +226,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
     
     item.innerHTML = `
+      <div class="preview-item-order-badge" aria-label="Order number">${index + 1}</div>
+      <div class="preview-item-drag-handle" aria-label="Drag to reorder">⋮⋮</div>
       <div class="preview-item-header">
         <div class="preview-item-info">
           <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
@@ -178,6 +257,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         </div>
       </div>
     `;
+    
+    // Add drag event handlers
+    item.addEventListener('dragstart', (e) => handleDragStart(e, index));
+    item.addEventListener('dragend', handleDragEnd);
     
     // Add input change handler
     const input = item.querySelector('.filename-input');
@@ -531,6 +614,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   mergeBtn.addEventListener('click', handleMerge);
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  previewList.addEventListener('dragover', handleDragOver);
 
   return { updateOutputDestinationDisplay };
 }
