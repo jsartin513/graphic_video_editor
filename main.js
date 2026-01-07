@@ -237,23 +237,6 @@ function formatFileSize(bytes) {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-// Extract session ID from GoPro filename
-function extractSessionId(filename) {
-  // Pattern: GX??????.MP4 -> extract last 4 digits
-  const gxMatch = filename.match(/GX\d{2}(\d{4})\.MP4$/i);
-  if (gxMatch) return gxMatch[1];
-  
-  // Pattern: GP??????.MP4 -> extract last 4 digits
-  const gpMatch = filename.match(/GP\d{2}(\d{4})\.MP4$/i);
-  if (gpMatch) return gpMatch[1];
-  
-  // Pattern: GOPR????.MP4 -> extract 4 digits
-  const goprMatch = filename.match(/GOPR(\d{4})\.MP4$/i);
-  if (goprMatch) return goprMatch[1];
-  
-  return null;
-}
-
 // Import video grouping functions
 const { analyzeAndGroupVideos } = require('./src/video-grouping');
 
