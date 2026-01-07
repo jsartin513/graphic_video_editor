@@ -379,11 +379,108 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           stdoutOutput += data.toString();
         });
         
+        // Track progress state
+        let totalDuration = null; // Will be set if provided, otherwise calculated from video files
+        ffmpeg.startTime = Date.now();
+        
+        // Calculate total duration from input files (non-blocking, runs in background)
+        (async () => {
+          try {
+            const durationPromises = validFilePaths.map(async (filePath) => {
+              try {
+                return await new Promise((resolve) => {
+                  const ffprobeCmd = getFFprobePath();
+                  const ffprobe = spawn(ffprobeCmd, [
+                    '-v', 'error',
+                    '-show_entries', 'format=duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1',
+                    filePath
+                  ], {
+                    env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+                  });
+                  
+                  let output = '';
+                  ffprobe.stdout.on('data', (data) => { output += data.toString(); });
+                  ffprobe.on('close', (code) => {
+                    if (code === 0) {
+                      const dur = parseFloat(output.trim());
+                      resolve(isNaN(dur) ? 0 : dur);
+                    } else {
+                      resolve(0);
+                    }
+                  });
+                  ffprobe.on('error', () => resolve(0));
+                });
+              } catch {
+                return 0;
+              }
+            });
+            
+            const durations = await Promise.all(durationPromises);
+            totalDuration = durations.reduce((sum, d) => sum + d, 0);
+            if (totalDuration > 0) {
+              console.log(`[merge-videos] Total estimated duration: ${totalDuration.toFixed(2)} seconds`);
+            }
+          } catch (err) {
+            console.log('[merge-videos] Could not calculate total duration, progress will show time only');
+          }
+        })();
+
         ffmpeg.stderr.on('data', (data) => {
           const output = data.toString();
           errorOutput += output;
           // Log stderr in real-time for debugging
           console.log(`[merge-videos] FFmpeg stderr: ${output.trim()}`);
+          
+          // Parse time from FFmpeg output: time=00:00:05.00
+          const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d+)/);
+          if (timeMatch && mainWindow) {
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            const seconds = parseFloat(timeMatch[3]);
+            const currentTime = hours * 3600 + minutes * 60 + seconds;
+            
+            // Calculate progress percentage if we have total duration
+            let percent = null;
+            if (totalDuration !== null && totalDuration > 0) {
+              percent = Math.min((currentTime / totalDuration) * 100, 100);
+            }
+            
+            // Format time string for display (HH:MM:SS)
+            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${Math.floor(seconds).toString().padStart(2, '0')}`;
+            
+            // Calculate ETA if we have progress
+            let eta = null;
+            let etaStr = null;
+            if (percent !== null && percent > 0 && percent < 100 && totalDuration > 0) {
+              const elapsed = (Date.now() - ffmpeg.startTime) / 1000; // seconds
+              if (elapsed > 0 && currentTime > 0) {
+                const rate = currentTime / elapsed; // seconds per second (should be ~1.0 for real-time)
+                if (rate > 0) {
+                  const remaining = totalDuration - currentTime;
+                  eta = Math.round(remaining / rate); // seconds remaining
+                  const etaHours = Math.floor(eta / 3600);
+                  const etaMinutes = Math.floor((eta % 3600) / 60);
+                  const etaSeconds = eta % 60;
+                  if (etaHours > 0) {
+                    etaStr = `${etaHours}:${etaMinutes.toString().padStart(2, '0')}:${etaSeconds.toString().padStart(2, '0')}`;
+                  } else {
+                    etaStr = `${etaMinutes}:${etaSeconds.toString().padStart(2, '0')}`;
+                  }
+                }
+              }
+            }
+            
+            // Emit progress event to renderer
+            mainWindow.webContents.send('merge-progress', {
+              currentTime,
+              totalDuration: totalDuration || 0,
+              percent,
+              timeStr,
+              eta,
+              etaStr
+            });
+          }
         });
         
         ffmpeg.on('error', (error) => {
