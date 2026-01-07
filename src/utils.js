@@ -1,22 +1,29 @@
-// Utility functions
+// Utility functions (CommonJS version for testing)
 
-export function getFileName(filePath) {
+function getFileName(filePath) {
   const parts = filePath.split(/[/\\]/);
   return parts[parts.length - 1];
 }
 
-export function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+function escapeHtml(text) {
+  // Server-side implementation without DOM
+  if (typeof text !== 'string') return text;
+  
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
 }
 
-export function formatDate(dateString) {
+function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatDuration(seconds) {
+function formatDuration(seconds) {
   if (seconds === null || seconds === undefined || isNaN(seconds) || (typeof seconds === 'string' && seconds.trim() === '')) return 'Unknown';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -28,7 +35,7 @@ export function formatDuration(seconds) {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function getDirectoryName(filePath) {
+function getDirectoryName(filePath) {
   // Handle non-string or empty paths with a meaningful default
   if (typeof filePath !== 'string' || filePath.length === 0) {
     return 'root';
@@ -49,14 +56,10 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
-// CommonJS exports for testing
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    getFileName,
-    escapeHtml,
-    formatDate,
-    formatDuration,
-    getDirectoryName
-  };
-}
-
+module.exports = {
+  getFileName,
+  escapeHtml,
+  formatDate,
+  formatDuration,
+  getDirectoryName
+};

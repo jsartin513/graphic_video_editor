@@ -80,6 +80,25 @@ The app remembers your filename patterns and preferences to make renaming files 
 - Date token support ({date}, {year}, {month}, {day})
 - Customizing date formats
 
+## Testing
+
+The project includes comprehensive unit and integration tests:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+**Test Coverage**: 84%+ across 112 tests in 5 test suites.
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
+
 ## Development
 
 The application uses Electron with context isolation for security. File operations are handled in the main process, and the renderer communicates with it via IPC.
