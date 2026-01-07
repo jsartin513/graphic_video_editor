@@ -73,7 +73,9 @@ function updateButtonLabels(domElements, platform) {
         // Keep the icon element and update text content
         element.childNodes.forEach(node => {
           if (node.nodeType === Node.TEXT_NODE) {
-            node.textContent = ` ${cleanText} (${hintText})`;
+            // Add leading space only if cleanText is not empty
+            const textWithHint = cleanText ? ` ${cleanText} (${hintText})` : `(${hintText})`;
+            node.textContent = textWithHint;
           }
         });
       } else {
@@ -85,9 +87,6 @@ function updateButtonLabels(domElements, platform) {
       if (ariaLabel && !ariaLabel.includes('keyboard shortcut')) {
         element.setAttribute('aria-label', `${ariaLabel}. Keyboard shortcut: ${hintText}`);
       }
-    }
-  });
-}
     }
   });
 }
