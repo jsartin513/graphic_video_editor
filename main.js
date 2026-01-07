@@ -254,6 +254,15 @@ function extractSessionId(filename) {
 // Import video grouping functions
 const { analyzeAndGroupVideos } = require('./src/video-grouping');
 
+// Import preferences module
+const {
+  loadPreferences,
+  savePreferences,
+  addRecentPattern,
+  setPreferredDateFormat,
+  applyDateTokens
+} = require('./src/preferences');
+
 // Analyze and group video files by session ID and directory
 // Files from different subdirectories with the same session ID are processed separately
 ipcMain.handle('analyze-videos', async (event, filePaths) => {
@@ -978,5 +987,66 @@ ipcMain.handle('install-prerequisites', async () => {
       });
     });
   });
+});
+
+// Preferences IPC handlers
+
+// Load user preferences
+ipcMain.handle('load-preferences', async () => {
+  try {
+    return await loadPreferences();
+  } catch (error) {
+    console.error('Error loading preferences:', error);
+    throw error;
+  }
+});
+
+// Save user preferences
+ipcMain.handle('save-preferences', async (event, preferences) => {
+  try {
+    await savePreferences(preferences);
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving preferences:', error);
+    throw error;
+  }
+});
+
+// Save a filename pattern to recent patterns
+ipcMain.handle('save-filename-pattern', async (event, pattern) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = addRecentPattern(prefs, pattern);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error saving filename pattern:', error);
+    throw error;
+  }
+});
+
+// Set preferred date format
+ipcMain.handle('set-date-format', async (event, format) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredDateFormat(prefs, format);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting date format:', error);
+    throw error;
+  }
+});
+
+// Apply date tokens to a pattern
+ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) => {
+  try {
+    const date = dateStr ? new Date(dateStr) : new Date();
+    const result = applyDateTokens(pattern, date, dateFormat);
+    return { result };
+  } catch (error) {
+    console.error('Error applying date tokens:', error);
+    throw error;
+  }
 });
 
