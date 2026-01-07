@@ -1066,6 +1066,19 @@ ipcMain.handle('set-date-format', async (event, format) => {
   }
 });
 
+// Set preferred quality
+ipcMain.handle('set-preferred-quality', async (event, quality) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredQuality(prefs, quality);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting preferred quality:', error);
+    throw error;
+  }
+});
+
 // Apply date tokens to a pattern
 ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) => {
   try {
