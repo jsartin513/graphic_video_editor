@@ -1297,6 +1297,122 @@ body {
   }
 }
 
+/* Failed Operations Modal Styles */
+.modal-large {
+  max-width: 800px;
+  width: 90%;
+}
+
+.failed-ops-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.failed-op-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.failed-op-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.failed-op-info {
+  flex: 1;
+}
+
+.failed-op-title {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.failed-op-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.failed-op-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.failed-op-details p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.error-message {
+  color: var(--error);
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.failed-op-files {
+  margin-top: 12px;
+}
+
+.failed-op-files summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--accent-primary);
+  user-select: none;
+}
+
+.failed-op-files summary:hover {
+  text-decoration: underline;
+}
+
+.failed-op-file-list {
+  list-style: none;
+  padding: 8px 0 0 16px;
+  margin: 8px 0 0 0;
+}
+
+.failed-op-file-list li {
+  padding: 4px 0;
+  font-size: 13px;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+.no-failed-ops {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.no-failed-ops p {
+  font-size: 16px;
+}
+
+.retry-btn {
+  background: var(--success);
+  color: white;
+}
+
+.retry-btn:hover {
+  background: var(--success-hover);
+}
+
+.remove-btn {
+  color: var(--text-secondary);
+}
+
+.remove-btn:hover {
+  color: var(--error);
+}
+
 /* Reduced motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   *,
