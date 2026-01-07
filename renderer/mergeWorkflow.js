@@ -20,6 +20,19 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     useDefaultDestinationBtn
   } = domElements;
 
+  // Load preferences on initialization
+  let userPreferences = null;
+  async function loadUserPreferences() {
+    try {
+      userPreferences = await window.electronAPI.loadPreferences();
+    } catch (error) {
+      console.error('Error loading preferences:', error);
+    }
+  }
+  
+  // Initialize preferences
+  loadUserPreferences();
+
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
     if (state.selectedFiles.length === 0) return;
@@ -125,6 +138,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
     const directoryDisplay = directoryName ? `<span class="preview-item-directory">📁 ${escapeHtml(directoryName)}</span>` : '';
     
+    // Create recent patterns dropdown
+    let patternsDatalist = '';
+    if (userPreferences && userPreferences.recentFilenamePatterns && userPreferences.recentFilenamePatterns.length > 0) {
+      const datalistId = `patterns-${index}`;
+      const options = userPreferences.recentFilenamePatterns.map(pattern => 
+        `<option value="${escapeHtml(pattern.replace(/\.MP4$/i, ''))}">`
+      ).join('');
+      patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
+    }
+    
     item.innerHTML = `
       <div class="preview-item-header">
         <div class="preview-item-info">
@@ -135,12 +158,19 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       <div class="preview-item-body">
         <div class="filename-edit">
           <label>Output Filename:</label>
-          <input type="text" 
-                 class="filename-input" 
-                 data-index="${index}"
-                 value="${escapeHtml(group.outputFilename)}"
-                 placeholder="PROCESSED${group.sessionId}.MP4">
-          <span class="filename-hint">.MP4</span>
+          <div class="filename-input-container">
+            <input type="text" 
+                   class="filename-input" 
+                   data-index="${index}"
+                   list="patterns-${index}"
+                   value="${escapeHtml(group.outputFilename)}"
+                   placeholder="PROCESSED${group.sessionId}.MP4">
+            ${patternsDatalist}
+            <span class="filename-hint">.MP4</span>
+          </div>
+          <div class="filename-help">
+            <small>💡 Use date tokens: {date}, {year}, {month}, {day}</small>
+          </div>
         </div>
         <div class="input-files">
           <label>Input Files:</label>
@@ -160,18 +190,46 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       }
     });
     
-    // Validate filename on blur
-    input.addEventListener('blur', (e) => {
+    // Validate filename on blur and apply date tokens
+    input.addEventListener('blur', async (e) => {
       let value = e.target.value.trim();
       if (!value) {
         value = `PROCESSED${group.sessionId}`;
       }
-      // Remove invalid characters and spaces
-      value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
       // Remove .MP4 if present
       value = value.replace(/\.MP4$/i, '');
+      
+      // Store the original pattern before token replacement for preferences
+      const originalPattern = value;
+      
+      // Apply date tokens if any
+      if (value.includes('{')) {
+        try {
+          const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat);
+          if (result && result.result) {
+            value = result.result;
+          }
+        } catch (error) {
+          console.error('Error applying date tokens:', error);
+        }
+      }
+      
+      // Remove invalid characters but preserve hyphens and underscores
+      // This happens after date token replacement to preserve date formatting
+      value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
       state.videoGroups[index].outputFilename = value + '.MP4';
       e.target.value = value;
+      
+      // Save the original pattern (with tokens) to preferences, not the replaced value
+      // This allows users to reuse patterns with date tokens
+      try {
+        await window.electronAPI.saveFilenamePattern(originalPattern);
+        // Reload preferences to get updated list
+        await loadUserPreferences();
+      } catch (error) {
+        console.error('Error saving pattern:', error);
+      }
     });
     
     return item;

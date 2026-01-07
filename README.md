@@ -9,6 +9,9 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - Drag and drop video files or folders directly into the app
 - View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
+- **Smart filename preferences** - Remember and suggest filename patterns
+- **Date token support** - Use {date}, {year}, {month}, {day} in filenames
+- **Auto-complete patterns** - Recent patterns suggested as you type
 
 ## Getting Started
 
@@ -61,10 +64,21 @@ npm start
 
 - `main.js` - Electron main process (handles file dialogs and system operations)
 - `preload.js` - Secure preload script (exposes safe APIs to renderer)
+- `src/` - Core modules
+  - `video-grouping.js` - Groups GoPro videos by session ID
+  - `preferences.js` - User preferences storage and management
 - `renderer/` - UI files
   - `index.html` - Main HTML structure
   - `styles.css` - Application styling
   - `renderer.js` - UI logic and event handlers
+  - `mergeWorkflow.js` - Video merging workflow with preferences
+
+## User Preferences
+
+The app remembers your filename patterns and preferences to make renaming files easier. See [FILENAME_PREFERENCES.md](FILENAME_PREFERENCES.md) for details on:
+- Using recent pattern suggestions
+- Date token support ({date}, {year}, {month}, {day})
+- Customizing date formats
 
 ## Development
 
