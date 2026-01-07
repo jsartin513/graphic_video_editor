@@ -52,8 +52,10 @@ export function initializeRecentDirectories(state, domElements, fileHandling) {
     item.setAttribute('role', 'button');
     item.setAttribute('tabindex', '0');
 
-    // Get directory name for display
-    const dirName = dirPath.split('/').filter(p => p).pop() || dirPath;
+    // Get directory name for display (handle both / and \ separators)
+    const pathSeparator = dirPath.includes('\\') ? '\\' : '/';
+    const parts = dirPath.split(pathSeparator).filter(p => p);
+    const dirName = parts[parts.length - 1] || dirPath;
     
     item.innerHTML = `
       <div class="recent-directory-info">
@@ -101,15 +103,22 @@ export function initializeRecentDirectories(state, domElements, fileHandling) {
         // Refresh the recent directories list
         await loadRecentDirectories();
       } else if (result.success && result.files.length === 0) {
-        alert('No video files found in this directory.');
+        showNotification('No video files found in this directory.');
       }
     } catch (error) {
       console.error('Error opening recent directory:', error);
-      alert('Failed to open directory. It may have been moved or deleted.');
+      showNotification('Failed to open directory. It may have been moved or deleted.');
       // Cleanup invalid directories
       await window.electronAPI.cleanupDirectories();
       await loadRecentDirectories();
     }
+  }
+
+  // Show notification message
+  function showNotification(message) {
+    // For now, use alert as a simple solution
+    // TODO: Replace with a proper toast notification system in future
+    alert(message);
   }
 
   // Handle pin/unpin toggle
@@ -148,11 +157,13 @@ export function initializeRecentDirectories(state, domElements, fileHandling) {
 
   // Helper function to get parent path for display
   function getParentPath(dirPath) {
-    const parts = dirPath.split('/').filter(p => p);
+    // Handle both / and \ separators
+    const pathSeparator = dirPath.includes('\\') ? '\\' : '/';
+    const parts = dirPath.split(pathSeparator).filter(p => p);
     if (parts.length <= 1) return '';
     parts.pop(); // Remove last part (directory name)
-    const parent = parts.slice(-2).join('/'); // Show last 2 parts of parent path
-    return parent ? `.../${parent}` : '';
+    const parent = parts.slice(-2).join(pathSeparator); // Show last 2 parts of parent path
+    return parent ? `...${pathSeparator}${parent}` : '';
   }
 
   // Load recent directories on init

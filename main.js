@@ -8,6 +8,9 @@ let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
 
+// Supported video extensions
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
+
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
 
@@ -152,7 +155,6 @@ ipcMain.handle('select-folder', async () => {
   }
 
   // Recursively find all video files in the folder
-  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
   const videoFiles = [];
 
   async function scanDirectory(dirPath) {
@@ -166,7 +168,7 @@ ipcMain.handle('select-folder', async () => {
           await scanDirectory(fullPath);
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name);
-          if (videoExtensions.includes(ext)) {
+          if (VIDEO_EXTENSIONS.includes(ext)) {
             videoFiles.push(fullPath);
           }
         }
@@ -206,7 +208,6 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
 
 // Handle processing dropped files/folders
 ipcMain.handle('process-dropped-paths', async (event, paths) => {
-  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
   const videoFiles = [];
 
   async function scanDirectory(dirPath) {
@@ -220,7 +221,7 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
           await scanDirectory(fullPath);
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name);
-          if (videoExtensions.includes(ext)) {
+          if (VIDEO_EXTENSIONS.includes(ext)) {
             videoFiles.push(fullPath);
           }
         }
@@ -1180,7 +1181,6 @@ ipcMain.handle('open-recent-directory', async (event, dirPath) => {
     await savePreferences(updated);
     
     // Scan for video files
-    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
     const videoFiles = [];
     
     async function scanDirectory(scanDirPath) {
@@ -1194,7 +1194,7 @@ ipcMain.handle('open-recent-directory', async (event, dirPath) => {
             await scanDirectory(fullPath);
           } else if (entry.isFile()) {
             const ext = path.extname(entry.name);
-            if (videoExtensions.includes(ext)) {
+            if (VIDEO_EXTENSIONS.includes(ext)) {
               videoFiles.push(fullPath);
             }
           }
