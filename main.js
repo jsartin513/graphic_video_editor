@@ -330,6 +330,12 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy') => {
   return new Promise((resolve, reject) => {
+    // Validate quality option
+    if (!VALID_QUALITY_OPTIONS.includes(qualityOption)) {
+      reject(new Error(`Invalid quality option: ${qualityOption}. Must be one of: ${VALID_QUALITY_OPTIONS.join(', ')}`));
+      return;
+    }
+    
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
       const filename = path.basename(filePath);
@@ -376,8 +382,8 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           // Fast copy mode (no re-encoding)
           ffmpegArgs.push('-c', 'copy');
         } else {
-          // Re-encode with quality settings
-          const settings = QUALITY_SETTINGS[qualityOption] || QUALITY_SETTINGS['medium'];
+          // Re-encode with quality settings (already validated)
+          const settings = QUALITY_SETTINGS[qualityOption];
           
           // Video codec settings
           ffmpegArgs.push(
