@@ -379,7 +379,10 @@ ipcMain.handle('get-video-metadata', async (event, videoPath) => {
               codecLongName: videoStream.codec_long_name || 'unknown',
               width: videoStream.width || 0,
               height: videoStream.height || 0,
-              fps: videoStream.r_frame_rate ? eval(videoStream.r_frame_rate) : 0, // e.g., "30/1" -> 30
+              fps: videoStream.r_frame_rate ? (() => {
+                const [num, den] = videoStream.r_frame_rate.split('/').map(Number);
+                return den ? num / den : 0;
+              })() : 0,
               bitrate: parseInt(videoStream.bit_rate) || 0,
               pixelFormat: videoStream.pix_fmt || 'unknown'
             } : null,
