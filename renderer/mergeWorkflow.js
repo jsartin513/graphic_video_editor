@@ -46,7 +46,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         return;
       }
       
-      // Calculate durations for each group
+      // Calculate durations and file sizes for each group
       let hasDurations = false;
       for (const group of state.videoGroups) {
         let totalDuration = 0;
@@ -62,6 +62,24 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           }
         }
         group.totalDuration = totalDuration;
+        
+        // Calculate total input file size
+        try {
+          const sizeData = await window.electronAPI.getTotalFileSize(group.files);
+          group.totalInputSize = sizeData.totalBytes;
+          group.totalInputSizeFormatted = sizeData.totalSizeFormatted;
+          
+          // Estimate output size: For `-c copy`, output size is roughly the sum of input sizes
+          // (may be slightly different due to container overhead, but close enough for estimation)
+          group.estimatedOutputSize = sizeData.totalBytes;
+          group.estimatedOutputSizeFormatted = sizeData.totalSizeFormatted;
+        } catch (error) {
+          console.error(`Error getting file sizes for group ${group.sessionId}:`, error);
+          group.totalInputSize = 0;
+          group.totalInputSizeFormatted = 'Unknown';
+          group.estimatedOutputSize = 0;
+          group.estimatedOutputSizeFormatted = 'Unknown';
+        }
       }
       
       // Warn if no durations were found (likely ffprobe not installed)
@@ -152,7 +170,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       <div class="preview-item-header">
         <div class="preview-item-info">
           <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
-          <span class="preview-item-meta">${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}</span>
+          <span class="preview-item-meta">
+            ${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}
+            ${group.totalInputSizeFormatted && group.totalInputSizeFormatted !== 'Unknown' ? ` • Input: ${group.totalInputSizeFormatted}` : ''}
+            ${group.estimatedOutputSizeFormatted && group.estimatedOutputSizeFormatted !== 'Unknown' ? ` • Est. Output: ${group.estimatedOutputSizeFormatted}` : ''}
+          </span>
         </div>
       </div>
       <div class="preview-item-body">
