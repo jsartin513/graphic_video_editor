@@ -75,6 +75,19 @@
           </div>
         </div>
         
+        <div class="quality-section">
+          <label class="quality-label">Video Quality:</label>
+          <div class="quality-controls">
+            <select id="qualitySelect" class="quality-select" aria-label="Select video quality">
+              <option value="copy">Copy (Fastest, No Re-encoding)</option>
+              <option value="high">High Quality (CRF 18, Slower)</option>
+              <option value="medium">Medium Quality (CRF 23, Balanced)</option>
+              <option value="low">Low Quality (CRF 28, Smaller File)</option>
+            </select>
+            <small class="quality-hint">Higher quality = larger file size, longer processing time</small>
+          </div>
+        </div>
+        
         <div class="preview-actions">
           <div class="batch-controls">
             <label class="batch-option">
