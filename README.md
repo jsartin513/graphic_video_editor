@@ -12,6 +12,22 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - **Smart filename preferences** - Remember and suggest filename patterns
 - **Date token support** - Use {date}, {year}, {month}, {day} in filenames
 - **Auto-complete patterns** - Recent patterns suggested as you type
+- **Keyboard shortcuts** - Fast workflow with keyboard navigation
+
+## Keyboard Shortcuts
+
+Speed up your workflow with these keyboard shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| `⌘+O` (macOS) / `Ctrl+O` (Windows/Linux) | Open files dialog |
+| `⌘+D` (macOS) / `Ctrl+D` (Windows/Linux) | Open folder dialog |
+| `⌘+M` (macOS) / `Ctrl+M` (Windows/Linux) | Prepare merge |
+| `Enter` | Start merge / Prepare merge (context-dependent) |
+| `Esc` | Cancel / Go back |
+| `⌘+S` (macOS) / `Ctrl+S` (Windows/Linux) | Save preferences |
+
+Keyboard shortcuts are displayed directly on buttons for easy reference.
 
 ## Getting Started
 
@@ -72,6 +88,7 @@ npm start
   - `styles.css` - Application styling
   - `renderer.js` - UI logic and event handlers
   - `mergeWorkflow.js` - Video merging workflow with preferences
+  - `keyboardShortcuts.js` - Keyboard shortcut handling and UI hints
 
 ## User Preferences
 

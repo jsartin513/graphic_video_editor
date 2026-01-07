@@ -5,6 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
+import { initializeKeyboardShortcuts } from './keyboardShortcuts.js';
 
 // Shared application state
 const state = {
@@ -76,5 +77,46 @@ const splitVideo = initializeSplitVideo(domElements, state);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
 
+// Initialize keyboard shortcuts with handlers
+const keyboardHandlers = {
+  selectFiles: () => domElements.selectFilesBtn.click(),
+  selectFolder: () => domElements.selectFolderBtn.click(),
+  prepareMerge: () => {
+    if (domElements.prepareMergeBtn.style.display !== 'none' && !domElements.prepareMergeBtn.disabled) {
+      domElements.prepareMergeBtn.click();
+    }
+  },
+  merge: () => {
+    if (domElements.mergeBtn && !domElements.mergeBtn.disabled) {
+      domElements.mergeBtn.click();
+    }
+  },
+  goBack: () => {
+    if (domElements.backBtn && domElements.previewScreen.style.display !== 'none') {
+      domElements.backBtn.click();
+    }
+  },
+  closeModal: () => {
+    // Close prerequisites modal if open
+    if (domElements.prerequisitesModal && domElements.prerequisitesModal.style.display !== 'none') {
+      domElements.prerequisitesModal.style.display = 'none';
+    }
+    // Close split video modal if open
+    else if (domElements.splitVideoModal && domElements.splitVideoModal.style.display !== 'none') {
+      domElements.splitVideoModal.style.display = 'none';
+      // Reset split modal state
+      if (domElements.splitProgress) domElements.splitProgress.style.display = 'none';
+      if (domElements.splitResult) domElements.splitResult.style.display = 'none';
+    }
+  },
+  savePreferences: () => {
+    // Placeholder for future preferences saving functionality
+    // This shortcut is reserved but not yet implemented
+  }
+};
+
+const keyboardShortcuts = initializeKeyboardShortcuts(domElements, keyboardHandlers);
+
 // Make state accessible for debugging
 window.appState = state;
+window.keyboardShortcuts = keyboardShortcuts;
