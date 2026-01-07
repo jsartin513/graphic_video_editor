@@ -77,6 +77,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   }
 
+  // Get hasMultipleDirectories flag
+  function hasMultipleDirectories() {
+    const directories = new Set(state.videoGroups.map(g => {
+      let dir = '';
+      if (g.directory) {
+        dir = g.directory;
+      } else if (g.files.length > 0) {
+        const parts = g.files[0].split(/[/\\]/);
+        dir = parts.slice(0, -1).join('/');
+      }
+      return dir.replace(/\\/g, '/');
+    }));
+    return directories.size > 1;
+  }
+
   // Show preview screen
   function showPreviewScreen() {
     state.currentScreen = 'preview';
@@ -87,30 +102,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     state.selectedOutputDestination = null;
     updateOutputDestinationDisplay();
     
-    // Check if we have multiple directories (for display purposes)
-    const directories = new Set(state.videoGroups.map(g => {
-      let dir = '';
-      if (g.directory) {
-        dir = g.directory;
-      } else if (g.files.length > 0) {
-        const parts = g.files[0].split(/[/\\]/);
-        dir = parts.slice(0, -1).join('/'); // All parts except filename
-      }
-      // Normalize path separators so Set comparison is consistent across platforms
-      return dir.replace(/\\/g, '/');
-    }));
-    const hasMultipleDirectories = directories.size > 1;
-    
-    renderPreviewList(hasMultipleDirectories);
+    renderPreviewList();
   }
 
   // Render preview list
-  function renderPreviewList(hasMultipleDirectories = false) {
+  function renderPreviewList() {
+    const showMultipleDirectories = hasMultipleDirectories();
     previewList.innerHTML = '';
     
     for (let i = 0; i < state.videoGroups.length; i++) {
       const group = state.videoGroups[i];
-      const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
+      const previewItem = createPreviewItem(group, i, showMultipleDirectories);
       previewList.appendChild(previewItem);
     }
   }
@@ -145,25 +147,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     const items = Array.from(previewList.querySelectorAll('.preview-item'));
     
     // Create a map of current DOM position to original index
-    const newOrder = items.map(item => parseInt(item.dataset.index));
+    const newOrder = items.map(item => parseInt(item.dataset.index, 10));
     
     // Reorder the state.videoGroups array based on DOM order
     const reorderedGroups = newOrder.map(oldIndex => state.videoGroups[oldIndex]);
     state.videoGroups = reorderedGroups;
     
     // Re-render to update indices and order numbers to match new positions
-    const hasMultipleDirectories = new Set(state.videoGroups.map(g => {
-      let dir = '';
-      if (g.directory) {
-        dir = g.directory;
-      } else if (g.files.length > 0) {
-        const parts = g.files[0].split(/[/\\]/);
-        dir = parts.slice(0, -1).join('/');
-      }
-      return dir.replace(/\\/g, '/');
-    })).size > 1;
-    
-    renderPreviewList(hasMultipleDirectories);
+    renderPreviewList();
   }
   
   // Get element after current drag position

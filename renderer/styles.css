@@ -505,8 +505,8 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  padding-left: 32px;
-  padding-right: 32px;
+  padding-left: 48px;
+  padding-right: 40px;
 }
 
 .preview-item-info h3 {
