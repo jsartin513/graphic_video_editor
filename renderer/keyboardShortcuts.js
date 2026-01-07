@@ -138,3 +138,26 @@ export function formatShortcut(key, useModifier = true) {
   return modifier ? `${modifier}${separator}${key.toUpperCase()}` : key.toUpperCase();
 }
 
+/**
+ * Update keyboard shortcut hints in the UI
+ * Call this on page load to set platform-specific shortcuts
+ */
+export function updateShortcutHints() {
+  // Update button shortcuts
+  const shortcuts = {
+    'selectFilesBtn': formatShortcut('O'),
+    'selectFolderBtn': formatShortcut('D'),
+    'prepareMergeBtn': `${formatShortcut('M')} or Enter`
+  };
+
+  Object.keys(shortcuts).forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      const shortcutSpan = btn.querySelector('.btn-shortcut');
+      if (shortcutSpan) {
+        shortcutSpan.textContent = shortcuts[btnId];
+      }
+    }
+  });
+}
+

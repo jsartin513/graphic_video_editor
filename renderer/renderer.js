@@ -5,7 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
-import { initializeKeyboardShortcuts } from './keyboardShortcuts.js';
+import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 
 // Shared application state
 const state = {
@@ -88,6 +88,9 @@ const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
     }
   })
 });
+
+// Update keyboard shortcut hints to show platform-specific shortcuts
+updateShortcutHints();
 
 // Make state accessible for debugging
 window.appState = state;
