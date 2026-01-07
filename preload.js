@@ -26,6 +26,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
-  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
+  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  // Recent directories API
+  addRecentDirectory: (dirPath) => ipcRenderer.invoke('add-recent-directory', dirPath),
+  pinDirectory: (dirPath) => ipcRenderer.invoke('pin-directory', dirPath),
+  unpinDirectory: (dirPath) => ipcRenderer.invoke('unpin-directory', dirPath),
+  clearRecentDirectories: () => ipcRenderer.invoke('clear-recent-directories'),
+  cleanupDirectories: () => ipcRenderer.invoke('cleanup-directories'),
+  openRecentDirectory: (dirPath) => ipcRenderer.invoke('open-recent-directory', dirPath)
 });
 

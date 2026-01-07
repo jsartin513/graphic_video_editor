@@ -9,6 +9,8 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - Drag and drop video files or folders directly into the app
 - View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
+- **Recent folders** - Quick access to recently used directories
+- **Pin favorites** - Pin frequently used folders for instant access
 - **Smart filename preferences** - Remember and suggest filename patterns
 - **Date token support** - Use {date}, {year}, {month}, {day} in filenames
 - **Auto-complete patterns** - Recent patterns suggested as you type
@@ -79,6 +81,19 @@ The app remembers your filename patterns and preferences to make renaming files 
 - Using recent pattern suggestions
 - Date token support ({date}, {year}, {month}, {day})
 - Customizing date formats
+
+### Recent Folders
+
+The app automatically tracks folders and directories you've recently accessed, making it easy to quickly return to commonly used locations. See [RECENT_FOLDERS.md](RECENT_FOLDERS.md) for complete details on:
+
+- **Automatic Tracking**: Every time you select files or folders, the directory is added to your recent list
+- **Quick Access**: Click any recent folder to instantly load all video files from that location
+- **Pin Favorites**: Pin frequently used folders to keep them at the top of the list
+- **Smart Cleanup**: Invalid or deleted folders are automatically removed
+- **Session Persistence**: Recent folders are saved across app restarts
+- **Privacy**: Clear recent folders at any time with the "Clear" button
+
+Recent folders appear at the top of the main screen when available. Pinned folders are shown first with a 📌 icon, followed by recent folders with a 📂 icon.
 
 ## Development
 
