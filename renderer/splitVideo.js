@@ -119,11 +119,36 @@ export function initializeSplitVideo(domElements) {
     const cancelBtn = document.getElementById('cancelSplitBtn');
     
     executeBtn.disabled = true;
-    cancelBtn.disabled = true;
+    cancelBtn.disabled = false; // Enable cancel button during operation
+    cancelBtn.textContent = 'Cancel';
     progressDiv.style.display = 'block';
     resultDiv.style.display = 'none';
     progressBar.style.width = '0%';
     progressText.textContent = `Splitting into ${splits.length} segments...`;
+    
+    // Set up cancel handler
+    let isCancelling = false;
+    const handleCancel = async () => {
+      if (isCancelling) return;
+      
+      const confirmed = confirm('Are you sure you want to cancel the split operation?\n\nAny progress will be lost.');
+      if (!confirmed) return;
+      
+      isCancelling = true;
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = 'Cancelling...';
+      
+      try {
+        await window.electronAPI.cancelSplit();
+        progressText.textContent = 'Split cancelled by user';
+      } catch (error) {
+        console.error('Error cancelling split:', error);
+      }
+    };
+    
+    // Temporarily replace the cancel button handler
+    const oldOnClick = cancelBtn.onclick;
+    cancelBtn.onclick = handleCancel;
     
     // Create split output directory (use path separator for cross-platform)
     const pathParts = outputDir.split(/[\/\\]/);
@@ -133,7 +158,20 @@ export function initializeSplitVideo(domElements) {
     try {
       const result = await window.electronAPI.splitVideo(videoPath, splits, splitOutputDir);
       
-      if (result.success) {
+      if (result.cancelled) {
+        // Operation was cancelled
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Split cancelled';
+        resultDiv.className = 'split-result error';
+        resultDiv.innerHTML = `<p>⚠ Operation cancelled by user</p>`;
+        resultDiv.style.display = 'block';
+        
+        // Update buttons
+        executeBtn.disabled = false;
+        cancelBtn.textContent = 'Close';
+        cancelBtn.disabled = false;
+        cancelBtn.onclick = closeSplitVideoModal;
+      } else if (result.success) {
         progressBar.style.width = '100%';
         progressText.textContent = 'Split complete!';
         
@@ -161,12 +199,23 @@ export function initializeSplitVideo(domElements) {
       }
     } catch (error) {
       progressBar.style.width = '100%';
-      progressText.textContent = 'Split failed!';
-      resultDiv.className = 'split-result error';
-      resultDiv.innerHTML = `<p>✗ Error: ${escapeHtml(error.message)}</p>`;
+      
+      // Check if error is due to cancellation
+      if (error.message && error.message.includes('cancelled')) {
+        progressText.textContent = 'Split cancelled';
+        resultDiv.className = 'split-result error';
+        resultDiv.innerHTML = `<p>⚠ Operation cancelled by user</p>`;
+      } else {
+        progressText.textContent = 'Split failed!';
+        resultDiv.className = 'split-result error';
+        resultDiv.innerHTML = `<p>✗ Error: ${escapeHtml(error.message)}</p>`;
+      }
+      
       resultDiv.style.display = 'block';
       executeBtn.disabled = false;
+      cancelBtn.textContent = 'Close';
       cancelBtn.disabled = false;
+      cancelBtn.onclick = closeSplitVideoModal;
     }
   }
 

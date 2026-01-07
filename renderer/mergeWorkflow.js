@@ -15,6 +15,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressBar,
     progressText,
     progressDetails,
+    cancelMergeBtn,
     outputDestinationPath,
     selectOutputDestinationBtn,
     useDefaultDestinationBtn
@@ -307,6 +308,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     
     const results = [];
     let completed = 0;
+    let wasCancelled = false;
     
     for (let i = 0; i < state.videoGroups.length; i++) {
       const group = state.videoGroups[i];
@@ -321,15 +323,30 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
-        results.push({ success: false, sessionId: group.sessionId, error: error.message });
-        updateProgress(i + 1, state.videoGroups.length, `Failed Session ${group.sessionId}`);
+        
+        // Check if error is due to cancellation
+        if (error.message && error.message.includes('cancelled')) {
+          wasCancelled = true;
+          results.push({ success: false, sessionId: group.sessionId, error: 'Cancelled', cancelled: true });
+          updateProgress(i + 1, state.videoGroups.length, 'Operation cancelled');
+          break; // Stop processing remaining groups
+        } else {
+          results.push({ success: false, sessionId: group.sessionId, error: error.message });
+          updateProgress(i + 1, state.videoGroups.length, `Failed Session ${group.sessionId}`);
+        }
       }
     }
     
-    updateProgress(state.videoGroups.length, state.videoGroups.length, 'All videos processed');
+    // Hide cancel button when merge is complete or cancelled
+    if (cancelMergeBtn) {
+      cancelMergeBtn.style.display = 'none';
+    }
     
-    // Show results
-    showMergeResults(results, outputDir);
+    if (!wasCancelled) {
+      updateProgress(state.videoGroups.length, state.videoGroups.length, 'All videos processed');
+      // Show results
+      showMergeResults(results, outputDir);
+    }
   }
 
   // Show progress screen
@@ -338,6 +355,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     previewScreen.style.display = 'none';
     progressScreen.style.display = 'block';
     progressBar.style.width = '0%';
+    
+    // Show and enable cancel button
+    if (cancelMergeBtn) {
+      cancelMergeBtn.style.display = 'inline-block';
+      cancelMergeBtn.disabled = false;
+    }
   }
 
   // Update progress
@@ -525,12 +548,66 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     });
   }
 
+  // Handle cancel merge
+  async function handleCancelMerge() {
+    // Show confirmation dialog
+    const confirmed = confirm('Are you sure you want to cancel the merge operation?\n\nAny progress will be lost.');
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    // Disable cancel button to prevent multiple clicks
+    if (cancelMergeBtn) {
+      cancelMergeBtn.disabled = true;
+      cancelMergeBtn.textContent = 'Cancelling...';
+    }
+    
+    try {
+      const result = await window.electronAPI.cancelMerge();
+      
+      if (result.success) {
+        progressText.textContent = 'Merge cancelled by user';
+        
+        // Hide cancel button after cancellation
+        if (cancelMergeBtn) {
+          cancelMergeBtn.style.display = 'none';
+        }
+        
+        // Show a message and allow user to go back
+        setTimeout(() => {
+          alert('Merge operation was cancelled. You can go back and start over.');
+          handleBack();
+        }, 1000);
+      } else {
+        // Re-enable button if cancellation failed
+        if (cancelMergeBtn) {
+          cancelMergeBtn.disabled = false;
+          cancelMergeBtn.textContent = 'Cancel';
+        }
+        alert(result.message || 'Could not cancel operation');
+      }
+    } catch (error) {
+      console.error('Error cancelling merge:', error);
+      // Re-enable button if error occurred
+      if (cancelMergeBtn) {
+        cancelMergeBtn.disabled = false;
+        cancelMergeBtn.textContent = 'Cancel';
+      }
+      alert('Error cancelling merge: ' + error.message);
+    }
+  }
+
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
   mergeBtn.addEventListener('click', handleMerge);
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  
+  if (cancelMergeBtn) {
+    cancelMergeBtn.addEventListener('click', handleCancelMerge);
+  }
 
   return { updateOutputDestinationDisplay };
 }
