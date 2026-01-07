@@ -1,6 +1,6 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate } from './utils.js';
+import { getFileName, escapeHtml, formatDate, getDirectoryPath } from './utils.js';
 
 // State will be managed in the main renderer.js
 export function initializeFileHandling(state, domElements, trimVideo = null) {
@@ -137,7 +137,7 @@ export function initializeFileHandling(state, domElements, trimVideo = null) {
           const file = trimBtn.getAttribute('data-file');
           const name = trimBtn.getAttribute('data-name');
           // Get directory from file path
-          const directory = filePath.split(/[/\\]/).slice(0, -1).join('/');
+          const directory = getDirectoryPath(filePath);
           trimVideo.showTrimVideoModal(file, name, directory);
         });
       }

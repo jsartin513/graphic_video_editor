@@ -1,6 +1,6 @@
 // Video trimming functionality
 
-import { formatDuration, escapeHtml } from './utils.js';
+import { formatDuration, escapeHtml, getDirectoryPath, formatTimeForFFmpeg } from './utils.js';
 
 export function initializeTrimVideo(domElements, state) {
   // Create and inject the trim modal HTML
@@ -26,14 +26,6 @@ export function initializeTrimVideo(domElements, state) {
   let currentVideoName = null;
   let currentVideoDuration = 0;
   let currentOutputDir = null;
-  
-  // Format time in seconds to HH:MM:SS
-  function formatTimeInput(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  }
   
   // Parse time input HH:MM:SS to seconds
   function parseTimeInput(timeStr) {
@@ -99,8 +91,8 @@ export function initializeTrimVideo(domElements, state) {
       trimVideoDuration.textContent = formatDuration(duration);
       
       // Set default trim times (full video)
-      trimStartTime.value = formatTimeInput(0);
-      trimEndTime.value = formatTimeInput(duration);
+      trimStartTime.value = formatTimeForFFmpeg(0);
+      trimEndTime.value = formatTimeForFFmpeg(duration);
       
       updateTrimPreview();
       updateTimelinePreview();
@@ -154,8 +146,8 @@ export function initializeTrimVideo(domElements, state) {
     trimProgressText.textContent = 'Trimming video...';
     
     try {
-      // Generate output filename - preserve case from input
-      const extension = currentVideoName.match(/\.[^.]+$/)?.[0] || '.MP4';
+      // Generate output filename - preserve case from input, default to lowercase
+      const extension = currentVideoName.match(/\.[^.]+$/)?.[0] || '.mp4';
       const baseName = currentVideoName.replace(/\.[^.]+$/, '');
       const outputFilename = `${baseName}_trimmed${extension}`;
       const outputPath = currentOutputDir ? `${currentOutputDir}/${outputFilename}` : null;
@@ -194,7 +186,8 @@ export function initializeTrimVideo(domElements, state) {
       // Add event listeners for result buttons
       document.getElementById('openTrimmedFolderBtn')?.addEventListener('click', async () => {
         try {
-          await window.electronAPI.openFolder(currentOutputDir || result.outputPath.split('/').slice(0, -1).join('/'));
+          const folderPath = currentOutputDir || getDirectoryPath(result.outputPath);
+          await window.electronAPI.openFolder(folderPath);
         } catch (error) {
           console.error('Error opening folder:', error);
         }
@@ -226,9 +219,9 @@ export function initializeTrimVideo(domElements, state) {
     
     // If shift key is held, set end time, otherwise set start time
     if (e.shiftKey) {
-      trimEndTime.value = formatTimeInput(clickedTime);
+      trimEndTime.value = formatTimeForFFmpeg(clickedTime);
     } else {
-      trimStartTime.value = formatTimeInput(clickedTime);
+      trimStartTime.value = formatTimeForFFmpeg(clickedTime);
     }
     
     updateTrimPreview();
