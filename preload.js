@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
   setPreferredQuality: (quality) => ipcRenderer.invoke('set-preferred-quality', quality),
+  setLastOutputDestination: (destination) => ipcRenderer.invoke('set-last-output-destination', destination),
   applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
 });
 
