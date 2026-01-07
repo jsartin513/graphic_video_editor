@@ -46,3 +46,21 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
+export function getDirectoryPath(filePath) {
+  // Get the directory path from a file path
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    return '';
+  }
+  
+  const parts = filePath.split(/[/\\]/);
+  return parts.slice(0, -1).join('/');
+}
+
+export function formatTimeForFFmpeg(seconds) {
+  // Format time in seconds to HH:MM:SS format for ffmpeg
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+

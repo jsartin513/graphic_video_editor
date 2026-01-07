@@ -2,7 +2,7 @@
 
 import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -417,7 +417,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         ` : ''}
     `;
     
-    // Add successful results with split buttons
+    // Add successful results with split and trim buttons
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success) {
@@ -426,6 +426,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           <div class="result-item success">
             <span class="result-icon">✓</span>
             <span class="result-name">${escapeHtml(filename)}</span>
+            <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">
+              ✂️ Trim
+            </button>
             <button class="btn-split-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">
               ✂️ Split
             </button>
@@ -521,6 +524,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         const videoPath = e.target.getAttribute('data-video-path');
         const videoName = e.target.getAttribute('data-video-name');
         splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+      });
+    });
+
+    // Add event listeners for trim video buttons
+    document.querySelectorAll('.btn-trim-video').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const videoPath = e.target.getAttribute('data-video-path');
+        const videoName = e.target.getAttribute('data-video-name');
+        trimVideo.showTrimVideoModal(videoPath, videoName, outputDir);
       });
     });
   }
