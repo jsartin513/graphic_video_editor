@@ -3,7 +3,7 @@
 import { getFileName, escapeHtml, formatDate } from './utils.js';
 
 // State will be managed in the main renderer.js
-export function initializeFileHandling(state, domElements) {
+export function initializeFileHandling(state, domElements, trimVideo = null) {
   const {
     selectFilesBtn,
     selectFolderBtn,
@@ -100,27 +100,47 @@ export function initializeFileHandling(state, domElements) {
     
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
+      const fileName = getFileName(filePath);
+      
       item.innerHTML = `
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
           <div class="file-meta">
             <span>Size: ${metadata.sizeFormatted}</span>
             <span>Modified: ${formatDate(metadata.modified)}</span>
           </div>
         </div>
         <div class="file-actions">
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeHtml(filePath)}" data-name="${escapeHtml(fileName)}">✂️ Trim</button>` : ''}
           <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
         </div>
       `;
     } catch (error) {
+      const fileName = getFileName(filePath);
+      
       item.innerHTML = `
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
         </div>
         <div class="file-actions">
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeHtml(filePath)}" data-name="${escapeHtml(fileName)}">✂️ Trim</button>` : ''}
           <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
         </div>
       `;
+    }
+
+    // Add trim button handler if trimVideo module is available
+    if (trimVideo) {
+      const trimBtn = item.querySelector('.btn-trim');
+      if (trimBtn) {
+        trimBtn.addEventListener('click', () => {
+          const file = trimBtn.getAttribute('data-file');
+          const name = trimBtn.getAttribute('data-name');
+          // Get directory from file path
+          const directory = filePath.split(/[/\\]/).slice(0, -1).join('/');
+          trimVideo.showTrimVideoModal(file, name, directory);
+        });
+      }
     }
 
     // Add remove button handler

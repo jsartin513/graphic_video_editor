@@ -4,6 +4,7 @@
 import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
+import { initializeTrimVideo } from './trimVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
 
 // Shared application state
@@ -71,9 +72,10 @@ const domElements = {
 };
 
 // Initialize all modules
-const fileHandling = initializeFileHandling(state, domElements);
+const trimVideo = initializeTrimVideo(domElements, state);
+const fileHandling = initializeFileHandling(state, domElements, trimVideo);
 const splitVideo = initializeSplitVideo(domElements, state);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo);
 const prerequisites = initializePrerequisites(domElements);
 
 // Make state accessible for debugging
