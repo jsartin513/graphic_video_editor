@@ -210,6 +210,23 @@ body {
   font-size: 18px;
 }
 
+.btn-shortcut {
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.btn:hover .btn-shortcut {
+  opacity: 1;
+}
+
 .drop-zone {
   border: 3px dashed var(--border-tertiary);
   border-radius: 12px;
