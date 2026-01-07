@@ -404,6 +404,36 @@ ipcMain.handle('generate-thumbnail', async (event, videoPath, timestamp = 1) => 
   }
 });
 
+// Get total file size for multiple files
+ipcMain.handle('get-total-file-size', async (event, filePaths) => {
+  if (!Array.isArray(filePaths) || filePaths.length === 0) {
+    return { totalBytes: 0, totalSizeFormatted: '0 Bytes' };
+  }
+  
+  let totalBytes = 0;
+  const errors = [];
+  
+  for (const filePath of filePaths) {
+    try {
+      const stats = await fs.stat(filePath);
+      totalBytes += stats.size;
+    } catch (error) {
+      console.error(`Error getting file size for ${filePath}:`, error);
+      errors.push(filePath);
+    }
+  }
+  
+  if (errors.length > 0 && errors.length === filePaths.length) {
+    // All files failed
+    throw new Error(`Could not get file sizes for any of the ${filePaths.length} files`);
+  }
+  
+  return {
+    totalBytes,
+    totalSizeFormatted: formatFileSize(totalBytes)
+  };
+});
+
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
