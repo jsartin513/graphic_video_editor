@@ -226,6 +226,9 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
   return videoFiles;
 });
 
+// Import utility functions
+const { formatFileSize } = require('./src/main-utils');
+
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
