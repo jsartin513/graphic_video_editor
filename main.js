@@ -246,7 +246,7 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
         }
       } else if (stats.isFile()) {
         const ext = path.extname(droppedPath);
-        if (videoExtensions.includes(ext)) {
+        if (VIDEO_EXTENSIONS.includes(ext)) {
           videoFiles.push(droppedPath);
           // Track directory of dropped file
           const dirPath = path.dirname(droppedPath);
