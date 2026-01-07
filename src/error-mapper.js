@@ -126,7 +126,7 @@ const ERROR_MAPPINGS = [
  * @returns {Object} Mapped error with user-friendly information
  */
 function mapError(error) {
-  const errorMessage = typeof error === 'string' ? error : error.message || String(error);
+  const errorMessage = typeof error === 'string' ? error : (error?.message || String(error || ''));
   
   // Try to match against known patterns
   for (const mapping of ERROR_MAPPINGS) {

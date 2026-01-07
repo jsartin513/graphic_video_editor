@@ -552,9 +552,15 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
 ipcMain.handle('open-external', async (event, url) => {
   const { shell } = require('electron');
   // Validate URL to prevent security issues
-  if (url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
-    await shell.openExternal(url);
-  } else {
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow http and https protocols
+    if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+      await shell.openExternal(url);
+    } else {
+      throw new Error('Only HTTP and HTTPS URLs are allowed');
+    }
+  } catch (error) {
     throw new Error('Invalid URL');
   }
 });
