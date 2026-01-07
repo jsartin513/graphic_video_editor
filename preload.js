@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removePrerequisitesListener: () => {
     ipcRenderer.removeAllListeners('prerequisites-missing');
   },
+  onMergeProgress: (callback) => {
+    ipcRenderer.on('merge-progress', (event, data) => callback(data));
+  },
+  removeMergeProgressListener: () => {
+    ipcRenderer.removeAllListeners('merge-progress');
+  },
   // Preferences API
   loadPreferences: () => ipcRenderer.invoke('load-preferences'),
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
