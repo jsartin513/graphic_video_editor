@@ -1069,6 +1069,12 @@ ipcMain.handle('set-date-format', async (event, format) => {
 // Set preferred quality
 ipcMain.handle('set-preferred-quality', async (event, quality) => {
   try {
+    // Validate quality parameter
+    const validQualities = ['copy', 'high', 'medium', 'low'];
+    if (!validQualities.includes(quality)) {
+      throw new Error(`Invalid quality option: ${quality}. Must be one of: ${validQualities.join(', ')}`);
+    }
+    
     const prefs = await loadPreferences();
     const updated = setPreferredQuality(prefs, quality);
     await savePreferences(updated);
