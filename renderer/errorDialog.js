@@ -4,6 +4,17 @@
  */
 
 /**
+ * Simple HTML escape function to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
  * Show an error dialog with user-friendly message and suggestions
  * @param {Object} errorInfo - Mapped error information
  * @param {string} errorInfo.userMessage - User-friendly error title
@@ -98,17 +109,6 @@ function showErrorDialog(errorInfo) {
 }
 
 /**
- * Simple HTML escape function to prevent XSS
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
  * Show a simple error alert (fallback for when dialog can't be shown)
  * @param {Object} errorInfo - Mapped error information
  */
@@ -120,11 +120,6 @@ function showSimpleError(errorInfo) {
   alert(message);
 }
 
-// Export functions for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    showErrorDialog,
-    showSimpleError,
-    escapeHtml
-  };
-}
+// Make functions available globally for use in other scripts
+window.showErrorDialog = showErrorDialog;
+window.showSimpleError = showSimpleError;
