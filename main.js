@@ -356,19 +356,32 @@ ipcMain.handle('get-video-metadata-detailed', async (event, filePath) => {
           // Parse frame rate (e.g., "30000/1001" -> 29.97)
           let fps = null;
           if (stream && stream.r_frame_rate) {
-            const [num, den] = stream.r_frame_rate.split('/').map(Number);
-            fps = den ? (num / den) : num;
+            const parts = stream.r_frame_rate.split('/');
+            if (parts.length === 2) {
+              const [num, den] = parts.map(Number);
+              if (!isNaN(num) && !isNaN(den) && den !== 0) {
+                fps = num / den;
+              }
+            } else if (parts.length === 1) {
+              const num = Number(parts[0]);
+              if (!isNaN(num)) {
+                fps = num;
+              }
+            }
           }
+          
+          // Consolidate bitrate - prefer format bitrate over stream bitrate
+          const bitrate = format.bit_rate ? parseInt(format.bit_rate) : 
+                         (stream?.bit_rate ? parseInt(stream.bit_rate) : null);
           
           const metadata = {
             width: stream?.width || null,
             height: stream?.height || null,
             fps: fps ? Math.round(fps * 100) / 100 : null,
             videoCodec: stream?.codec_name || null,
-            videoBitrate: stream?.bit_rate ? parseInt(stream.bit_rate) : null,
+            bitrate: bitrate,
             duration: format.duration ? parseFloat(format.duration) : null,
-            fileSize: format.size ? parseInt(format.size) : null,
-            formatBitrate: format.bit_rate ? parseInt(format.bit_rate) : null
+            fileSize: format.size ? parseInt(format.size) : null
           };
           
           resolve(metadata);

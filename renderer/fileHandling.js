@@ -144,12 +144,16 @@ export function initializeFileHandling(state, domElements) {
           allValues.forEach(v => {
             valueCounts[v] = (valueCounts[v] || 0) + 1;
           });
-          const mostCommon = Object.keys(valueCounts).reduce((a, b) => 
+          
+          const keys = Object.keys(valueCounts);
+          if (keys.length === 0) return;
+          
+          const mostCommon = keys.reduce((a, b) => 
             valueCounts[a] > valueCounts[b] ? a : b
           );
           
           // Check if this item's value differs from most common
-          if (metadata[warning.property] != mostCommon) {
+          if (metadata[warning.property] !== mostCommon) {
             mismatches.push(warning.property);
           }
         });
@@ -248,7 +252,7 @@ export function initializeFileHandling(state, domElements) {
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Bitrate:</span>
-                <span class="metadata-value">${formatBitrate(videoMetadata.formatBitrate || videoMetadata.videoBitrate)}</span>
+                <span class="metadata-value">${formatBitrate(videoMetadata.bitrate)}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Duration:</span>
@@ -276,7 +280,11 @@ export function initializeFileHandling(state, domElements) {
       if (videoMetadata) {
         const toggleBtn = item.querySelector('.metadata-toggle');
         const detailsSection = item.querySelector('.metadata-details');
-        const toggleIcon = item.querySelector('.toggle-icon');
+        
+        const TOGGLE_TEXT = {
+          collapsed: { icon: '▶', text: 'Show Details' },
+          expanded: { icon: '▼', text: 'Hide Details' }
+        };
         
         toggleBtn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -285,13 +293,13 @@ export function initializeFileHandling(state, domElements) {
           if (isExpanded) {
             detailsSection.style.display = 'none';
             toggleBtn.setAttribute('aria-expanded', 'false');
-            toggleIcon.textContent = '▶';
-            toggleBtn.innerHTML = `<span class="toggle-icon">▶</span> Show Details`;
+            const { icon, text } = TOGGLE_TEXT.collapsed;
+            toggleBtn.innerHTML = `<span class="toggle-icon">${icon}</span> ${text}`;
           } else {
             detailsSection.style.display = 'block';
             toggleBtn.setAttribute('aria-expanded', 'true');
-            toggleIcon.textContent = '▼';
-            toggleBtn.innerHTML = `<span class="toggle-icon">▼</span> Hide Details`;
+            const { icon, text } = TOGGLE_TEXT.expanded;
+            toggleBtn.innerHTML = `<span class="toggle-icon">${icon}</span> ${text}`;
           }
         });
       }
