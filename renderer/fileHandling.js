@@ -88,9 +88,112 @@ export function initializeFileHandling(state, domElements) {
     prepareMergeBtn.style.display = 'inline-flex';
     fileCount.textContent = `${state.selectedFiles.length} file${state.selectedFiles.length !== 1 ? 's' : ''}`;
     
+    // Create all file items
+    const items = [];
     for (const filePath of state.selectedFiles) {
       const item = await createFileItem(filePath);
+      items.push(item);
       fileList.appendChild(item);
+    }
+    
+    // Perform compatibility check if we have multiple files
+    if (state.selectedFiles.length > 1) {
+      await checkCompatibility(items);
+    }
+  }
+  
+  async function checkCompatibility(items) {
+    // Extract metadata from all items
+    const metadataList = items.map(item => {
+      const metadataStr = item.dataset.videoMetadata;
+      return metadataStr ? JSON.parse(metadataStr) : null;
+    }).filter(m => m !== null);
+    
+    if (metadataList.length < 2) return;
+    
+    // Find the most common values for each property
+    const properties = ['width', 'height', 'fps', 'videoCodec'];
+    const warnings = [];
+    
+    properties.forEach(prop => {
+      const values = metadataList.map(m => m[prop]).filter(v => v !== null);
+      const uniqueValues = [...new Set(values)];
+      
+      if (uniqueValues.length > 1) {
+        // Multiple different values found
+        warnings.push({
+          property: prop,
+          values: uniqueValues
+        });
+      }
+    });
+    
+    // If there are warnings, highlight mismatched items
+    if (warnings.length > 0) {
+      items.forEach((item, index) => {
+        const metadataStr = item.dataset.videoMetadata;
+        if (!metadataStr) return;
+        
+        const metadata = JSON.parse(metadataStr);
+        const mismatches = [];
+        
+        warnings.forEach(warning => {
+          // Find the most common value
+          const allValues = metadataList.map(m => m[warning.property]);
+          const valueCounts = {};
+          allValues.forEach(v => {
+            valueCounts[v] = (valueCounts[v] || 0) + 1;
+          });
+          const mostCommon = Object.keys(valueCounts).reduce((a, b) => 
+            valueCounts[a] > valueCounts[b] ? a : b
+          );
+          
+          // Check if this item's value differs from most common
+          if (metadata[warning.property] != mostCommon) {
+            mismatches.push(warning.property);
+          }
+        });
+        
+        // Add warning indicator if there are mismatches
+        if (mismatches.length > 0) {
+          item.classList.add('metadata-mismatch');
+          
+          // Add warning message
+          const warningDiv = document.createElement('div');
+          warningDiv.className = 'compatibility-warning';
+          warningDiv.innerHTML = `
+            <span class="warning-icon" aria-hidden="true">⚠️</span>
+            <span class="warning-text">
+              This video has different ${mismatches.join(', ')} compared to other files.
+              Merging may require re-encoding.
+            </span>
+          `;
+          
+          const fileInfo = item.querySelector('.file-info');
+          fileInfo.insertBefore(warningDiv, fileInfo.querySelector('.metadata-toggle') || fileInfo.querySelector('.file-actions'));
+        }
+      });
+      
+      // Add a summary warning at the top of the file list
+      const summaryWarning = document.createElement('div');
+      summaryWarning.className = 'compatibility-summary';
+      summaryWarning.innerHTML = `
+        <span class="warning-icon" aria-hidden="true">⚠️</span>
+        <div class="warning-content">
+          <strong>Compatibility Warning:</strong>
+          <p>The selected videos have different properties. This may affect merge quality:</p>
+          <ul>
+            ${warnings.map(w => {
+              const propName = w.property === 'fps' ? 'frame rate' : 
+                               w.property === 'videoCodec' ? 'video codec' :
+                               w.property;
+              return `<li><strong>${propName}:</strong> ${w.values.join(', ')}</li>`;
+            }).join('')}
+          </ul>
+        </div>
+      `;
+      
+      fileList.insertBefore(summaryWarning, fileList.firstChild);
     }
   }
 
