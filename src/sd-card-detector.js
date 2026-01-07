@@ -9,12 +9,14 @@ const path = require('path');
 const { EventEmitter } = require('events');
 
 class SDCardDetector extends EventEmitter {
-  constructor() {
+  constructor(volumesPath = '/Volumes') {
     super();
-    this.volumesPath = '/Volumes';
+    this.volumesPath = volumesPath;
     this.watcher = null;
     this.knownVolumes = new Set();
     this.checkInterval = null;
+    // List of volume names to exclude (common system volumes)
+    this.excludedVolumes = new Set(['Macintosh HD', 'Preboot', 'Recovery', 'VM', 'Update']);
   }
 
   /**
@@ -63,7 +65,7 @@ class SDCardDetector extends EventEmitter {
 
       // Find new volumes (newly mounted)
       for (const volume of volumes) {
-        if (!this.knownVolumes.has(volume) && volume !== 'Macintosh HD') {
+        if (!this.knownVolumes.has(volume) && !this.excludedVolumes.has(volume)) {
           const volumePath = path.join(this.volumesPath, volume);
           
           // Check if this is a GoPro SD card
@@ -188,7 +190,7 @@ class SDCardDetector extends EventEmitter {
       const volumes = await fs.readdir(this.volumesPath);
       
       for (const volume of volumes) {
-        if (volume === 'Macintosh HD') continue;
+        if (this.excludedVolumes.has(volume)) continue;
         
         const volumePath = path.join(this.volumesPath, volume);
         const isGoPro = await this.isGoProSDCard(volumePath);

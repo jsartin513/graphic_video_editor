@@ -7,13 +7,6 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Mock file system for testing
-jest.mock('fs', () => ({
-  promises: {
-    readdir: jest.fn(),
-    stat: jest.fn()
-  }
-}));
-
 jest.mock('fs', () => {
   const actualFs = jest.requireActual('fs');
   return {
