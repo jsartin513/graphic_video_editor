@@ -101,6 +101,43 @@ export function initializeFileHandling(state, domElements) {
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
       
+      // Get video metadata (lazy load - don't await)
+      let videoMetadataHtml = '';
+      window.electronAPI.getVideoMetadata(filePath)
+        .then(videoMetadata => {
+          if (videoMetadata && videoMetadata.video) {
+            const metadataDetails = item.querySelector('.video-metadata-details');
+            if (metadataDetails) {
+              const v = videoMetadata.video;
+              const a = videoMetadata.audio;
+              metadataDetails.innerHTML = `
+                <div class="metadata-row">
+                  <span class="metadata-label">Resolution:</span>
+                  <span class="metadata-value">${v.width}×${v.height}</span>
+                </div>
+                <div class="metadata-row">
+                  <span class="metadata-label">Codec:</span>
+                  <span class="metadata-value">${v.codec.toUpperCase()}</span>
+                </div>
+                <div class="metadata-row">
+                  <span class="metadata-label">FPS:</span>
+                  <span class="metadata-value">${v.fps ? v.fps.toFixed(2) : 'N/A'}</span>
+                </div>
+                ${a ? `
+                <div class="metadata-row">
+                  <span class="metadata-label">Audio:</span>
+                  <span class="metadata-value">${a.codec.toUpperCase()} ${a.channels}ch</span>
+                </div>
+                ` : ''}
+              `;
+              metadataDetails.style.display = 'block';
+            }
+          }
+        })
+        .catch(error => {
+          console.error(`Error getting video metadata for ${filePath}:`, error);
+        });
+      
       // Generate thumbnail (lazy load - don't await)
       let thumbnailHtml = '<div class="file-thumbnail-placeholder">🎬</div>';
       window.electronAPI.generateThumbnail(filePath, 1)
@@ -131,6 +168,7 @@ export function initializeFileHandling(state, domElements) {
             <span>Size: ${metadata.sizeFormatted}</span>
             <span>Modified: ${formatDate(metadata.modified)}</span>
           </div>
+          <div class="video-metadata-details" style="display: none; margin-top: 8px; font-size: 11px; color: var(--text-secondary);"></div>
         </div>
         <div class="file-actions">
           <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
