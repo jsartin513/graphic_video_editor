@@ -11,6 +11,7 @@ let ffprobePath = null;
 // Process tracking for cancellation
 let currentMergeProcess = null;
 let currentMergeTempFile = null;
+let currentMergeOutputPath = null; // Track output path for cleanup
 let currentSplitProcesses = [];
 let isCancelled = false;
 
@@ -397,10 +398,21 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           errorOutput += output;
           // Log stderr in real-time for debugging
           console.log(`[merge-videos] FFmpeg stderr: ${output.trim()}`);
+          
+          // Check for cancellation during processing (faster detection)
+          if (isCancelled) {
+            console.log('[merge-videos] Cancellation detected, stopping process...');
+            ffmpeg.kill('SIGTERM');
+          }
         });
         
         ffmpeg.on('error', (error) => {
           clearTimeout(timeout);
+          // Clean up references
+          currentMergeProcess = null;
+          currentMergeTempFile = null;
+          currentMergeOutputPath = null;
+          // Clean up temp file after error
           fs.unlink(tempFileList).catch(() => {});
           console.error(`[merge-videos] ⚠️  FFmpeg spawn error:`, error);
           // Handle case where ffmpeg is not found
@@ -413,10 +425,18 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         
         ffmpeg.on('close', (code) => {
           clearTimeout(timeout);
-          // Clean up temp file and process reference
-          fs.unlink(tempFileList).catch(() => {});
+          
+          // Clean up temp file and process reference (after process exits)
+          const tempFile = currentMergeTempFile;
+          const outputFile = currentMergeOutputPath;
           currentMergeProcess = null;
           currentMergeTempFile = null;
+          currentMergeOutputPath = null;
+          
+          // Clean up temp file after process has exited
+          if (tempFile) {
+            fs.unlink(tempFile).catch(() => {});
+          }
           
           if (hasTimedOut) {
             return; // Already rejected in timeout handler
@@ -425,6 +445,12 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
           // Check if operation was cancelled
           if (isCancelled) {
             console.log(`[merge-videos] ⚠️  Operation was cancelled by user`);
+            // Clean up partial output file if it exists
+            if (outputFile) {
+              fs.unlink(outputFile).catch((err) => {
+                console.log(`[merge-videos] Could not clean up partial output (may not exist): ${err.message}`);
+              });
+            }
             reject(new Error('Operation cancelled by user'));
             return;
           }
@@ -453,15 +479,24 @@ ipcMain.handle('cancel-merge', async () => {
         console.log('[cancel-merge] Cancelling merge operation...');
         isCancelled = true;
         
-        // Kill the ffmpeg process
+        // Kill the ffmpeg process with SIGTERM (graceful shutdown)
         currentMergeProcess.kill('SIGTERM');
         
-        // Clean up temp file if it exists
-        if (currentMergeTempFile) {
-          fs.unlink(currentMergeTempFile).catch((err) => {
-            console.error('[cancel-merge] Error removing temp file:', err);
-          });
-        }
+        // Set up fallback: if process doesn't exit within 2 seconds, force kill with SIGKILL
+        const forceKillTimeout = setTimeout(() => {
+          if (currentMergeProcess && !currentMergeProcess.killed) {
+            console.log('[cancel-merge] Process did not exit gracefully, force killing...');
+            currentMergeProcess.kill('SIGKILL');
+          }
+        }, 2000);
+        
+        // Clear timeout if process exits gracefully
+        currentMergeProcess.once('exit', () => {
+          clearTimeout(forceKillTimeout);
+        });
+        
+        // Note: Temp file and partial output cleanup happens in the 'close' handler
+        // after the process fully exits, to avoid deleting files while process is using them
         
         resolve({ success: true, message: 'Merge operation cancelled' });
       } else {
@@ -604,10 +639,24 @@ ipcMain.handle('cancel-split', async () => {
         console.log('[cancel-split] Cancelling split operation...');
         isCancelled = true;
         
-        // Kill all active split processes
-        currentSplitProcesses.forEach(process => {
+        // Kill all active split processes with SIGTERM (graceful shutdown)
+        const processesToKill = [...currentSplitProcesses]; // Copy array
+        processesToKill.forEach(process => {
           if (process && !process.killed) {
             process.kill('SIGTERM');
+            
+            // Set up fallback: if process doesn't exit within 2 seconds, force kill
+            const forceKillTimeout = setTimeout(() => {
+              if (process && !process.killed) {
+                console.log('[cancel-split] Process did not exit gracefully, force killing...');
+                process.kill('SIGKILL');
+              }
+            }, 2000);
+            
+            // Clear timeout if process exits gracefully
+            process.once('exit', () => {
+              clearTimeout(forceKillTimeout);
+            });
           }
         });
         
