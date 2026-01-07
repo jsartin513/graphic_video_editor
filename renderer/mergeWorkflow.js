@@ -115,12 +115,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   }
 
-  // Drag and drop state
-  let draggedIndex = null;
-  
   // Handle drag start
   function handleDragStart(e, index) {
-    draggedIndex = index;
     e.currentTarget.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index);
@@ -145,15 +141,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   function handleDragEnd(e) {
     e.currentTarget.classList.remove('dragging');
     
-    // Get the new order from DOM
+    // Get the new order from DOM based on current positions
     const items = Array.from(previewList.querySelectorAll('.preview-item'));
+    
+    // Create a map of current DOM position to original index
     const newOrder = items.map(item => parseInt(item.dataset.index));
     
-    // Reorder the state.videoGroups array based on new order
+    // Reorder the state.videoGroups array based on DOM order
     const reorderedGroups = newOrder.map(oldIndex => state.videoGroups[oldIndex]);
     state.videoGroups = reorderedGroups;
     
-    // Re-render to update indices and order numbers
+    // Re-render to update indices and order numbers to match new positions
     const hasMultipleDirectories = new Set(state.videoGroups.map(g => {
       let dir = '';
       if (g.directory) {
@@ -166,7 +164,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     })).size > 1;
     
     renderPreviewList(hasMultipleDirectories);
-    draggedIndex = null;
   }
   
   // Get element after current drag position
