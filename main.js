@@ -11,6 +11,33 @@ let ffprobePath = null;
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
 
+// Quality option constants
+const QUALITY_COPY = 'copy';
+const QUALITY_HIGH = 'high';
+const QUALITY_MEDIUM = 'medium';
+const QUALITY_LOW = 'low';
+
+// Video quality settings for encoding
+const QUALITY_SETTINGS = {
+  [QUALITY_HIGH]: { crf: '18', preset: 'slow' },
+  [QUALITY_MEDIUM]: { crf: '23', preset: 'medium' },
+  [QUALITY_LOW]: { crf: '28', preset: 'fast' }
+};
+
+// Valid quality options (including 'copy' which doesn't use QUALITY_SETTINGS)
+const VALID_QUALITY_OPTIONS = [QUALITY_COPY, QUALITY_HIGH, QUALITY_MEDIUM, QUALITY_LOW];
+
+/**
+ * Validates that the quality option is one of the allowed values
+ * @param {string} qualityOption - The quality option to validate
+ * @throws {Error} If the quality option is not valid
+ */
+function validateQualityOption(qualityOption) {
+  if (!VALID_QUALITY_OPTIONS.includes(qualityOption)) {
+    throw new Error(`Invalid quality option: ${qualityOption}. Must be one of: ${VALID_QUALITY_OPTIONS.join(', ')}`);
+  }
+}
+
 // Set app icon for development (will be overridden by electron-builder in production)
 function setupAppIcon() {
   const iconPath = ICON_PATH;
@@ -320,6 +347,14 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy') => {
   return new Promise((resolve, reject) => {
+    // Validate quality option
+    try {
+      validateQualityOption(qualityOption);
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
       const filename = path.basename(filePath);
@@ -362,18 +397,14 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           '-i', tempFileList
         ];
         
-        if (qualityOption === 'copy') {
+        if (qualityOption === QUALITY_COPY) {
           // Fast copy mode (no re-encoding)
           ffmpegArgs.push('-c', 'copy');
         } else {
           // Re-encode with quality settings
-          const qualitySettings = {
-            'high': { crf: '18', preset: 'slow' },
-            'medium': { crf: '23', preset: 'medium' },
-            'low': { crf: '28', preset: 'fast' }
-          };
-          
-          const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
+          // Note: qualityOption is guaranteed to be in QUALITY_SETTINGS because
+          // it's validated against VALID_QUALITY_OPTIONS and 'copy' is handled above
+          const settings = QUALITY_SETTINGS[qualityOption];
           
           // Video codec settings
           ffmpegArgs.push(
@@ -1062,6 +1093,22 @@ ipcMain.handle('set-date-format', async (event, format) => {
     return { success: true, preferences: updated };
   } catch (error) {
     console.error('Error setting date format:', error);
+    throw error;
+  }
+});
+
+// Set preferred quality
+ipcMain.handle('set-preferred-quality', async (event, quality) => {
+  try {
+    // Validate quality parameter
+    validateQualityOption(quality);
+    
+    const prefs = await loadPreferences();
+    const updated = setPreferredQuality(prefs, quality);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting preferred quality:', error);
     throw error;
   }
 });
