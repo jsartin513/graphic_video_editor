@@ -11,7 +11,9 @@ const state = {
   selectedFiles: [],
   videoGroups: [],
   currentScreen: 'fileList', // 'fileList', 'preview', 'progress'
-  selectedOutputDestination: null // null means use default
+  selectedOutputDestination: null, // null means use default
+  selectedGroups: new Set(), // Track which groups are selected for batch merge
+  stopOnError: true // Stop batch processing on error by default
 };
 
 // DOM element references
