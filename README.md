@@ -149,3 +149,9 @@ The built DMG file can be distributed to users. When they open it, they can drag
 
 **Note**: The app requires ffmpeg to be installed on the user's system. Make sure to include this requirement in your distribution notes.
 
+## Troubleshooting
+
+If you encounter any errors or issues while using the app, please refer to the [Troubleshooting Guide](TROUBLESHOOTING.md) for detailed solutions to common problems.
+
+The app includes user-friendly error messages with actionable suggestions to help you resolve issues quickly.
+

@@ -263,6 +263,9 @@ const {
   applyDateTokens
 } = require('./src/preferences');
 
+// Import error mapper module
+const { mapError } = require('./src/error-mapper');
+
 // Analyze and group video files by session ID and directory
 // Files from different subdirectories with the same session ID are processed separately
 ipcMain.handle('analyze-videos', async (event, filePaths) => {
@@ -1048,5 +1051,23 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
     console.error('Error applying date tokens:', error);
     throw error;
   }
+});
+
+// Map error to user-friendly format
+ipcMain.handle('map-error', async (event, error) => {
+  try {
+    return mapError(error);
+  } catch (e) {
+    console.error('Error mapping error:', e);
+    // Return a basic error object if mapping fails
+    return {
+      userMessage: "An Error Occurred",
+      suggestion: "Something went wrong.",
+      fixes: ["Try again", "Restart the app"],
+      code: "UNKNOWN",
+      technicalDetails: String(error)
+    };
+  }
+});
 });
 

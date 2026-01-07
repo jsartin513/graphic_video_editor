@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, shell } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFiles: () => ipcRenderer.invoke('select-files'),
@@ -12,9 +12,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
   selectOutputDestination: () => ipcRenderer.invoke('select-output-destination'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+  openExternal: (url) => shell.openExternal(url),
   getTestVideosPath: () => ipcRenderer.invoke('get-test-videos-path'),
   checkFFmpeg: () => ipcRenderer.invoke('check-ffmpeg'),
   installPrerequisites: () => ipcRenderer.invoke('install-prerequisites'),
+  mapError: (error) => ipcRenderer.invoke('map-error', error),
   onPrerequisitesMissing: (callback) => {
     ipcRenderer.on('prerequisites-missing', (event, data) => callback(data));
   },

@@ -73,7 +73,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       showPreviewScreen();
     } catch (error) {
       console.error('Error preparing merge:', error);
-      alert('Error analyzing videos: ' + error.message);
+      // Map error and show user-friendly dialog
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
     }
   }
 
@@ -252,7 +254,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       }
     } catch (error) {
       console.error('Error selecting output destination:', error);
-      alert('Error selecting output destination: ' + error.message);
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
     }
   }
 
@@ -298,7 +301,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[0].files[0]);
       }
     } catch (error) {
-      alert('Error creating output directory: ' + error.message);
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
       return;
     }
     
