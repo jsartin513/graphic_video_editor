@@ -105,10 +105,8 @@ const keyboardHandlers = {
     else if (domElements.splitVideoModal && domElements.splitVideoModal.style.display !== 'none') {
       domElements.splitVideoModal.style.display = 'none';
       // Reset split modal state
-      const splitProgress = document.getElementById('splitProgress');
-      const splitResult = document.getElementById('splitResult');
-      if (splitProgress) splitProgress.style.display = 'none';
-      if (splitResult) splitResult.style.display = 'none';
+      if (domElements.splitProgress) domElements.splitProgress.style.display = 'none';
+      if (domElements.splitResult) domElements.splitResult.style.display = 'none';
     }
   },
   savePreferences: () => {

@@ -65,20 +65,34 @@ function updateButtonLabels(domElements, platform) {
         }
       });
       
-      // Remove any existing shortcut hints
+      // Remove any existing shortcut hints and clean up whitespace
       const cleanText = currentText.trim().replace(/\s*\([^)]+\)\s*$/, '').trim();
+      
+      // Skip if button has no text (shouldn't happen, but be safe)
+      if (!cleanText && !icon) {
+        return;
+      }
       
       // Update button content
       if (icon) {
-        // Keep the icon element and update text content
+        // Find the text node to update (or create one if needed)
+        let textNode = null;
         element.childNodes.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            // Add leading space only if cleanText is not empty
-            const textWithHint = cleanText ? ` ${cleanText} (${hintText})` : `(${hintText})`;
-            node.textContent = textWithHint;
+          if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+            textNode = node;
           }
         });
+        
+        if (textNode) {
+          // Update existing text node with proper spacing
+          textNode.textContent = ` ${cleanText} (${hintText})`;
+        } else {
+          // Create new text node after the icon
+          const newTextNode = document.createTextNode(` ${cleanText || ''} (${hintText})`);
+          element.appendChild(newTextNode);
+        }
       } else {
+        // No icon, just update the entire text content
         element.textContent = `${cleanText} (${hintText})`;
       }
       
