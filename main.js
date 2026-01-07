@@ -27,7 +27,11 @@ const QUALITY_SETTINGS = {
 // Valid quality options (including 'copy' which doesn't use QUALITY_SETTINGS)
 const VALID_QUALITY_OPTIONS = [QUALITY_COPY, QUALITY_HIGH, QUALITY_MEDIUM, QUALITY_LOW];
 
-// Helper function to validate quality option
+/**
+ * Validates that the quality option is one of the allowed values
+ * @param {string} qualityOption - The quality option to validate
+ * @throws {Error} If the quality option is not valid
+ */
 function validateQualityOption(qualityOption) {
   if (!VALID_QUALITY_OPTIONS.includes(qualityOption)) {
     throw new Error(`Invalid quality option: ${qualityOption}. Must be one of: ${VALID_QUALITY_OPTIONS.join(', ')}`);
