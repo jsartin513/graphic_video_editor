@@ -17,7 +17,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
 
   // Detect platform (macOS uses Meta, others use Ctrl)
   // Check for macOS more reliably
-  const isMac = process.platform === 'darwin' || 
+  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') || 
                 navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
                 navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
   const modifierKey = isMac ? 'metaKey' : 'ctrlKey';
