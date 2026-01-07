@@ -8,6 +8,12 @@ let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
 
+// Process tracking for cancellation
+let currentMergeProcess = null;
+let currentMergeTempFile = null;
+let currentSplitProcesses = [];
+let isCancelled = false;
+
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
 
@@ -319,6 +325,9 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
+    // Reset cancellation flag
+    isCancelled = false;
+    
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
       const filename = path.basename(filePath);
@@ -332,6 +341,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
     
     // Create temporary file list
     const tempFileList = path.join(path.dirname(outputPath), `filelist_${Date.now()}.txt`);
+    currentMergeTempFile = tempFileList;
     const fileListContent = validFilePaths.map(f => `file '${f.replace(/'/g, "'\\''")}'`).join('\n');
     
     fs.writeFile(tempFileList, fileListContent, 'utf8')
@@ -362,6 +372,9 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         ], { 
           env
         });
+        
+        // Track the current merge process for cancellation
+        currentMergeProcess = ffmpeg;
         
         let errorOutput = '';
         let stdoutOutput = '';
@@ -400,11 +413,20 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         
         ffmpeg.on('close', (code) => {
           clearTimeout(timeout);
-          // Clean up temp file
+          // Clean up temp file and process reference
           fs.unlink(tempFileList).catch(() => {});
+          currentMergeProcess = null;
+          currentMergeTempFile = null;
           
           if (hasTimedOut) {
             return; // Already rejected in timeout handler
+          }
+          
+          // Check if operation was cancelled
+          if (isCancelled) {
+            console.log(`[merge-videos] ⚠️  Operation was cancelled by user`);
+            reject(new Error('Operation cancelled by user'));
+            return;
           }
           
           console.log(`[merge-videos] FFmpeg exited with code: ${code}`);
@@ -420,6 +442,35 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         });
       })
       .catch(reject);
+  });
+});
+
+// Cancel ongoing merge operation
+ipcMain.handle('cancel-merge', async () => {
+  return new Promise((resolve, reject) => {
+    try {
+      if (currentMergeProcess && !currentMergeProcess.killed) {
+        console.log('[cancel-merge] Cancelling merge operation...');
+        isCancelled = true;
+        
+        // Kill the ffmpeg process
+        currentMergeProcess.kill('SIGTERM');
+        
+        // Clean up temp file if it exists
+        if (currentMergeTempFile) {
+          fs.unlink(currentMergeTempFile).catch((err) => {
+            console.error('[cancel-merge] Error removing temp file:', err);
+          });
+        }
+        
+        resolve({ success: true, message: 'Merge operation cancelled' });
+      } else {
+        resolve({ success: false, message: 'No active merge operation to cancel' });
+      }
+    } catch (error) {
+      console.error('[cancel-merge] Error cancelling merge:', error);
+      reject(error);
+    }
   });
 });
 
@@ -441,6 +492,10 @@ ipcMain.handle('get-output-directory', async (event, inputPath) => {
 ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
   return new Promise(async (resolve, reject) => {
     try {
+      // Reset split cancellation
+      isCancelled = false;
+      currentSplitProcesses = [];
+      
       // Ensure output directory exists
       await fs.mkdir(outputDir, { recursive: true });
       
@@ -449,6 +504,13 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
       
       // Process each split
       for (let i = 0; i < splits.length; i++) {
+        // Check if operation was cancelled
+        if (isCancelled) {
+          console.log('[split-video] Operation cancelled by user');
+          resolve({ success: false, cancelled: true, results });
+          return;
+        }
+        
         const split = splits[i];
         const outputPath = path.join(outputDir, split.filename);
         
@@ -477,6 +539,9 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
               env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
             });
             
+            // Track this process for cancellation
+            currentSplitProcesses.push(ffmpeg);
+            
             let errorOutput = '';
             
             ffmpeg.stderr.on('data', (data) => {
@@ -484,6 +549,10 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
             });
             
             ffmpeg.on('error', (error) => {
+              // Remove from tracking
+              const idx = currentSplitProcesses.indexOf(ffmpeg);
+              if (idx > -1) currentSplitProcesses.splice(idx, 1);
+              
               if (error.code === 'ENOENT') {
                 splitReject(new Error('ffmpeg not found'));
               } else {
@@ -492,6 +561,16 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
             });
             
             ffmpeg.on('close', (code) => {
+              // Remove from tracking
+              const idx = currentSplitProcesses.indexOf(ffmpeg);
+              if (idx > -1) currentSplitProcesses.splice(idx, 1);
+              
+              // Check if cancelled
+              if (isCancelled) {
+                splitReject(new Error('Operation cancelled'));
+                return;
+              }
+              
               if (code === 0) {
                 results.push({ success: true, filename: split.filename, outputPath });
                 splitResolve();
@@ -513,6 +592,34 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
       resolve({ success: true, results });
     } catch (error) {
       reject(error);
+    }
+  });
+});
+
+// Cancel ongoing split operation
+ipcMain.handle('cancel-split', async () => {
+  return new Promise((resolve) => {
+    try {
+      if (currentSplitProcesses.length > 0) {
+        console.log('[cancel-split] Cancelling split operation...');
+        isCancelled = true;
+        
+        // Kill all active split processes
+        currentSplitProcesses.forEach(process => {
+          if (process && !process.killed) {
+            process.kill('SIGTERM');
+          }
+        });
+        
+        currentSplitProcesses = [];
+        
+        resolve({ success: true, message: 'Split operation cancelled' });
+      } else {
+        resolve({ success: false, message: 'No active split operation to cancel' });
+      }
+    } catch (error) {
+      console.error('[cancel-split] Error cancelling split:', error);
+      resolve({ success: false, message: error.message });
     }
   });
 });

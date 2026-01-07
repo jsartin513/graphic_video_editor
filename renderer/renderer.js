@@ -36,6 +36,7 @@ const domElements = {
   progressBar: document.getElementById('progressBar'),
   progressText: document.getElementById('progressText'),
   progressDetails: document.getElementById('progressDetails'),
+  cancelMergeBtn: document.getElementById('cancelMergeBtn'),
   
   // Output destination
   outputDestinationPath: document.getElementById('outputDestinationPath'),
