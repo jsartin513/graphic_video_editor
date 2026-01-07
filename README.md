@@ -7,7 +7,10 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - Select multiple video files via file picker dialog
 - Select a folder containing video files (recursively scans for videos)
 - Drag and drop video files or folders directly into the app
-- View selected files with metadata (file size, modification date)
+- **Detailed video metadata viewing** - View resolution, frame rate, codec, bitrate, and duration
+- **Expandable metadata details** - Toggle detailed properties for each video
+- **Compatibility checking** - Automatic detection of mismatched video properties
+- **Visual warnings** - Highlights videos with incompatible properties before merging
 - Remove individual files from the selection list
 - **Smart filename preferences** - Remember and suggest filename patterns
 - **Date token support** - Use {date}, {year}, {month}, {day} in filenames
@@ -72,6 +75,35 @@ npm start
   - `styles.css` - Application styling
   - `renderer.js` - UI logic and event handlers
   - `mergeWorkflow.js` - Video merging workflow with preferences
+
+## Video Metadata Viewing
+
+The app provides detailed information about each video file to help you make informed decisions before merging:
+
+### Basic Metadata
+Each video displays:
+- File size
+- Modification date
+- Duration
+- Resolution (width x height)
+
+### Detailed Metadata
+Click "Show Details" on any video to see comprehensive properties:
+- **Resolution**: Full video dimensions
+- **Frame Rate**: Frames per second (fps)
+- **Video Codec**: Encoding format (e.g., h264, hevc)
+- **Bitrate**: Data rate in Mbps or Kbps
+- **Duration**: Total video length
+- **File Size**: Storage space required
+
+### Compatibility Checking
+When multiple videos are selected, the app automatically:
+- Compares video properties across all files
+- Highlights videos with mismatched properties (resolution, frame rate, codec)
+- Shows warning indicators on incompatible videos
+- Displays a summary banner explaining potential issues
+
+**Note**: Videos with different properties may require re-encoding during merge, which can affect quality and processing time.
 
 ## User Preferences
 
