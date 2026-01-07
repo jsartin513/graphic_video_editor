@@ -5,6 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
+import { initializeKeyboardShortcuts } from './keyboardShortcuts.js';
 
 // Shared application state
 const state = {
@@ -77,6 +78,16 @@ const fileHandling = initializeFileHandling(state, domElements);
 const splitVideo = initializeSplitVideo(domElements, state);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
+
+// Initialize keyboard shortcuts
+const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
+  cancelMerge: mergeWorkflow?.cancelMerge || (() => {
+    // Fallback: try to cancel via IPC if available
+    if (window.electronAPI?.cancelMerge) {
+      window.electronAPI.cancelMerge();
+    }
+  })
+});
 
 // Make state accessible for debugging
 window.appState = state;
