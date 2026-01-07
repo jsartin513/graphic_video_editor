@@ -316,6 +316,94 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
   });
 });
 
+// Generate thumbnail for a video file
+ipcMain.handle('generate-thumbnail', async (event, videoPath, timestamp = 1) => {
+  // Validate videoPath
+  if (!videoPath || typeof videoPath !== 'string') {
+    throw new Error('Invalid video path');
+  }
+  
+  try {
+    // Check if thumbnail cache directory exists, create if not
+    const os = require('os');
+    const cacheDir = path.join(os.tmpdir(), 'video-merger-thumbnails');
+    await fs.mkdir(cacheDir, { recursive: true });
+    
+    // Create a cache key based on file path, size, and mtime
+    const stats = await fs.stat(videoPath);
+    const cacheKey = require('crypto')
+      .createHash('md5')
+      .update(`${videoPath}-${stats.size}-${stats.mtime.getTime()}-${timestamp}`)
+      .digest('hex');
+    
+    const thumbnailPath = path.join(cacheDir, `${cacheKey}.jpg`);
+    
+    // Check if thumbnail already exists
+    try {
+      await fs.access(thumbnailPath);
+      // Thumbnail exists, return as data URL
+      const imageData = await fs.readFile(thumbnailPath);
+      return `data:image/jpeg;base64,${imageData.toString('base64')}`;
+    } catch {
+      // Thumbnail doesn't exist, generate it
+    }
+    
+    // Generate thumbnail using ffmpeg
+    const ffmpegCmd = getFFmpegPath();
+    const env = { ...process.env };
+    if (ffmpegCmd.includes('.app/Contents/Resources')) {
+      env.PATH = '/usr/bin:/bin';
+    } else {
+      env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+    }
+    
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn(ffmpegCmd, [
+        '-ss', timestamp.toString(), // Seek to timestamp
+        '-i', videoPath,
+        '-vframes', '1', // Extract 1 frame
+        '-vf', 'scale=320:-1', // Scale to width 320, maintain aspect ratio
+        '-q:v', '2', // High quality
+        '-f', 'image2', // Output format
+        '-y', // Overwrite output file
+        thumbnailPath
+      ], { env });
+      
+      let errorOutput = '';
+      
+      ffmpeg.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+      
+      ffmpeg.on('error', (error) => {
+        if (error.code === 'ENOENT') {
+          reject(new Error('ffmpeg not found'));
+        } else {
+          reject(error);
+        }
+      });
+      
+      ffmpeg.on('close', async (code) => {
+        if (code === 0) {
+          try {
+            // Read the generated thumbnail and return as data URL
+            const imageData = await fs.readFile(thumbnailPath);
+            const dataUrl = `data:image/jpeg;base64,${imageData.toString('base64')}`;
+            resolve(dataUrl);
+          } catch (error) {
+            reject(new Error(`Failed to read generated thumbnail: ${error.message}`));
+          }
+        } else {
+          reject(new Error(`ffmpeg exited with code ${code}: ${errorOutput}`));
+        }
+      });
+    });
+  } catch (error) {
+    console.error(`Error generating thumbnail for ${videoPath}:`, error);
+    throw error;
+  }
+});
+
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
