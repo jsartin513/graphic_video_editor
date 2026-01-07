@@ -52,14 +52,14 @@ export function initializeTrimVideo(domElements, state) {
     
     if (endSeconds <= startSeconds) {
       trimPreview.textContent = 'End time must be after start time';
-      trimPreview.style.color = 'var(--color-danger)';
+      trimPreview.style.color = 'var(--accent-danger)';
       executeTrimBtn.disabled = true;
       return;
     }
     
     if (endSeconds > currentVideoDuration) {
       trimPreview.textContent = 'End time exceeds video duration';
-      trimPreview.style.color = 'var(--color-danger)';
+      trimPreview.style.color = 'var(--accent-danger)';
       executeTrimBtn.disabled = true;
       return;
     }
@@ -154,9 +154,10 @@ export function initializeTrimVideo(domElements, state) {
     trimProgressText.textContent = 'Trimming video...';
     
     try {
-      // Generate output filename
-      const baseName = currentVideoName.replace(/\.mp4$/i, '');
-      const outputFilename = `${baseName}_trimmed.MP4`;
+      // Generate output filename - preserve case from input
+      const extension = currentVideoName.match(/\.[^.]+$/)?.[0] || '.MP4';
+      const baseName = currentVideoName.replace(/\.[^.]+$/, '');
+      const outputFilename = `${baseName}_trimmed${extension}`;
       const outputPath = currentOutputDir ? `${currentOutputDir}/${outputFilename}` : null;
       
       // Call trim handler
