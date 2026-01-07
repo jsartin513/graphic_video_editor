@@ -119,14 +119,22 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }));
     const hasMultipleDirectories = directories.size > 1;
     
-    previewList.innerHTML = '';
-    
-    for (let i = 0; i < state.videoGroups.length; i++) {
-      const group = state.videoGroups[i];
-      const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
-      previewList.appendChild(previewItem);
+      previewList.innerHTML = '';
+      
+      // Initialize all groups as selected by default
+      state.selectedGroups.clear();
+      for (let i = 0; i < state.videoGroups.length; i++) {
+        state.selectedGroups.add(i);
+      }
+      
+      for (let i = 0; i < state.videoGroups.length; i++) {
+        const group = state.videoGroups[i];
+        const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
+        previewList.appendChild(previewItem);
+      }
+      
+      updateBatchControls();
     }
-  }
 
   // Create preview item
   function createPreviewItem(group, index, showDirectory = false) {
@@ -168,14 +176,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     
     item.innerHTML = `
       <div class="preview-item-header">
-        <div class="preview-item-info">
-          <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
-          <span class="preview-item-meta">
-            ${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}
-            ${group.totalInputSizeFormatted && group.totalInputSizeFormatted !== 'Unknown' ? ` • Input: ${group.totalInputSizeFormatted}` : ''}
-            ${group.estimatedOutputSizeFormatted && group.estimatedOutputSizeFormatted !== 'Unknown' ? ` • Est. Output: ${group.estimatedOutputSizeFormatted}` : ''}
-          </span>
-        </div>
+        <label class="preview-item-checkbox-label">
+          <input type="checkbox" 
+                 class="preview-item-checkbox" 
+                 data-index="${index}"
+                 ${state.selectedGroups.has(index) ? 'checked' : ''}
+                 aria-label="Select Session ${group.sessionId} for batch merge">
+          <div class="preview-item-info">
+            <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
+            <span class="preview-item-meta">
+              ${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}
+              ${group.totalInputSizeFormatted && group.totalInputSizeFormatted !== 'Unknown' ? ` • Input: ${group.totalInputSizeFormatted}` : ''}
+              ${group.estimatedOutputSizeFormatted && group.estimatedOutputSizeFormatted !== 'Unknown' ? ` • Est. Output: ${group.estimatedOutputSizeFormatted}` : ''}
+            </span>
+          </div>
+        </label>
       </div>
       <div class="preview-item-body">
         <div class="filename-edit">
@@ -210,6 +225,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         const cleanValue = value.replace(/\.MP4$/i, '');
         state.videoGroups[index].outputFilename = cleanValue + '.MP4';
       }
+    });
+    
+    // Add checkbox change handler for batch selection
+    const checkbox = item.querySelector('.preview-item-checkbox');
+    checkbox.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        state.selectedGroups.add(index);
+      } else {
+        state.selectedGroups.delete(index);
+      }
+      updateBatchControls();
     });
     
     // Validate filename on blur and apply date tokens
@@ -297,14 +323,26 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   }
 
-  // Handle Merge button
+  // Handle Merge button (merge all groups)
   async function handleMerge() {
-    if (state.videoGroups.length === 0) return;
+    // Merge all groups
+    await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
+  }
+  
+  // Handle Merge Selected button (batch merge)
+  async function handleBatchMerge(selectedIndices = null) {
+    const indicesToMerge = selectedIndices || Array.from(state.selectedGroups).sort((a, b) => a - b);
     
-    // Validate all filenames
-    for (const group of state.videoGroups) {
+    if (indicesToMerge.length === 0) {
+      alert('Please select at least one video group to merge.');
+      return;
+    }
+    
+    // Validate filenames for selected groups only
+    for (const index of indicesToMerge) {
+      const group = state.videoGroups[index];
       if (!group.outputFilename || !group.outputFilename.trim()) {
-        alert('Please provide a filename for all videos.');
+        alert(`Please provide a filename for Session ${group.sessionId}.`);
         return;
       }
     }
@@ -317,7 +355,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         outputDir = state.selectedOutputDestination;
       } else {
         // Use default (merged_videos subfolder)
-        outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[0].files[0]);
+        outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[indicesToMerge[0]].files[0]);
       }
     } catch (error) {
       alert('Error creating output directory: ' + error.message);
@@ -339,24 +377,33 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     
     const results = [];
     let completed = 0;
+    let failed = 0;
     
-    for (let i = 0; i < state.videoGroups.length; i++) {
-      const group = state.videoGroups[i];
+    for (let i = 0; i < indicesToMerge.length; i++) {
+      const index = indicesToMerge[i];
+      const group = state.videoGroups[index];
       const outputPath = outputDir + '/' + group.outputFilename;
       currentGroupIndex = i;
       currentGroup = group;
       
-      updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
+      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
       
       try {
         await window.electronAPI.mergeVideos(group.files, outputPath);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
-        updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
+        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
         results.push({ success: false, sessionId: group.sessionId, error: error.message });
-        updateProgress(i + 1, state.videoGroups.length, `Failed Session ${group.sessionId}`);
+        failed++;
+        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        
+        // Stop on error if configured
+        if (state.stopOnError) {
+          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`);
+          break;
+        }
       }
     }
     
@@ -364,10 +411,41 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     currentGroup = null;
     window.electronAPI.removeMergeProgressListener();
     
-    updateProgress(state.videoGroups.length, state.videoGroups.length, 'All videos processed');
+    const statusText = failed > 0 
+      ? `Batch complete: ${completed} succeeded, ${failed} failed`
+      : `All ${completed} videos processed successfully`;
+    updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
     
     // Show results
     showMergeResults(results, outputDir);
+  }
+  
+  // Update batch controls based on selection
+  function updateBatchControls() {
+    const selectedCount = state.selectedGroups.size;
+    const totalCount = state.videoGroups.length;
+    
+    // Update merge button text
+    const mergeBtn = document.getElementById('mergeBtn');
+    if (mergeBtn) {
+      if (selectedCount === totalCount) {
+        mergeBtn.textContent = 'Merge All Videos';
+      } else if (selectedCount > 0) {
+        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
+      } else {
+        mergeBtn.textContent = 'Merge Videos';
+      }
+    }
+    
+    // Show/hide merge selected button
+    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
+    if (mergeSelectedBtn) {
+      if (selectedCount > 0 && selectedCount < totalCount) {
+        mergeSelectedBtn.style.display = 'inline-flex';
+      } else {
+        mergeSelectedBtn.style.display = 'none';
+      }
+    }
   }
 
   // Show progress screen
@@ -613,7 +691,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
-  mergeBtn.addEventListener('click', handleMerge);
+    mergeBtn.addEventListener('click', handleMerge);
+    
+    // Batch merge button
+    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
+    if (mergeSelectedBtn) {
+      mergeSelectedBtn.addEventListener('click', () => handleBatchMerge());
+    }
+    
+    // Stop on error checkbox
+    const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
+    if (stopOnErrorCheckbox) {
+      stopOnErrorCheckbox.addEventListener('change', (e) => {
+        state.stopOnError = e.target.checked;
+      });
+    }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
 
