@@ -86,7 +86,7 @@ function showErrorDialog(errorInfo) {
   
   helpBtn.addEventListener('click', () => {
     // Open troubleshooting guide
-    window.electronAPI.openExternal('https://github.com/jsartin513/graphic_video_editor#troubleshooting');
+    window.electronAPI.openExternal('https://github.com/jsartin513/graphic_video_editor/blob/main/TROUBLESHOOTING.md');
   });
   
   // Close on overlay click

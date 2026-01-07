@@ -1080,5 +1080,5 @@ ipcMain.handle('map-error', async (event, error) => {
     };
   }
 });
-});
+
 
