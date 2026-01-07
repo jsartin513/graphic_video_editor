@@ -422,7 +422,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       const details = [];
       for (let i = 0; i < current && i < indicesToMerge.length; i++) {
         const groupIndex = indicesToMerge[i];
-        const status = i < current - 1 ? '✓' : '⏳';
+        // Show ✓ for completed items (all except the last one in the current range)
+        // Show ⏳ for the item currently being processed
+        const status = (i < current - 1 || current === total) ? '✓' : '⏳';
         details.push(`${status} Session ${state.videoGroups[groupIndex].sessionId}`);
       }
       if (details.length > 0) {
