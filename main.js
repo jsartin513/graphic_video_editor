@@ -548,6 +548,17 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
   shell.openPath(folderPath);
 });
 
+// Open external URL (e.g., troubleshooting guide)
+ipcMain.handle('open-external', async (event, url) => {
+  const { shell } = require('electron');
+  // Validate URL to prevent security issues
+  if (url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+    await shell.openExternal(url);
+  } else {
+    throw new Error('Invalid URL');
+  }
+});
+
 // Check if ffmpeg is installed
 ipcMain.handle('check-ffmpeg', async () => {
   return await checkFFmpeg();
