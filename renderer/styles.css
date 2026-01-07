@@ -695,6 +695,15 @@ body {
   overflow-y: auto;
 }
 
+.progress-actions {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.progress-actions .btn {
+  min-width: 120px;
+}
+
 .progress-details h3 {
   font-size: clamp(14px, 3vw, 18px);
   font-weight: 600;
