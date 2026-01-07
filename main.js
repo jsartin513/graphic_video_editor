@@ -11,6 +11,16 @@ let ffprobePath = null;
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
 
+// Video quality settings for encoding
+const QUALITY_SETTINGS = {
+  'high': { crf: '18', preset: 'slow' },
+  'medium': { crf: '23', preset: 'medium' },
+  'low': { crf: '28', preset: 'fast' }
+};
+
+// Valid quality options (including 'copy' which doesn't use QUALITY_SETTINGS)
+const VALID_QUALITY_OPTIONS = ['copy', 'high', 'medium', 'low'];
+
 // Set app icon for development (will be overridden by electron-builder in production)
 function setupAppIcon() {
   const iconPath = ICON_PATH;
@@ -367,13 +377,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           ffmpegArgs.push('-c', 'copy');
         } else {
           // Re-encode with quality settings
-          const qualitySettings = {
-            'high': { crf: '18', preset: 'slow' },
-            'medium': { crf: '23', preset: 'medium' },
-            'low': { crf: '28', preset: 'fast' }
-          };
-          
-          const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
+          const settings = QUALITY_SETTINGS[qualityOption] || QUALITY_SETTINGS['medium'];
           
           // Video codec settings
           ffmpegArgs.push(
@@ -1070,9 +1074,8 @@ ipcMain.handle('set-date-format', async (event, format) => {
 ipcMain.handle('set-preferred-quality', async (event, quality) => {
   try {
     // Validate quality parameter
-    const validQualities = ['copy', 'high', 'medium', 'low'];
-    if (!validQualities.includes(quality)) {
-      throw new Error(`Invalid quality option: ${quality}. Must be one of: ${validQualities.join(', ')}`);
+    if (!VALID_QUALITY_OPTIONS.includes(quality)) {
+      throw new Error(`Invalid quality option: ${quality}. Must be one of: ${VALID_QUALITY_OPTIONS.join(', ')}`);
     }
     
     const prefs = await loadPreferences();
