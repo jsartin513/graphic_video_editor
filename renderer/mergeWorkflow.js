@@ -116,8 +116,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     fileListContainer.style.display = 'none';
     previewScreen.style.display = 'block';
     
-    // Reset output destination to default when showing preview
-    state.selectedOutputDestination = null;
+    // Load saved output destination preference
+    if (userPreferences && userPreferences.lastOutputDestination) {
+      state.selectedOutputDestination = userPreferences.lastOutputDestination;
+    } else {
+      state.selectedOutputDestination = null;
+    }
     updateOutputDestinationDisplay();
     
     // Check if we have multiple directories (for display purposes)

@@ -261,6 +261,7 @@ const {
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,
+  setLastOutputDestination,
   applyDateTokens
 } = require('./src/preferences');
 
