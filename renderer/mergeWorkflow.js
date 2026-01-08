@@ -414,7 +414,27 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
-        results.push({ success: false, sessionId: group.sessionId, error: error.message });
+        const failedResult = { 
+          success: false, 
+          sessionId: group.sessionId, 
+          error: error.message,
+          files: group.files,
+          outputPath: path.join(outputDir, group.outputFilename)
+        };
+        results.push(failedResult);
+        
+        // Save failed operation for recovery
+        try {
+          await window.electronAPI.addFailedOperation({
+            sessionId: group.sessionId,
+            files: group.files,
+            outputPath: path.join(outputDir, group.outputFilename),
+            error: error.message,
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          console.error('Error saving failed operation:', err);
+        }
         failed++;
         updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
         
