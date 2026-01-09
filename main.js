@@ -265,6 +265,9 @@ const {
   applyDateTokens
 } = require('./src/preferences');
 
+// Import error mapper module
+const { mapError } = require('./src/error-mapper');
+
 // Analyze and group video files by session ID and directory
 // Files from different subdirectories with the same session ID are processed separately
 ipcMain.handle('analyze-videos', async (event, filePaths) => {
@@ -723,9 +726,15 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           console.error(`[merge-videos] ⚠️  FFmpeg spawn error:`, error);
           // Handle case where ffmpeg is not found
           if (error.code === 'ENOENT') {
-            reject(new Error('ffmpeg not found. Please install ffmpeg using the prerequisites installer or run: brew install ffmpeg'));
+            const mappedError = mapError('ffmpeg not found');
+            const userFriendlyError = new Error(mappedError.userMessage);
+            userFriendlyError.mappedError = mappedError;
+            reject(userFriendlyError);
           } else {
-            reject(error);
+            const mappedError = mapError(error);
+            const userFriendlyError = new Error(mappedError.userMessage);
+            userFriendlyError.mappedError = mappedError;
+            reject(userFriendlyError);
           }
         });
         
@@ -746,7 +755,12 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           } else {
             console.error(`[merge-videos] ❌ FFmpeg failed with code ${code}`);
             console.error(`[merge-videos] Error output:\n${errorOutput}`);
-            reject(new Error(`ffmpeg failed: ${errorOutput}`));
+            
+            // Map error to user-friendly message
+            const mappedError = mapError(`ffmpeg failed: ${errorOutput}`);
+            const userFriendlyError = new Error(mappedError.userMessage);
+            userFriendlyError.mappedError = mappedError;
+            reject(userFriendlyError);
           }
         });
       })
@@ -874,6 +888,23 @@ ipcMain.handle('select-output-destination', async () => {
 ipcMain.handle('open-folder', async (event, folderPath) => {
   const { shell } = require('electron');
   shell.openPath(folderPath);
+});
+
+// Open external URL (e.g., troubleshooting guide)
+ipcMain.handle('open-external', async (event, url) => {
+  const { shell } = require('electron');
+  // Validate URL to prevent security issues
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow http and https protocols
+    if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+      await shell.openExternal(url);
+    } else {
+      throw new Error('Only HTTP and HTTPS URLs are allowed');
+    }
+  } catch (error) {
+    throw new Error('Invalid URL');
+  }
 });
 
 // Check if ffmpeg is installed
@@ -1369,6 +1400,24 @@ ipcMain.handle('set-date-format', async (event, format) => {
   }
 });
 
+// Map error to user-friendly message (for renderer)
+ipcMain.handle('map-error', async (event, errorMessage) => {
+  try {
+    return mapError(errorMessage);
+  } catch (error) {
+    console.error('Error mapping error:', error);
+    // Fallback to basic error structure
+    return {
+      userMessage: 'An Error Occurred',
+      suggestion: 'Something went wrong.',
+      fixes: ['Try again', 'Check console for details'],
+      code: 'MAPPING_ERROR',
+      technicalDetails: errorMessage,
+      originalError: error
+    };
+  }
+});
+
 // Apply date tokens to a pattern
 ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) => {
   try {
@@ -1380,4 +1429,22 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
     throw error;
   }
 });
+
+// Map error to user-friendly format
+ipcMain.handle('map-error', async (event, error) => {
+  try {
+    return mapError(error);
+  } catch (e) {
+    console.error('Error mapping error:', e);
+    // Return a basic error object if mapping fails
+    return {
+      userMessage: "An Error Occurred",
+      suggestion: "Something went wrong.",
+      fixes: ["Try again", "Restart the app"],
+      code: "UNKNOWN",
+      technicalDetails: String(error)
+    };
+  }
+});
+
 
