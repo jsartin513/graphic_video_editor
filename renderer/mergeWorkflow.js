@@ -193,6 +193,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
     
+    // Make item draggable for reordering
+    item.draggable = true;
+    item.dataset.index = index;
+    
     item.innerHTML = `
       <div class="preview-item-header">
         <label class="preview-item-checkbox-label">
@@ -761,6 +765,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  
+  // Add drag handlers for preview list
+  previewList.addEventListener('dragover', handlePreviewDragOver);
 
   return { updateOutputDestinationDisplay };
 }
