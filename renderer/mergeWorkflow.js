@@ -2,6 +2,7 @@
 
 import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
 import { showError, enhanceError } from './errorHandler.js';
+import { showErrorDialog } from './errorDialog.js';
 
 export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo) {
   const {

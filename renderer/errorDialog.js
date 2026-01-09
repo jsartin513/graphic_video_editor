@@ -120,6 +120,9 @@ function showSimpleError(errorInfo) {
   alert(message);
 }
 
-// Make functions available globally for use in other scripts
+// Export functions for use in other modules
+export { showErrorDialog, showSimpleError };
+
+// Also make available globally for backward compatibility
 window.showErrorDialog = showErrorDialog;
 window.showSimpleError = showSimpleError;
