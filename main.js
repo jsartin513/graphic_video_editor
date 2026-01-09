@@ -524,7 +524,7 @@ ipcMain.handle('get-total-file-size', async (event, filePaths) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy') => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', normalizeAudio = false) => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
@@ -570,7 +570,18 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         
         if (qualityOption === 'copy') {
           // Fast copy mode (no re-encoding)
-          ffmpegArgs.push('-c', 'copy');
+          if (normalizeAudio) {
+            // Audio normalization in copy mode requires re-encoding audio only
+            ffmpegArgs.push(
+              '-c:v', 'copy',
+              '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          } else {
+            // Pure copy mode (fastest)
+            ffmpegArgs.push('-c', 'copy');
+          }
         } else {
           // Re-encode with quality settings
           const qualitySettings = {
@@ -585,10 +596,23 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           ffmpegArgs.push(
             '-c:v', 'libx264',
             '-crf', settings.crf,
-            '-preset', settings.preset,
-            '-c:a', 'aac',
-            '-b:a', '192k'
+            '-preset', settings.preset
           );
+          
+          // Audio normalization using loudnorm filter
+          if (normalizeAudio) {
+            // Use loudnorm filter for audio normalization (EBU R128 standard)
+            ffmpegArgs.push(
+              '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          } else {
+            ffmpegArgs.push(
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          }
         }
         
         ffmpegArgs.push(outputPath);

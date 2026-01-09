@@ -38,6 +38,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   
   // Quality selection state
   let selectedQuality = 'copy'; // Default to copy (fastest)
+  let normalizeAudio = false; // Audio normalization option
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -408,7 +409,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
@@ -738,6 +739,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       } catch (error) {
         console.error('Error saving quality preference:', error);
       }
+    });
+  }
+  
+  // Audio normalization checkbox handler
+  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+  if (normalizeAudioCheckbox) {
+    normalizeAudioCheckbox.addEventListener('change', (e) => {
+      normalizeAudio = e.target.checked;
     });
   }
   
