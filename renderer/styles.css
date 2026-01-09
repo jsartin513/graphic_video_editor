@@ -656,7 +656,8 @@ body {
 }
 
 .output-destination-label,
-.quality-label {
+.quality-label,
+.format-label {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
@@ -665,14 +666,16 @@ body {
 }
 
 .output-destination-controls,
-.quality-controls {
+.quality-controls,
+.format-controls {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.quality-select {
+.quality-select,
+.format-select {
   padding: 8px 12px;
   font-size: 14px;
   border: 1px solid var(--border-primary);
@@ -683,15 +686,25 @@ body {
   min-width: 250px;
 }
 
-.quality-select:focus {
+.quality-select:focus,
+.format-select:focus {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: var(--focus-ring);
 }
 
-.quality-hint {
+.quality-hint,
+.format-hint {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.format-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
 }
 
 .output-destination-display {

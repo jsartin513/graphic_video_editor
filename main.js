@@ -261,6 +261,7 @@ const {
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,
+  setPreferredFormat,
   setLastOutputDestination,
   applyDateTokens
 } = require('./src/preferences');
@@ -524,7 +525,7 @@ ipcMain.handle('get-total-file-size', async (event, filePaths) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy') => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4') => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
@@ -561,12 +562,33 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         console.log(`[merge-videos] Quality option: ${qualityOption}`);
         
-        // Build ffmpeg command based on quality option
+        // Build ffmpeg command based on quality option and format
         const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
           '-i', tempFileList
         ];
+        
+        // Map format to ffmpeg muxer (if needed, otherwise auto-detect from extension)
+        const formatMuxers = {
+          'mp4': 'mp4',
+          'mov': 'mov',
+          'mkv': 'matroska',
+          'avi': 'avi',
+          'm4v': 'mp4' // M4V uses same muxer as MP4
+        };
+        
+        // Ensure output path has correct extension
+        const outputExt = path.extname(outputPath).toLowerCase().slice(1);
+        if (outputExt !== format.toLowerCase()) {
+          const basePath = outputPath.replace(/\.[^/.]+$/, '');
+          outputPath = basePath + '.' + format.toLowerCase();
+        }
+        
+        // Add format muxer if not MP4 (MP4 is default)
+        if (format.toLowerCase() !== 'mp4' && formatMuxers[format.toLowerCase()]) {
+          ffmpegArgs.push('-f', formatMuxers[format.toLowerCase()]);
+        }
         
         if (qualityOption === 'copy') {
           // Fast copy mode (no re-encoding)
@@ -581,14 +603,19 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           
           const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
           
-          // Video codec settings
+          // Video codec settings (H.264 for maximum compatibility)
           ffmpegArgs.push(
             '-c:v', 'libx264',
             '-crf', settings.crf,
-            '-preset', settings.preset,
-            '-c:a', 'aac',
-            '-b:a', '192k'
+            '-preset', settings.preset
           );
+          
+          // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
+          if (['mp4', 'mov', 'm4v'].includes(format.toLowerCase())) {
+            ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
+          } else {
+            ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
+          }
         }
         
         ffmpegArgs.push(outputPath);
@@ -1365,6 +1392,32 @@ ipcMain.handle('set-date-format', async (event, format) => {
     return { success: true, preferences: updated };
   } catch (error) {
     console.error('Error setting date format:', error);
+    throw error;
+  }
+});
+
+// Set preferred quality
+ipcMain.handle('set-preferred-quality', async (event, quality) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredQuality(prefs, quality);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting preferred quality:', error);
+    throw error;
+  }
+});
+
+// Set preferred format
+ipcMain.handle('set-preferred-format', async (event, format) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredFormat(prefs, format);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting preferred format:', error);
     throw error;
   }
 });
