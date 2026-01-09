@@ -42,6 +42,18 @@
         <div class="file-list-header">
           <h2>Selected Videos</h2>
           <span id="fileCount" class="file-count" aria-live="polite">0 files</span>
+          <div class="undo-redo-controls">
+            <button id="undoBtn" class="btn btn-icon" aria-label="Undo last action" disabled title="Nothing to undo">
+              <span class="btn-icon" aria-hidden="true">↶</span>
+              Undo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘Z</span>
+            </button>
+            <button id="redoBtn" class="btn btn-icon" aria-label="Redo last action" disabled title="Nothing to redo">
+              <span class="btn-icon" aria-hidden="true">↷</span>
+              Redo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘⇧Z</span>
+            </button>
+          </div>
         </div>
         <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">

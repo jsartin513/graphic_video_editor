@@ -3,7 +3,7 @@
 import { getFileName, escapeHtml, formatDate } from './utils.js';
 
 // State will be managed in the main renderer.js
-export function initializeFileHandling(state, domElements) {
+export function initializeFileHandling(state, domElements, undoRedo = null) {
   const {
     selectFilesBtn,
     selectFolderBtn,
@@ -116,6 +116,11 @@ export function initializeFileHandling(state, domElements) {
       // For now, we'll just show the error and not add duplicates
     }
     
+    // Save state for undo/redo if files were added
+    if (undoRedo && added.length > 0) {
+      undoRedo.saveState(`Added ${added.length} file${added.length > 1 ? 's' : ''}`);
+    }
+    
     // Update UI only if files were added
     if (added.length > 0 || duplicates.length === 0) {
       updateFileList();
@@ -123,7 +128,14 @@ export function initializeFileHandling(state, domElements) {
   }
 
   function removeFile(filePath) {
+    const fileName = getFileName(filePath);
     state.selectedFiles = state.selectedFiles.filter(f => f !== filePath);
+    
+    // Save state for undo/redo
+    if (undoRedo) {
+      undoRedo.saveState(`Removed ${fileName}`);
+    }
+    
     updateFileList();
   }
 
@@ -256,5 +268,5 @@ export function initializeFileHandling(state, domElements) {
   dropZone.addEventListener('click', () => selectFilesBtn.click());
 
   // Export updateFileList so it can be called from other modules
-  return { updateFileList, addFiles, removeFile };
+  return { updateFileList, addFiles, removeFile, updateFileCount };
 }
