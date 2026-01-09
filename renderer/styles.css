@@ -1592,3 +1592,232 @@ body {
   }
 }
 
+/* Error Dialog Styles */
+.error-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.error-dialog {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  max-width: 560px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.error-dialog-header {
+  background: var(--accent-danger);
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-dialog-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.error-dialog-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  color: white;
+}
+
+.error-dialog-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.error-suggestion {
+  font-size: 16px;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.error-fixes {
+  margin-bottom: 20px;
+}
+
+.error-fixes h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.error-fixes ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.error-fixes li {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  position: relative;
+  padding-left: 32px;
+}
+
+.error-fixes li:before {
+  content: "→";
+  position: absolute;
+  left: 12px;
+  color: var(--accent-primary);
+  font-weight: bold;
+}
+
+.error-technical {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.error-technical details {
+  cursor: pointer;
+}
+
+.error-technical summary {
+  font-size: 14px;
+  color: var(--accent-primary);
+  font-weight: 500;
+  padding: 8px 0;
+  user-select: none;
+  outline: none;
+}
+
+.error-technical summary:hover {
+  color: var(--accent-primary-hover);
+}
+
+.error-technical summary::-webkit-details-marker {
+  color: var(--accent-primary);
+}
+
+.technical-content {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.technical-content p {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary);
+}
+
+.technical-content pre {
+  background: var(--bg-code);
+  color: #f8f8f2;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-dialog-footer {
+  padding: 16px 24px;
+  background: var(--bg-tertiary);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-primary);
+}
+
+.error-dialog-footer .btn-primary,
+.error-dialog-footer .btn-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.error-dialog-footer .btn-primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.error-dialog-footer .btn-primary:hover {
+  background: var(--accent-primary-hover);
+}
+
+.error-dialog-footer .btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+}
+
+.error-dialog-footer .btn-secondary:hover {
+  background: var(--bg-tertiary);
+}
+
+.error-dialog-footer button:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .error-dialog {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .error-dialog-footer .btn-secondary {
+    background: var(--bg-primary);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+

@@ -397,7 +397,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[indicesToMerge[0]].files[0]);
       }
     } catch (error) {
-      alert('Error creating output directory: ' + error.message);
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
       return;
     }
     
@@ -772,7 +773,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         const resultIndex = parseInt(e.target.getAttribute('data-result-index'));
         const result = results[resultIndex];
         if (result && !result.success && result.errorDetails) {
-          showError(result.errorDetails.original || result.error, {
+          showError(result.errorDetails?.original || result.error, {
             operation: 'Merge Videos',
             sessionId: result.sessionId,
             outputPath: result.outputPath

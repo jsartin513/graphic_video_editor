@@ -1,6 +1,7 @@
 /**
  * Enhanced Error Handler Module
  * Provides better error messages with context, categorization, and actionable suggestions
+ * Integrates with backend error-mapper.js for consistent error handling
  */
 
 // Simple HTML escape function
@@ -8,6 +9,47 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * Map error using backend error-mapper if available, otherwise use local enhancement
+ * @param {Error|string} error - The error
+ * @returns {Promise<Object>} Enhanced error info
+ */
+async function mapErrorIfAvailable(error) {
+  // Try to use backend error-mapper first (more comprehensive)
+  if (window.electronAPI && window.electronAPI.mapError) {
+    try {
+      const errorMessage = typeof error === 'string' ? error : (error?.message || String(error || ''));
+      const mapped = await window.electronAPI.mapError(errorMessage);
+      // Convert mapped error to our enhanced format
+      return {
+        userMessage: mapped.userMessage,
+        original: mapped.technicalDetails || errorMessage,
+        category: categorizeErrorFromCode(mapped.code),
+        suggestions: mapped.fixes || [],
+        severity: mapped.code === 'FILE_EXISTS' ? 'warning' : 'error',
+        code: mapped.code
+      };
+    } catch (e) {
+      console.warn('Error using backend error-mapper, falling back to local:', e);
+    }
+  }
+  
+  // Fallback to local enhancement
+  return enhanceError(error, {});
+}
+
+/**
+ * Categorize error from error code
+ */
+function categorizeErrorFromCode(code) {
+  if (!code) return ERROR_CATEGORIES.UNKNOWN;
+  if (code.includes('FILE_NOT_FOUND') || code.includes('ENOENT')) return ERROR_CATEGORIES.FILE_SYSTEM;
+  if (code.includes('FFMPEG') || code.includes('CODEC')) return ERROR_CATEGORIES.FFMPEG;
+  if (code.includes('PERMISSION')) return ERROR_CATEGORIES.PERMISSIONS;
+  if (code.includes('NO_SPACE') || code.includes('DISK')) return ERROR_CATEGORIES.FILE_SYSTEM;
+  return ERROR_CATEGORIES.UNKNOWN;
 }
 
 // Error categories
@@ -157,9 +199,29 @@ export function enhanceError(error, context = {}) {
  */
 export function showError(error, context = {}, callback = null) {
   // If error is already an enhanced object, use it directly
-  const enhanced = (error && typeof error === 'object' && error.userMessage) 
-    ? { ...error, context: { ...(error.context || {}), ...context } }
-    : enhanceError(error, context);
+  let enhanced;
+  if (error && typeof error === 'object' && error.userMessage) {
+    enhanced = { ...error, context: { ...(error.context || {}), ...context } };
+  } else {
+    // Use local enhancement immediately (async mapping will happen in background if needed)
+    enhanced = enhanceError(error, context);
+    
+    // Also try to enhance with backend mapper in background (non-blocking)
+    if (window.electronAPI && window.electronAPI.mapError) {
+      const errorMessage = typeof error === 'string' ? error : (error?.message || String(error || ''));
+      window.electronAPI.mapError(errorMessage).then(mapped => {
+        // Update suggestions if backend has better ones
+        if (mapped && mapped.fixes && mapped.fixes.length > 0) {
+          enhanced.suggestions = mapped.fixes;
+        }
+        if (mapped && mapped.userMessage) {
+          enhanced.userMessage = mapped.userMessage;
+        }
+      }).catch(() => {
+        // Ignore errors in background enhancement
+      });
+    }
+  }
   
   // Merge context suggestions if provided
   const finalContext = { ...enhanced.context, ...context };
