@@ -284,6 +284,8 @@ body {
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 2px solid var(--border-primary);
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .file-list-header h2 {
@@ -296,6 +298,43 @@ body {
   font-size: clamp(12px, 2vw, 14px);
   color: var(--text-secondary);
   font-weight: 500;
+  margin-left: auto;
+}
+
+.undo-redo-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon .btn-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .file-list {

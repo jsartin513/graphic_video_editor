@@ -6,6 +6,7 @@ import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
 import { initializeKeyboardShortcuts, formatShortcut } from './keyboardShortcuts.js';
+import { initializeUndoRedo } from './undoRedo.js';
 
 // Shared application state
 const state = {
@@ -70,14 +71,46 @@ const domElements = {
   splitProgress: document.getElementById('splitProgress'),
   splitProgressBar: document.getElementById('splitProgressBar'),
   splitProgressText: document.getElementById('splitProgressText'),
-  splitResult: document.getElementById('splitResult')
+  splitResult: document.getElementById('splitResult'),
+  
+  // Undo/Redo
+  undoBtn: document.getElementById('undoBtn'),
+  redoBtn: document.getElementById('redoBtn')
 };
 
-// Initialize all modules
-const fileHandling = initializeFileHandling(state, domElements);
+// Initialize modules (fileHandling and mergeWorkflow will be updated with undoRedo after it's created)
 const splitVideo = initializeSplitVideo(domElements, state);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
+
+// Create a closure that will access modules from outer scope
+// This allows us to reference modules that are defined later
+let fileHandling, mergeWorkflow;
+function createUpdateStateCallback() {
+  return (restoredState) => {
+    // Update UI when state is restored
+    // Use variables from outer scope at call time
+    if (fileHandling && typeof fileHandling.updateFileList === 'function') {
+      fileHandling.updateFileList();
+    }
+    if (restoredState.videoGroups && restoredState.videoGroups.length > 0) {
+      if (mergeWorkflow && typeof mergeWorkflow.updatePreviewList === 'function') {
+        mergeWorkflow.updatePreviewList();
+      }
+    }
+    // Update file count
+    const fileCount = document.getElementById('fileCount');
+    if (fileCount) {
+      fileCount.textContent = `${restoredState.selectedFiles.length} file${restoredState.selectedFiles.length !== 1 ? 's' : ''}`;
+    }
+  };
+}
+
+// Initialize undo/redo with callback that will access modules via closure
+const undoRedo = initializeUndoRedo(state, createUpdateStateCallback(), domElements);
+
+// Now initialize modules with undoRedo reference
+fileHandling = initializeFileHandling(state, domElements, undoRedo);
+mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, undoRedo);
 
 // Initialize keyboard shortcuts
 const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
@@ -115,6 +148,22 @@ function updateShortcutHints() {
       }
     }
   });
+}
+
+  // Wire up undo/redo button handlers
+  if (domElements.undoBtn) {
+    domElements.undoBtn.addEventListener('click', () => undoRedo.performUndo());
+  }
+  if (domElements.redoBtn) {
+    domElements.redoBtn.addEventListener('click', () => undoRedo.performRedo());
+  }
+
+  // Wire up undo/redo button handlers
+if (domElements.undoBtn) {
+  domElements.undoBtn.addEventListener('click', () => undoRedo.performUndo());
+}
+if (domElements.redoBtn) {
+  domElements.redoBtn.addEventListener('click', () => undoRedo.performRedo());
 }
 
 // Update shortcuts when DOM is ready
