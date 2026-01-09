@@ -244,6 +244,76 @@ export function initializeFileHandling(state, domElements) {
     const removeBtn = item.querySelector('.btn-remove');
     removeBtn.addEventListener('click', () => removeFile(filePath));
 
+    // Make item draggable for reordering
+    item.draggable = true;
+    item.setAttribute('data-file-index', state.selectedFiles.indexOf(filePath));
+    item.classList.add('draggable-item');
+    
+    // Drag event handlers
+    item.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', filePath);
+      item.classList.add('dragging');
+      
+      // Store the dragged item reference
+      state.draggedItem = item;
+      state.draggedIndex = state.selectedFiles.indexOf(filePath);
+    });
+    
+    item.addEventListener('dragend', (e) => {
+      item.classList.remove('dragging');
+      
+      // Clear drop indicators
+      document.querySelectorAll('.drag-over-item').forEach(el => {
+        el.classList.remove('drag-over-item');
+      });
+      
+      delete state.draggedItem;
+      delete state.draggedIndex;
+    });
+    
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      // Only show drop indicator if dragging over a different item
+      if (state.draggedItem && item !== state.draggedItem) {
+        item.classList.add('drag-over-item');
+      }
+    });
+    
+    item.addEventListener('dragleave', (e) => {
+      // Only remove indicator if not dragging over a child element
+      if (!item.contains(e.relatedTarget)) {
+        item.classList.remove('drag-over-item');
+      }
+    });
+    
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over-item');
+      
+      if (state.draggedItem && state.draggedIndex !== undefined) {
+        const draggedFilePath = state.selectedFiles[state.draggedIndex];
+        const dropIndex = state.selectedFiles.indexOf(filePath);
+        
+        if (draggedFilePath && dropIndex !== -1 && state.draggedIndex !== dropIndex) {
+          // Reorder files in state
+          state.selectedFiles.splice(state.draggedIndex, 1);
+          state.selectedFiles.splice(dropIndex, 0, draggedFilePath);
+          
+          // Save state for undo/redo if available (will be integrated when undo/redo feature is merged)
+          if (typeof undoRedo !== 'undefined' && undoRedo) {
+            undoRedo.saveState(`Reordered files`);
+          }
+          
+          // Update UI
+          updateFileList();
+        }
+      }
+    });
+
     return item;
   }
 
