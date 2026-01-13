@@ -261,7 +261,11 @@ const {
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,
-  applyDateTokens
+  applyDateTokens,
+  addFailedOperation,
+  removeFailedOperation,
+  getFailedOperations,
+  clearFailedOperations
 } = require('./src/preferences');
 
 // Analyze and group video files by session ID and directory
@@ -1289,6 +1293,56 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
     return { result };
   } catch (error) {
     console.error('Error applying date tokens:', error);
+    throw error;
+  }
+});
+
+// Add a failed operation for recovery
+ipcMain.handle('add-failed-operation', async (event, operation) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = addFailedOperation(prefs, operation);
+    await savePreferences(updated);
+    return { success: true };
+  } catch (error) {
+    console.error('Error adding failed operation:', error);
+    throw error;
+  }
+});
+
+// Remove a failed operation
+ipcMain.handle('remove-failed-operation', async (event, sessionId, outputPath) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = removeFailedOperation(prefs, sessionId, outputPath);
+    await savePreferences(updated);
+    return { success: true };
+  } catch (error) {
+    console.error('Error removing failed operation:', error);
+    throw error;
+  }
+});
+
+// Get all failed operations
+ipcMain.handle('get-failed-operations', async () => {
+  try {
+    const prefs = await loadPreferences();
+    return getFailedOperations(prefs);
+  } catch (error) {
+    console.error('Error getting failed operations:', error);
+    throw error;
+  }
+});
+
+// Clear all failed operations
+ipcMain.handle('clear-failed-operations', async () => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = clearFailedOperations(prefs);
+    await savePreferences(updated);
+    return { success: true };
+  } catch (error) {
+    console.error('Error clearing failed operations:', error);
     throw error;
   }
 });
