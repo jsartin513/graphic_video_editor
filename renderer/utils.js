@@ -28,6 +28,12 @@ export function formatDuration(seconds) {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
+export function getDirectoryPath(filePath) {
+  if (typeof filePath !== 'string' || filePath.length === 0) return '.';
+  const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+  return lastSep >= 0 ? filePath.substring(0, lastSep) : '.';
+}
+
 export function getDirectoryName(filePath) {
   // Handle non-string or empty paths with a meaningful default
   if (typeof filePath !== 'string' || filePath.length === 0) {
