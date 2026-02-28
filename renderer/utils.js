@@ -11,6 +11,12 @@ export function escapeHtml(text) {
   return div.innerHTML;
 }
 
+export function escapeAttr(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;').replace(/\r/g, '&#13;').replace(/\n/g, '&#10;');
+}
+
 export function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -69,16 +75,6 @@ export function getDirectoryName(filePath) {
 
   // Get parent directory name
   return parts[parts.length - 2];
-}
-
-export function getDirectoryPath(filePath) {
-  // Get the directory path from a file path
-  if (typeof filePath !== 'string' || filePath.length === 0) {
-    return '';
-  }
-  
-  const parts = filePath.split(/[/\\]/);
-  return parts.slice(0, -1).join('/');
 }
 
 export function formatTimeForFFmpeg(seconds) {

@@ -1,6 +1,6 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate, getDirectoryPath } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDate, getDirectoryPath } from './utils.js';
 
 // State will be managed in the main renderer.js
 export function initializeFileHandling(state, domElements, trimVideo = null) {
@@ -223,8 +223,8 @@ export function initializeFileHandling(state, domElements, trimVideo = null) {
           <div class="video-metadata-details" style="display: none; margin-top: 8px; font-size: 11px; color: var(--text-secondary);"></div>
         </div>
         <div class="file-actions">
-          ${trimVideo ? `<button class="btn-trim" data-file="${escapeHtml(filePath)}" data-name="${escapeHtml(fileName)}">✂️ Trim</button>` : ''}
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}">Remove</button>
         </div>
       `;
     } catch (error) {
@@ -238,8 +238,8 @@ export function initializeFileHandling(state, domElements, trimVideo = null) {
           <div class="file-name">${escapeHtml(fileName)}</div>
         </div>
         <div class="file-actions">
-          ${trimVideo ? `<button class="btn-trim" data-file="${escapeHtml(filePath)}" data-name="${escapeHtml(fileName)}">✂️ Trim</button>` : ''}
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}">Remove</button>
         </div>
       `;
     }

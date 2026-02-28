@@ -866,6 +866,7 @@ ipcMain.handle('trim-video', async (event, options) => {
       console.log(`[trim-video] Trimming ${inputPath} from ${startTimeFormatted} for ${durationFormatted}`);
       
       const ffmpeg = spawn(ffmpegCmd, [
+        '-y',
         '-i', inputPath,
         '-ss', startTimeFormatted,
         '-t', durationFormatted,
@@ -873,7 +874,6 @@ ipcMain.handle('trim-video', async (event, options) => {
         '-avoid_negative_ts', 'make_zero',
         outputPath
       ], {
-        shell: true,
         env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
       });
       
