@@ -45,7 +45,6 @@ __tests__/
 ## Test Coverage by Module
 
 ### 1. Preferences Module (`src/preferences.js`)
-- **Tests**: 40
 - **Coverage**: Comprehensive
 - **Key Areas**:
   - Pattern management (adding, limiting, deduplication)
@@ -54,7 +53,6 @@ __tests__/
   - Edge cases (empty patterns, null values)
 
 ### 2. Video Grouping Module (`src/video-grouping.js`)
-- **Tests**: 40
 - **Coverage**: Comprehensive
 - **Key Areas**:
   - GoPro filename pattern recognition (GX, GP, GOPR)
@@ -64,7 +62,6 @@ __tests__/
   - Edge cases (non-GoPro files, empty inputs)
 
 ### 3. Utility Functions (`src/utils.js`)
-- **Tests**: 51
 - **Coverage**: Comprehensive
 - **Key Areas**:
   - File path parsing (`getFileName`, `getDirectoryName`)
@@ -73,14 +70,12 @@ __tests__/
   - Edge cases (null, undefined, special characters)
 
 ### 4. Main Process Utilities (`src/main-utils.js`)
-- **Tests**: 9
 - **Coverage**: Complete
 - **Key Areas**:
   - File size formatting (bytes to KB/MB/GB)
   - Precision and rounding
 
 ### 5. Integration Tests (`__tests__/workflow-integration.test.js`)
-- **Tests**: 12
 - **Coverage**: End-to-end workflows
 - **Key Areas**:
   - Video grouping + preferences integration
