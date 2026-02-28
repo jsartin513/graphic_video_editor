@@ -6,6 +6,7 @@ import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
 import { initializeKeyboardShortcuts, formatShortcut } from './keyboardShortcuts.js';
+import { getFileName, getDirectoryPath } from './utils.js';
 
 // Shared application state
 const state = {
@@ -22,6 +23,7 @@ const domElements = {
   // File selection
   selectFilesBtn: document.getElementById('selectFilesBtn'),
   selectFolderBtn: document.getElementById('selectFolderBtn'),
+  splitVideoBtn: document.getElementById('splitVideoBtn'),
   dropZone: document.getElementById('dropZone'),
   fileListContainer: document.getElementById('fileListContainer'),
   fileList: document.getElementById('fileList'),
@@ -79,6 +81,23 @@ const splitVideo = initializeSplitVideo(domElements, state);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
 
+// Split Video button (start screen)
+const splitVideoBtn = document.getElementById('splitVideoBtn');
+if (splitVideoBtn) {
+  splitVideoBtn.addEventListener('click', async () => {
+    try {
+      const result = await window.electronAPI.selectFiles();
+      if (result.canceled || !result.files?.length) return;
+      const videoPath = result.files[0];
+      const videoName = getFileName(videoPath);
+      const outputDir = getDirectoryPath(videoPath);
+      splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+    } catch (error) {
+      console.error('Error opening split video:', error);
+    }
+  });
+}
+
 // Initialize keyboard shortcuts
 const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
   cancelMerge: mergeWorkflow?.cancelMerge || (() => {
@@ -100,6 +119,7 @@ function updateShortcutHints() {
     const shortcutMap = {
       'selectFilesBtn': 'O',
       'selectFolderBtn': 'D',
+      'splitVideoBtn': '⇧S',
       'prepareMergeBtn': 'M',
       'backBtn': 'Esc',
       'mergeBtn': 'Enter'

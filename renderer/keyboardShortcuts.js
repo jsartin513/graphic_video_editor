@@ -10,6 +10,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
   const {
     selectFilesBtn,
     selectFolderBtn,
+    splitVideoBtn,
     prepareMergeBtn,
     backBtn,
     mergeBtn
@@ -64,6 +65,15 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
       e.preventDefault();
       if (selectFolderBtn && !selectFolderBtn.disabled) {
         selectFolderBtn.click();
+      }
+      return;
+    }
+
+    // Cmd+Shift+S / Ctrl+Shift+S - Split video
+    if (e[modifierKey] && !e.altKey && e.shiftKey && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (splitVideoBtn && !splitVideoBtn.disabled) {
+        splitVideoBtn.click();
       }
       return;
     }
