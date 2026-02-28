@@ -606,14 +606,20 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     
     // Fetch duration for each successful result (to decide whether to show Split button)
     const durationsByIndex = new Map();
-    for (let i = 0; i < results.length; i++) {
-      if (results[i].success) {
-        try {
-          const dur = await window.electronAPI.getVideoDuration(results[i].outputPath);
-          durationsByIndex.set(i, dur);
-        } catch {
-          durationsByIndex.set(i, 0);
-        }
+    const durationPromises = results.map((result, index) => {
+      if (!result.success) {
+        return Promise.resolve(null);
+      }
+      return window.electronAPI
+        .getVideoDuration(result.outputPath)
+        .then((dur) => ({ index, duration: dur }))
+        .catch(() => ({ index, duration: null }));
+    });
+    const settledDurations = await Promise.allSettled(durationPromises);
+    for (const settled of settledDurations) {
+      if (settled.status === 'fulfilled' && settled.value !== null && settled.value.duration !== null) {
+        const { index, duration } = settled.value;
+        durationsByIndex.set(index, duration);
       }
     }
     
