@@ -1,4 +1,6 @@
-// Utility functions (CommonJS version for testing)
+// CommonJS test helper: provides Node-compatible implementations of renderer/utils.js.
+// Note: escapeHtml uses regex (not DOM) since tests run outside a browser context.
+// This file is intentionally excluded from coverage metrics.
 
 function getFileName(filePath) {
   const parts = filePath.split(/[/\\]/);

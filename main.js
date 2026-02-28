@@ -229,14 +229,6 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
 // Import utility functions
 const { formatFileSize } = require('./src/main-utils');
 
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
-
 // Import video grouping functions
 const { analyzeAndGroupVideos } = require('./src/video-grouping');
 

@@ -258,9 +258,10 @@ npm run test:coverage
 
 ### Module Not Found Errors
 
-Ensure files use correct module format:
-- Source files: CommonJS (`module.exports`)
-- Test files: CommonJS (`require()`)
+Ensure files use the correct module format for each part of the application:
+- Main/src (Node/Electron main process) files: CommonJS (`require`, `module.exports`)
+- Renderer files (e.g., `renderer/*.js`): ES modules (`import` / `export`)
+- Test files: match the module system of the code under test (e.g., renderer tests as ESM, main/src tests as CommonJS)
 
 ## Best Practices
 
