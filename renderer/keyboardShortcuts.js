@@ -70,7 +70,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
     }
 
     // Cmd+Shift+S / Ctrl+Shift+S - Split video
-    if (hasModifier(e) && e.shiftKey && e.key.toLowerCase() === 's') {
+    if (e[modifierKey] && !e.altKey && e.shiftKey && e.key.toLowerCase() === 's') {
       e.preventDefault();
       if (splitVideoBtn && !splitVideoBtn.disabled) {
         splitVideoBtn.click();
