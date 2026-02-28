@@ -261,6 +261,7 @@ const {
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,
+  setLastOutputDestination,
   applyDateTokens
 } = require('./src/preferences');
 
@@ -312,6 +313,93 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
         // Don't fail completely, just return 0 duration
         console.error(`ffprobe failed for ${filePath}: ${errorOutput}`);
         resolve(0);
+      }
+    });
+  });
+});
+
+// Get detailed video metadata using ffprobe
+ipcMain.handle('get-video-metadata', async (event, videoPath) => {
+  // Validate videoPath
+  if (!videoPath || typeof videoPath !== 'string') {
+    throw new Error('Invalid video path');
+  }
+
+  return new Promise((resolve, reject) => {
+    const ffprobeCmd = getFFprobePath();
+    const env = { ...process.env };
+    if (ffprobeCmd.includes('.app/Contents/Resources')) {
+      env.PATH = '/usr/bin:/bin';
+    } else {
+      env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+    }
+
+    // Get comprehensive video metadata
+    const ffprobe = spawn(ffprobeCmd, [
+      '-v', 'error',
+      '-print_format', 'json',
+      '-show_format',
+      '-show_streams',
+      videoPath
+    ], { env });
+
+    let output = '';
+    let errorOutput = '';
+
+    ffprobe.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    ffprobe.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    ffprobe.on('error', (error) => {
+      if (error.code === 'ENOENT') {
+        reject(new Error('ffprobe not found'));
+      } else {
+        reject(error);
+      }
+    });
+
+    ffprobe.on('close', async (code) => {
+      if (code === 0) {
+        try {
+          const metadata = JSON.parse(output);
+          const videoStream = metadata.streams?.find(s => s.codec_type === 'video');
+          const audioStream = metadata.streams?.find(s => s.codec_type === 'audio');
+          const format = metadata.format || {};
+
+          // Extract useful metadata
+          const result = {
+            duration: parseFloat(format.duration) || 0,
+            size: parseInt(format.size) || 0,
+            bitrate: parseInt(format.bit_rate) || 0,
+            video: videoStream ? {
+              codec: videoStream.codec_name || 'unknown',
+              codecLongName: videoStream.codec_long_name || 'unknown',
+              width: videoStream.width || 0,
+              height: videoStream.height || 0,
+              fps: videoStream.r_frame_rate ? eval(videoStream.r_frame_rate) : 0, // e.g., "30/1" -> 30
+              bitrate: parseInt(videoStream.bit_rate) || 0,
+              pixelFormat: videoStream.pix_fmt || 'unknown'
+            } : null,
+            audio: audioStream ? {
+              codec: audioStream.codec_name || 'unknown',
+              codecLongName: audioStream.codec_long_name || 'unknown',
+              sampleRate: parseInt(audioStream.sample_rate) || 0,
+              channels: audioStream.channels || 0,
+              bitrate: parseInt(audioStream.bit_rate) || 0
+            } : null,
+            container: format.format_name || 'unknown'
+          };
+
+          resolve(result);
+        } catch (error) {
+          reject(new Error(`Failed to parse ffprobe output: ${error.message}`));
+        }
+      } else {
+        reject(new Error(`ffprobe exited with code ${code}: ${errorOutput}`));
       }
     });
   });
@@ -503,7 +591,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           );
         }
         
-        ffmpegArgs.push(outputPath);
+        ffmpegArgs.push('-y', outputPath); // -y: overwrite output without prompting
         
         const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
@@ -714,6 +802,7 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
               '-t', duration,
               '-c', 'copy', // Use copy to avoid re-encoding (faster)
               '-avoid_negative_ts', 'make_zero',
+              '-y', // Overwrite output without prompting
               outputPath
             ], {
               shell: true,
