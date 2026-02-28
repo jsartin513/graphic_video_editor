@@ -8,13 +8,7 @@ The project uses **Jest** as the testing framework with comprehensive unit and i
 
 ### Test Statistics
 
-- **Total Tests**: 112
-- **Test Suites**: 5
-- **Overall Coverage**: 84%+ across all metrics
-  - Statements: 84.07%
-  - Branches: 85.71%
-  - Functions: 84.21%
-  - Lines: 83.49%
+Run `npm run test:coverage` to see current test counts and coverage metrics.
 
 ## Running Tests
 
@@ -41,11 +35,11 @@ Tests are organized in the `__tests__/` directory with the following structure:
 
 ```
 __tests__/
-├── preferences.test.js          # User preferences (40 tests)
-├── video-grouping.test.js       # GoPro video grouping (40 tests)
-├── utils.test.js                # Utility functions (51 tests)
-├── main-utils.test.js           # Main process utilities (9 tests)
-└── workflow-integration.test.js # Integration tests (12 tests)
+├── preferences.test.js          # User preferences
+├── video-grouping.test.js       # GoPro video grouping
+├── utils.test.js                # Utility functions
+├── main-utils.test.js           # Main process utilities
+└── workflow-integration.test.js # Integration tests
 ```
 
 ## Test Coverage by Module

@@ -95,7 +95,7 @@ npm run test:watch
 npm run test:coverage
 ```
 
-**Test Coverage**: 84%+ across 112 tests in 5 test suites.
+**Test Coverage**: High coverage across multiple unit and integration test suites (see coverage reports for current metrics).
 
 See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
 
