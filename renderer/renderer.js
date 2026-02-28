@@ -4,6 +4,7 @@
 import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
+import { initializeTrimVideo } from './trimVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
 import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
@@ -76,9 +77,10 @@ const domElements = {
 };
 
 // Initialize all modules
-const fileHandling = initializeFileHandling(state, domElements);
+const trimVideo = initializeTrimVideo(domElements, state);
+const fileHandling = initializeFileHandling(state, domElements, trimVideo);
 const splitVideo = initializeSplitVideo(domElements, state);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo);
 const prerequisites = initializePrerequisites(domElements);
 
 // Split Video button (start screen)

@@ -11,6 +11,12 @@ export function escapeHtml(text) {
   return div.innerHTML;
 }
 
+export function escapeAttr(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;').replace(/\r/g, '&#13;').replace(/\n/g, '&#10;');
+}
+
 export function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -69,5 +75,13 @@ export function getDirectoryName(filePath) {
 
   // Get parent directory name
   return parts[parts.length - 2];
+}
+
+export function formatTimeForFFmpeg(seconds) {
+  // Format time in seconds to HH:MM:SS format for ffmpeg
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 

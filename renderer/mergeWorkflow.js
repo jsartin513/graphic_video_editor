@@ -1,8 +1,8 @@
 // Video merging workflow functionality
 
-import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -682,7 +682,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         ` : ''}
     `;
     
-    // Add successful results with split buttons (only if video is at least 40 minutes)
+    // Add successful results with split and trim buttons (split only if video is at least 40 minutes)
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success) {
@@ -693,7 +693,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           <div class="result-item success">
             <span class="result-icon">✓</span>
             <span class="result-name">${escapeHtml(filename)}</span>
-            ${showSplitBtn ? `<button class="btn-split-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">✂️ Split</button>` : ''}
+            <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">
+              ✂️ Trim
+            </button>
+            ${showSplitBtn ? `<button class="btn-split-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">✂️ Split</button>` : ''}
           </div>
         `;
       }
@@ -786,6 +789,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         const videoPath = e.target.getAttribute('data-video-path');
         const videoName = e.target.getAttribute('data-video-name');
         splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+      });
+    });
+
+    // Add event listeners for trim video buttons
+    document.querySelectorAll('.btn-trim-video').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const videoPath = e.target.getAttribute('data-video-path');
+        const videoName = e.target.getAttribute('data-video-name');
+        trimVideo.showTrimVideoModal(videoPath, videoName, outputDir);
       });
     });
   }

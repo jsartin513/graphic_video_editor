@@ -1,9 +1,9 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDate, getDirectoryPath } from './utils.js';
 
 // State will be managed in the main renderer.js
-export function initializeFileHandling(state, domElements) {
+export function initializeFileHandling(state, domElements, trimVideo = null) {
   const {
     selectFilesBtn,
     selectFolderBtn,
@@ -152,9 +152,9 @@ export function initializeFileHandling(state, domElements) {
     
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
+      const fileName = getFileName(filePath);
       
       // Get video metadata (lazy load - don't await)
-      let videoMetadataHtml = '';
       window.electronAPI.getVideoMetadata(filePath)
         .then(videoMetadata => {
           if (videoMetadata && videoMetadata.video) {
@@ -215,7 +215,7 @@ export function initializeFileHandling(state, domElements) {
           ${thumbnailHtml}
         </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
           <div class="file-meta">
             <span>Size: ${metadata.sizeFormatted}</span>
             <span>Modified: ${formatDate(metadata.modified)}</span>
@@ -223,21 +223,39 @@ export function initializeFileHandling(state, domElements) {
           <div class="video-metadata-details" style="display: none; margin-top: 8px; font-size: 11px; color: var(--text-secondary);"></div>
         </div>
         <div class="file-actions">
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}">Remove</button>
         </div>
       `;
     } catch (error) {
+      const fileName = getFileName(filePath);
+      
       item.innerHTML = `
         <div class="file-thumbnail-container">
           <div class="file-thumbnail-placeholder">🎬</div>
         </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
         </div>
         <div class="file-actions">
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}">Remove</button>
         </div>
       `;
+    }
+
+    // Add trim button handler if trimVideo module is available
+    if (trimVideo) {
+      const trimBtn = item.querySelector('.btn-trim');
+      if (trimBtn) {
+        trimBtn.addEventListener('click', () => {
+          const file = trimBtn.getAttribute('data-file');
+          const name = trimBtn.getAttribute('data-name');
+          // Get directory from file path
+          const directory = getDirectoryPath(filePath);
+          trimVideo.showTrimVideoModal(file, name, directory);
+        });
+      }
     }
 
     // Add remove button handler

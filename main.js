@@ -842,6 +842,89 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
   });
 });
 
+// Trim video to specific start and end times
+// options: { inputPath: string, outputPath: string, startTime: number (seconds), endTime: number (seconds) }
+ipcMain.handle('trim-video', async (event, options) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { inputPath, outputPath, startTime, endTime } = options;
+      
+      // Validate inputs
+      if (!inputPath || !outputPath) {
+        reject(new Error('Input and output paths are required'));
+        return;
+      }
+      
+      if (startTime < 0 || endTime <= startTime) {
+        reject(new Error('Invalid trim times'));
+        return;
+      }
+      
+      // Calculate duration
+      const duration = endTime - startTime;
+      
+      // Ensure output directory exists
+      const outputDir = path.dirname(outputPath);
+      await fs.mkdir(outputDir, { recursive: true });
+      
+      const ffmpegCmd = getFFmpegPath();
+      
+      // Convert seconds to HH:MM:SS format for ffmpeg
+      const formatTime = (seconds) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      };
+      
+      const startTimeFormatted = formatTime(startTime);
+      const durationFormatted = formatTime(duration);
+      
+      console.log(`[trim-video] Trimming ${inputPath} from ${startTimeFormatted} for ${durationFormatted}`);
+      
+      const ffmpeg = spawn(ffmpegCmd, [
+        '-y',
+        '-i', inputPath,
+        '-ss', startTimeFormatted,
+        '-t', durationFormatted,
+        '-c', 'copy', // Use copy to avoid re-encoding (faster)
+        '-avoid_negative_ts', 'make_zero',
+        outputPath
+      ], {
+        env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+      });
+      
+      let errorOutput = '';
+      
+      ffmpeg.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+        console.log(`[trim-video] FFmpeg stderr: ${data.toString().trim()}`);
+      });
+      
+      ffmpeg.on('error', (error) => {
+        if (error.code === 'ENOENT') {
+          reject(new Error('ffmpeg not found. Please install ffmpeg.'));
+        } else {
+          reject(error);
+        }
+      });
+      
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          console.log(`[trim-video] ✅ Trim completed successfully: ${outputPath}`);
+          resolve({ success: true, outputPath });
+        } else {
+          console.error(`[trim-video] ❌ FFmpeg failed with code ${code}`);
+          console.error(`[trim-video] Error output:\n${errorOutput}`);
+          reject(new Error(`ffmpeg failed: ${errorOutput}`));
+        }
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});
+
 // Select output destination folder
 ipcMain.handle('select-output-destination', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
