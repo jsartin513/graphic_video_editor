@@ -1,6 +1,17 @@
 // Keyboard shortcuts functionality
 
 /**
+ * Detect the platform
+ * @returns {string} 'mac' or 'other'
+ */
+function getPlatform() {
+  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') || 
+                navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
+                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+  return isMac ? 'mac' : 'other';
+}
+
+/**
  * Initialize keyboard shortcuts
  * @param {Object} state - Application state
  * @param {Object} domElements - DOM element references
@@ -10,6 +21,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
   const {
     selectFilesBtn,
     selectFolderBtn,
+    splitVideoBtn,
     prepareMergeBtn,
     backBtn,
     mergeBtn
@@ -17,9 +29,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
 
   // Detect platform (macOS uses Meta, others use Ctrl)
   // Check for macOS more reliably
-  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') || 
-                navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
-                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = getPlatform() === 'mac';
   const modifierKey = isMac ? 'metaKey' : 'ctrlKey';
   const modifierDisplay = isMac ? '⌘' : 'Ctrl';
 
@@ -64,6 +74,15 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
       e.preventDefault();
       if (selectFolderBtn && !selectFolderBtn.disabled) {
         selectFolderBtn.click();
+      }
+      return;
+    }
+
+    // Cmd+Shift+S / Ctrl+Shift+S - Split video
+    if (e[modifierKey] && !e.altKey && e.shiftKey && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (splitVideoBtn && !splitVideoBtn.disabled) {
+        splitVideoBtn.click();
       }
       return;
     }
@@ -117,10 +136,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
  * @returns {string} Display string for modifier key (⌘ or Ctrl)
  */
 export function getModifierDisplay() {
-  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') || 
-                navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
-                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-  return isMac ? '⌘' : 'Ctrl';
+  return getPlatform() === 'mac' ? '⌘' : 'Ctrl';
 }
 
 /**
@@ -131,10 +147,33 @@ export function getModifierDisplay() {
  */
 export function formatShortcut(key, useModifier = true) {
   const modifier = useModifier ? getModifierDisplay() : '';
-  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') || 
-                navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
-                navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = getPlatform() === 'mac';
   const separator = isMac ? '' : '+';
   return modifier ? `${modifier}${separator}${key.toUpperCase()}` : key.toUpperCase();
+}
+
+/**
+ * Update keyboard shortcut hints in the UI
+ * Call this on page load to set platform-specific shortcuts
+ * Note: Only updates shortcuts with platform-specific modifiers (Cmd/Ctrl).
+ * Shortcuts like Enter and Esc are the same across all platforms and don't need updating.
+ */
+export function updateShortcutHints() {
+  // Update button shortcuts with platform-specific modifiers
+  const shortcuts = {
+    'selectFilesBtn': formatShortcut('O'),
+    'selectFolderBtn': formatShortcut('D'),
+    'prepareMergeBtn': `${formatShortcut('M')} or Enter`
+  };
+
+  Object.keys(shortcuts).forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      const shortcutSpan = btn.querySelector('.btn-shortcut');
+      if (shortcutSpan) {
+        shortcutSpan.textContent = shortcuts[btnId];
+      }
+    }
+  });
 }
 
