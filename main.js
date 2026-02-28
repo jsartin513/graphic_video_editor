@@ -1298,10 +1298,65 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
 });
 
 // Add a failed operation for recovery
+function sanitizeFailedOperation(operation) {
+  const MAX_STRING_LENGTH = 1024;
+  const MAX_FILES = 100;
+  const MAX_SERIALIZED_LENGTH = 10 * 1024; // 10 KB
+
+  if (!operation || typeof operation !== 'object') {
+    throw new Error('Invalid failed operation: expected an object.');
+  }
+
+  const sanitized = {};
+
+  if (typeof operation.sessionId === 'string') {
+    sanitized.sessionId = operation.sessionId.trim().slice(0, MAX_STRING_LENGTH);
+  }
+  if (!sanitized.sessionId) {
+    throw new Error('Invalid failed operation: missing sessionId.');
+  }
+
+  if (typeof operation.outputPath === 'string') {
+    sanitized.outputPath = operation.outputPath.trim().slice(0, MAX_STRING_LENGTH);
+  }
+  if (!sanitized.outputPath) {
+    throw new Error('Invalid failed operation: missing outputPath.');
+  }
+
+  if (Array.isArray(operation.files)) {
+    sanitized.files = operation.files
+      .filter(f => typeof f === 'string')
+      .slice(0, MAX_FILES)
+      .map(f => f.slice(0, MAX_STRING_LENGTH));
+  } else {
+    sanitized.files = [];
+  }
+
+  if (typeof operation.timestamp === 'number' && Number.isFinite(operation.timestamp)) {
+    sanitized.timestamp = operation.timestamp;
+  } else {
+    sanitized.timestamp = Date.now();
+  }
+
+  if (typeof operation.error === 'string') {
+    sanitized.error = operation.error.slice(0, MAX_STRING_LENGTH);
+  } else {
+    sanitized.error = '';
+  }
+
+  const serialized = JSON.stringify(sanitized);
+  if (serialized.length > MAX_SERIALIZED_LENGTH) {
+    throw new Error('Failed operation too large to store.');
+  }
+
+  return sanitized;
+}
+
 ipcMain.handle('add-failed-operation', async (event, operation) => {
   try {
+    const sanitizedOperation = sanitizeFailedOperation(operation);
     const prefs = await loadPreferences();
-    const updated = addFailedOperation(prefs, operation);
+    const updated = addFailedOperation(prefs, sanitizedOperation);
     await savePreferences(updated);
     return { success: true };
   } catch (error) {

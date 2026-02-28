@@ -177,12 +177,14 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD') 
  * @param {Object} operation - Failed operation details (sessionId, files, outputPath, error, timestamp)
  * @returns {Object} Updated preferences
  */
+const MAX_FAILED_OPERATIONS = 50;
+
 function addFailedOperation(preferences, operation) {
   if (!operation || !operation.sessionId) {
     return preferences;
   }
   
-  const failedOps = preferences.failedOperations || [];
+  const failedOps = [...(preferences.failedOperations || [])];
   
   // Check if this operation already exists (by sessionId and outputPath)
   const existingIndex = failedOps.findIndex(
@@ -205,9 +207,14 @@ function addFailedOperation(preferences, operation) {
     });
   }
   
+  // Keep only the most recent MAX_FAILED_OPERATIONS entries
+  const trimmed = failedOps
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_FAILED_OPERATIONS);
+  
   return {
     ...preferences,
-    failedOperations: failedOps
+    failedOperations: trimmed
   };
 }
 

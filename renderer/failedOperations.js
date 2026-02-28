@@ -110,15 +110,11 @@ export function initializeFailedOperations(domElements, state) {
         </div>
         <div class="failed-op-actions">
           <button class="btn btn-small btn-primary retry-btn" 
-                  data-session-id="${escapeHtml(op.sessionId)}"
-                  data-output-path="${escapeHtml(op.outputPath)}"
                   aria-label="Retry merge for session ${escapeHtml(op.sessionId)}">
             <span class="btn-icon" aria-hidden="true">🔄</span>
             Retry
           </button>
           <button class="btn btn-small btn-text remove-btn" 
-                  data-session-id="${escapeHtml(op.sessionId)}"
-                  data-output-path="${escapeHtml(op.outputPath)}"
                   aria-label="Remove failed operation for session ${escapeHtml(op.sessionId)}">
             ✕
           </button>
@@ -130,7 +126,11 @@ export function initializeFailedOperations(domElements, state) {
         <details class="failed-op-files">
           <summary>View input files (${fileCount})</summary>
           <ul class="failed-op-file-list">
-            ${op.files.map(f => `<li>${escapeHtml(getFileName(f))}</li>`).join('')}
+            ${
+              Array.isArray(op.files)
+                ? op.files.map(f => `<li>${escapeHtml(getFileName(f))}</li>`).join('')
+                : '<li>(no input files recorded)</li>'
+            }
           </ul>
         </details>
       </div>
@@ -154,13 +154,25 @@ export function initializeFailedOperations(domElements, state) {
   // Retry a failed operation
   async function retryOperation(op) {
     try {
+      // Validate operation data before using it
+      if (!op || !Array.isArray(op.files) || op.files.length === 0) {
+        console.error('Cannot retry failed operation: missing or invalid files array.', op);
+        alert(
+          'This failed operation cannot be retried because the associated file list is missing or invalid.\n\n' +
+          'Please remove this entry from the Failed Operations list.'
+        );
+        await showFailedOperationsModal();
+        return;
+      }
+
       // Close the modal
       closeModal();
       
       // Show confirmation
+      const filesCount = op.files.length;
       const confirmed = confirm(
         `Retry merging Session ${op.sessionId}?\n\n` +
-        `This will attempt to merge ${op.files.length} file${op.files.length !== 1 ? 's' : ''} again.`
+        `This will attempt to merge ${filesCount} file${filesCount !== 1 ? 's' : ''} again.`
       );
       
       if (!confirmed) {
