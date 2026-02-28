@@ -316,6 +316,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       if (!result.canceled && result.path) {
         state.selectedOutputDestination = result.path;
         updateOutputDestinationDisplay();
+        
+        // Save the selected output destination to preferences
+        try {
+          await window.electronAPI.setLastOutputDestination(result.path);
+          if (userPreferences) userPreferences.lastOutputDestination = result.path;
+        } catch (prefError) {
+          console.error('Error saving output destination preference:', prefError);
+        }
       }
     } catch (error) {
       console.error('Error selecting output destination:', error);
@@ -324,9 +332,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   }
 
   // Handle use default destination
-  function handleUseDefaultDestination() {
+  async function handleUseDefaultDestination() {
     state.selectedOutputDestination = null;
     updateOutputDestinationDisplay();
+    
+    // Clear the saved output destination preference
+    try {
+      await window.electronAPI.setLastOutputDestination(null);
+      if (userPreferences) userPreferences.lastOutputDestination = null;
+    } catch (error) {
+      console.error('Error clearing output destination preference:', error);
+    }
   }
 
   // Update output destination display
