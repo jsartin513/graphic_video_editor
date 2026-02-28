@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
+const { formatFileSize } = require('./src/main-utils');
 
 let mainWindow;
 let ffmpegPath = null;
@@ -225,9 +226,6 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
 
   return videoFiles;
 });
-
-// Import utility functions
-const { formatFileSize } = require('./src/main-utils');
 
 // Import video grouping functions
 const { analyzeAndGroupVideos } = require('./src/video-grouping');

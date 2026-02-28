@@ -1,6 +1,6 @@
-// CommonJS test helper: provides Node-compatible implementations of renderer/utils.js.
-// Note: escapeHtml uses regex (not DOM) since tests run outside a browser context.
-// This file is intentionally excluded from coverage metrics.
+// CommonJS utilities: provides Node-compatible implementations of renderer/utils.js.
+// Note: escapeHtml uses regex (not DOM) so it can run in non-browser environments (e.g. Node, tests).
+//
 
 function getFileName(filePath) {
   const parts = filePath.split(/[/\\]/);
@@ -9,9 +9,9 @@ function getFileName(filePath) {
 
 function escapeHtml(text) {
   // Server-side implementation without DOM
-  if (typeof text !== 'string') return text;
-  
-  return text
+  const str = String(text);
+
+  return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

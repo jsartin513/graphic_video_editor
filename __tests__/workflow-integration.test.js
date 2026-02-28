@@ -1,7 +1,5 @@
 const { analyzeAndGroupVideos } = require('../src/video-grouping');
 const { 
-  loadPreferences, 
-  savePreferences, 
   addRecentPattern,
   applyDateTokens,
   DEFAULT_PREFERENCES 

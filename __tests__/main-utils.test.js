@@ -38,7 +38,7 @@ describe('formatFileSize', () => {
   });
 
   test('handles very small files (1 byte)', () => {
-    expect(formatFileSize(1)).toBe('1 Bytes');
+    expect(formatFileSize(1)).toBe('1 Byte');
   });
 
   test('handles exact boundaries', () => {

@@ -49,9 +49,11 @@
     "testMatch": [
       "**/__tests__/**/*.test.js"
     ],
+    "moduleNameMapper": {
+      "^electron$": "<rootDir>/__mocks__/electron.js"
+    },
     "collectCoverageFrom": [
       "src/**/*.js",
-      "!src/utils.js",
       "!src/**/*.test.js",
       "!**/node_modules/**"
     ],
