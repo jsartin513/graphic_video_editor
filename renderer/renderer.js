@@ -5,7 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
-import { initializeKeyboardShortcuts, formatShortcut } from './keyboardShortcuts.js';
+import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
 
 // Shared application state
@@ -108,41 +108,8 @@ const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
   })
 });
 
-// Update shortcut hints dynamically based on platform
-function updateShortcutHints() {
-  const shortcutElements = document.querySelectorAll('.btn-shortcut');
-  shortcutElements.forEach(el => {
-    const button = el.closest('button');
-    if (!button) return;
-    
-    // Map button IDs to shortcuts
-    const shortcutMap = {
-      'selectFilesBtn': 'O',
-      'selectFolderBtn': 'D',
-      'splitVideoBtn': '⇧S',
-      'prepareMergeBtn': 'M',
-      'backBtn': 'Esc',
-      'mergeBtn': 'Enter'
-    };
-    
-    const buttonId = button.id;
-    if (shortcutMap[buttonId]) {
-      const key = shortcutMap[buttonId];
-      if (key === 'Esc' || key === 'Enter') {
-        el.textContent = key;
-      } else {
-        el.textContent = formatShortcut(key);
-      }
-    }
-  });
-}
-
-// Update shortcuts when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', updateShortcutHints);
-} else {
-  updateShortcutHints();
-}
+// Update keyboard shortcut hints to show platform-specific shortcuts
+updateShortcutHints();
 
 // Make state accessible for debugging
 window.appState = state;
