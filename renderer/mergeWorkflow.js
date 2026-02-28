@@ -1,6 +1,6 @@
 // Video merging workflow functionality
 
-import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 
 export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo) {
   const {
@@ -677,10 +677,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           <div class="result-item success">
             <span class="result-icon">✓</span>
             <span class="result-name">${escapeHtml(filename)}</span>
-            <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">
+            <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">
               ✂️ Trim
             </button>
-            ${showSplitBtn ? `<button class="btn-split-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">✂️ Split</button>` : ''}
+            ${showSplitBtn ? `<button class="btn-split-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">✂️ Split</button>` : ''}
           </div>
         `;
       }

@@ -271,7 +271,7 @@ function createTrimModal() {
           
           <div class="timeline-section">
             <label>Visual Timeline</label>
-            <div id="timelineSlider" class="timeline-slider" role="slider" aria-label="Video timeline">
+            <div id="timelineSlider" class="timeline-slider" role="group" aria-label="Video timeline">
               <div class="timeline-track"></div>
               <div id="timelinePreview" class="timeline-preview"></div>
             </div>
