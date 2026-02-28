@@ -5,6 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
+import { initializeFailedOperations } from './failedOperations.js';
 
 // Shared application state
 const state = {
@@ -69,13 +70,24 @@ const domElements = {
   splitProgress: document.getElementById('splitProgress'),
   splitProgressBar: document.getElementById('splitProgressBar'),
   splitProgressText: document.getElementById('splitProgressText'),
-  splitResult: document.getElementById('splitResult')
+  splitResult: document.getElementById('splitResult'),
+
+  // Failed Operations Modal
+  viewFailedBtn: document.getElementById('viewFailedBtn'),
+  failedOpsModal: document.getElementById('failedOpsModal'),
+  closeFailedOpsModalBtn: document.getElementById('closeFailedOpsModalBtn'),
+  closeFailedOpsBtn: document.getElementById('closeFailedOpsBtn'),
+  failedOpsList: document.getElementById('failedOpsList'),
+  noFailedOps: document.getElementById('noFailedOps'),
+  clearAllFailedBtn: document.getElementById('clearAllFailedBtn'),
+  failedBadge: document.getElementById('failedBadge')
 };
 
 // Initialize all modules
 const fileHandling = initializeFileHandling(state, domElements);
 const splitVideo = initializeSplitVideo(domElements, state);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
+const failedOperations = initializeFailedOperations(domElements, state);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, failedOperations);
 const prerequisites = initializePrerequisites(domElements);
 
 // Make state accessible for debugging
