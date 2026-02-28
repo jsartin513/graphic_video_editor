@@ -28,6 +28,28 @@ export function formatDuration(seconds) {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
+export function getDirectoryPath(filePath) {
+  if (typeof filePath !== 'string' || filePath.length === 0) return '.';
+  const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+
+  if (lastSep < 0) {
+    return '.';
+  }
+
+  if (lastSep === 0) {
+    // POSIX root, e.g. "/video.mp4"
+    return '/';
+  }
+
+  // Handle Windows drive root, e.g. "C:\\video.mp4" or "C:/video.mp4"
+  if (lastSep === 2 && filePath[1] === ':') {
+    // Preserve the trailing separator so we return "C:\\" or "C:/"
+    return filePath.substring(0, lastSep + 1);
+  }
+
+  return filePath.substring(0, lastSep);
+}
+
 export function getDirectoryName(filePath) {
   // Handle non-string or empty paths with a meaningful default
   if (typeof filePath !== 'string' || filePath.length === 0) {

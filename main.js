@@ -261,6 +261,7 @@ const {
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,
+  setLastOutputDestination,
   applyDateTokens
 } = require('./src/preferences');
 
@@ -593,7 +594,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           );
         }
         
-        ffmpegArgs.push(outputPath);
+        ffmpegArgs.push('-y', outputPath); // -y: overwrite output without prompting
         
         const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
@@ -804,6 +805,7 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
               '-t', duration,
               '-c', 'copy', // Use copy to avoid re-encoding (faster)
               '-avoid_negative_ts', 'make_zero',
+              '-y', // Overwrite output without prompting
               outputPath
             ], {
               shell: true,

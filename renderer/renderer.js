@@ -5,6 +5,8 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
+import { initializeKeyboardShortcuts, formatShortcut } from './keyboardShortcuts.js';
+import { getFileName, getDirectoryPath } from './utils.js';
 
 // Shared application state
 const state = {
@@ -21,6 +23,7 @@ const domElements = {
   // File selection
   selectFilesBtn: document.getElementById('selectFilesBtn'),
   selectFolderBtn: document.getElementById('selectFolderBtn'),
+  splitVideoBtn: document.getElementById('splitVideoBtn'),
   dropZone: document.getElementById('dropZone'),
   fileListContainer: document.getElementById('fileListContainer'),
   fileList: document.getElementById('fileList'),
@@ -77,6 +80,69 @@ const fileHandling = initializeFileHandling(state, domElements);
 const splitVideo = initializeSplitVideo(domElements, state);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
+
+// Split Video button (start screen)
+const splitVideoBtn = document.getElementById('splitVideoBtn');
+if (splitVideoBtn) {
+  splitVideoBtn.addEventListener('click', async () => {
+    try {
+      const result = await window.electronAPI.selectFiles();
+      if (result.canceled || !result.files?.length) return;
+      const videoPath = result.files[0];
+      const videoName = getFileName(videoPath);
+      const outputDir = getDirectoryPath(videoPath);
+      splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+    } catch (error) {
+      console.error('Error opening split video:', error);
+    }
+  });
+}
+
+// Initialize keyboard shortcuts
+const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
+  cancelMerge: mergeWorkflow?.cancelMerge || (() => {
+    // Fallback: try to cancel via IPC if available
+    if (window.electronAPI?.cancelMerge) {
+      window.electronAPI.cancelMerge();
+    }
+  })
+});
+
+// Update shortcut hints dynamically based on platform
+function updateShortcutHints() {
+  const shortcutElements = document.querySelectorAll('.btn-shortcut');
+  shortcutElements.forEach(el => {
+    const button = el.closest('button');
+    if (!button) return;
+    
+    // Map button IDs to shortcuts
+    const shortcutMap = {
+      'selectFilesBtn': 'O',
+      'selectFolderBtn': 'D',
+      'splitVideoBtn': '⇧S',
+      'prepareMergeBtn': 'M',
+      'backBtn': 'Esc',
+      'mergeBtn': 'Enter'
+    };
+    
+    const buttonId = button.id;
+    if (shortcutMap[buttonId]) {
+      const key = shortcutMap[buttonId];
+      if (key === 'Esc' || key === 'Enter') {
+        el.textContent = key;
+      } else {
+        el.textContent = formatShortcut(key);
+      }
+    }
+  });
+}
+
+// Update shortcuts when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', updateShortcutHints);
+} else {
+  updateShortcutHints();
+}
 
 // Make state accessible for debugging
 window.appState = state;
