@@ -1353,7 +1353,7 @@ body {
 }
 
 .error-message {
-  color: var(--error);
+  color: var(--accent-danger);
   font-family: monospace;
   font-size: 13px;
 }
@@ -1397,12 +1397,12 @@ body {
 }
 
 .retry-btn {
-  background: var(--success);
+  background: var(--accent-secondary);
   color: white;
 }
 
 .retry-btn:hover {
-  background: var(--success-hover);
+  background: var(--accent-secondary-hover);
 }
 
 .remove-btn {
@@ -1410,7 +1410,7 @@ body {
 }
 
 .remove-btn:hover {
-  color: var(--error);
+  color: var(--accent-danger);
 }
 
 /* Reduced motion for users who prefer it */
