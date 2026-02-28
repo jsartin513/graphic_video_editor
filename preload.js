@@ -7,10 +7,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   processDroppedPaths: (paths) => ipcRenderer.invoke('process-dropped-paths', paths),
   analyzeVideos: (filePaths) => ipcRenderer.invoke('analyze-videos', filePaths),
   getVideoDuration: (filePath) => ipcRenderer.invoke('get-video-duration', filePath),
+  getVideoMetadata: (videoPath) => ipcRenderer.invoke('get-video-metadata', videoPath),
   generateThumbnail: (videoPath, timestamp) => ipcRenderer.invoke('generate-thumbnail', videoPath, timestamp),
   getTotalFileSize: (filePaths) => ipcRenderer.invoke('get-total-file-size', filePaths),
   mergeVideos: (filePaths, outputPath, qualityOption) => ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption),
   splitVideo: (videoPath, splits, outputDir) => ipcRenderer.invoke('split-video', videoPath, splits, outputDir),
+  trimVideo: (options) => ipcRenderer.invoke('trim-video', options),
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
   selectOutputDestination: () => ipcRenderer.invoke('select-output-destination'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
@@ -35,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
   setPreferredQuality: (quality) => ipcRenderer.invoke('set-preferred-quality', quality),
+  setLastOutputDestination: (destination) => ipcRenderer.invoke('set-last-output-destination', destination),
   applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
 });
 

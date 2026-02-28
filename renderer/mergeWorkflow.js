@@ -2,7 +2,7 @@
 
 import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -116,8 +116,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     fileListContainer.style.display = 'none';
     previewScreen.style.display = 'block';
     
-    // Reset output destination to default when showing preview
-    state.selectedOutputDestination = null;
+    // Load saved output destination preference
+    if (userPreferences && userPreferences.lastOutputDestination) {
+      state.selectedOutputDestination = userPreferences.lastOutputDestination;
+    } else {
+      state.selectedOutputDestination = null;
+    }
     updateOutputDestinationDisplay();
     
     // Check if we have multiple directories (for display purposes)
@@ -344,6 +348,29 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
   }
   
+  // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
+  async function syncAndApplyTokensFromInputs(indicesToMerge) {
+    for (const index of indicesToMerge) {
+      const input = document.querySelector(`.filename-input[data-index="${index}"]`);
+      const group = state.videoGroups[index];
+      let value = input ? input.value.trim() : (group.outputFilename || '').replace(/\.MP4$/i, '');
+      if (!value) value = `PROCESSED${group.sessionId}`;
+      value = value.replace(/\.MP4$/i, '');
+
+      if (value.includes('{')) {
+        try {
+          const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat);
+          if (result && result.result) value = result.result;
+        } catch (error) {
+          console.error('Error applying date tokens:', error);
+        }
+      }
+      value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      group.outputFilename = value + '.MP4';
+    }
+  }
+
   // Handle Merge Selected button (batch merge)
   async function handleBatchMerge(selectedIndices = null) {
     const indicesToMerge = selectedIndices || Array.from(state.selectedGroups).sort((a, b) => a - b);
@@ -352,6 +379,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       alert('Please select at least one video group to merge.');
       return;
     }
+    
+    // Sync from DOM and apply tokens before validating (handles Merge clicked while cursor still in filename input)
+    await syncAndApplyTokensFromInputs(indicesToMerge);
     
     // Validate filenames for selected groups only
     for (const index of indicesToMerge) {
@@ -410,7 +440,27 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
-        results.push({ success: false, sessionId: group.sessionId, error: error.message });
+        const failedResult = { 
+          success: false, 
+          sessionId: group.sessionId, 
+          error: error.message,
+          files: group.files,
+          outputPath: path.join(outputDir, group.outputFilename)
+        };
+        results.push(failedResult);
+        
+        // Save failed operation for recovery
+        try {
+          await window.electronAPI.addFailedOperation({
+            sessionId: group.sessionId,
+            files: group.files,
+            outputPath: path.join(outputDir, group.outputFilename),
+            error: error.message,
+            timestamp: Date.now()
+          });
+        } catch (err) {
+          console.error('Error saving failed operation:', err);
+        }
         failed++;
         updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
         
@@ -432,7 +482,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
     
     // Show results
-    showMergeResults(results, outputDir);
+    await showMergeResults(results, outputDir);
   }
   
   // Update batch controls based on selection
@@ -534,8 +584,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressText.textContent = progressMessage;
   }
 
+  const MIN_DURATION_FOR_SPLIT_SECONDS = 40 * 60; // 40 minutes
+
   // Show merge results
-  function showMergeResults(results, outputDir) {
+  async function showMergeResults(results, outputDir) {
     const successCount = results.filter(r => r.success).length;
     const failCount = results.filter(r => !r.success).length;
     const totalCount = results.length;
@@ -551,6 +603,25 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressText.textContent = failCount === 0 
       ? `Successfully merged ${successCount} video${successCount !== 1 ? 's' : ''}` 
       : `Completed: ${successCount} succeeded, ${failCount} failed`;
+    
+    // Fetch duration for each successful result (to decide whether to show Split button)
+    const durationsByIndex = new Map();
+    const durationPromises = results.map((result, index) => {
+      if (!result.success) {
+        return Promise.resolve(null);
+      }
+      return window.electronAPI
+        .getVideoDuration(result.outputPath)
+        .then((dur) => ({ index, duration: dur }))
+        .catch(() => ({ index, duration: null }));
+    });
+    const settledDurations = await Promise.allSettled(durationPromises);
+    for (const settled of settledDurations) {
+      if (settled.status === 'fulfilled' && settled.value !== null && settled.value.duration !== null) {
+        const { index, duration } = settled.value;
+        durationsByIndex.set(index, duration);
+      }
+    }
     
     // Build results HTML with improved design
     let resultsHtml = `
@@ -595,18 +666,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         ` : ''}
     `;
     
-    // Add successful results with split buttons
+    // Add successful results with split and trim buttons (split only if video is at least 40 minutes)
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success) {
         const filename = getFileName(result.outputPath);
+        const durationSeconds = durationsByIndex.get(i) ?? 0;
+        const showSplitBtn = durationSeconds >= MIN_DURATION_FOR_SPLIT_SECONDS;
         resultsHtml += `
           <div class="result-item success">
             <span class="result-icon">✓</span>
             <span class="result-name">${escapeHtml(filename)}</span>
-            <button class="btn-split-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">
-              ✂️ Split
+            <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">
+              ✂️ Trim
             </button>
+            ${showSplitBtn ? `<button class="btn-split-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">✂️ Split</button>` : ''}
           </div>
         `;
       }
@@ -699,6 +773,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         const videoPath = e.target.getAttribute('data-video-path');
         const videoName = e.target.getAttribute('data-video-name');
         splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+      });
+    });
+
+    // Add event listeners for trim video buttons
+    document.querySelectorAll('.btn-trim-video').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const videoPath = e.target.getAttribute('data-video-path');
+        const videoName = e.target.getAttribute('data-video-name');
+        trimVideo.showTrimVideoModal(videoPath, videoName, outputDir);
       });
     });
   }

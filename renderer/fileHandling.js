@@ -1,9 +1,9 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate } from './utils.js';
+import { getFileName, escapeHtml, formatDate, getDirectoryPath } from './utils.js';
 
 // State will be managed in the main renderer.js
-export function initializeFileHandling(state, domElements) {
+export function initializeFileHandling(state, domElements, trimVideo = null) {
   const {
     selectFilesBtn,
     selectFolderBtn,
@@ -62,12 +62,64 @@ export function initializeFileHandling(state, domElements) {
   }
 
   function addFiles(newFiles) {
+    const duplicates = [];
+    const added = [];
+    const fileNameMap = new Map(); // filename -> full path
+    
+    // Build map of existing filenames
+    for (const existingFile of state.selectedFiles) {
+      const fileName = getFileName(existingFile);
+      if (!fileNameMap.has(fileName)) {
+        fileNameMap.set(fileName, []);
+      }
+      fileNameMap.get(fileName).push(existingFile);
+    }
+    
+    // Check for duplicates and add new files
     for (const file of newFiles) {
-      if (!state.selectedFiles.includes(file)) {
+      // Skip if exact path already exists
+      if (state.selectedFiles.includes(file)) {
+        continue;
+      }
+      
+      const fileName = getFileName(file);
+      const existingPaths = fileNameMap.get(fileName) || [];
+      
+      if (existingPaths.length > 0) {
+        // Duplicate filename detected
+        duplicates.push({
+          newFile: file,
+          fileName: fileName,
+          existingFiles: existingPaths
+        });
+      } else {
+        // No duplicate, add file
         state.selectedFiles.push(file);
+        if (!fileNameMap.has(fileName)) {
+          fileNameMap.set(fileName, []);
+        }
+        fileNameMap.get(fileName).push(file);
+        added.push(file);
       }
     }
-    updateFileList();
+    
+    // Show error if duplicates found
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map(d => d.fileName).join(', ');
+      const message = duplicates.length === 1
+        ? `File "${duplicateNames}" is already in the list. Each file must have a unique name.`
+        : `Files with duplicate names detected: ${duplicateNames}. Each file must have a unique name.`;
+      
+      alert(message);
+      
+      // Optionally still add files with a suffix to make them unique
+      // For now, we'll just show the error and not add duplicates
+    }
+    
+    // Update UI only if files were added
+    if (added.length > 0 || duplicates.length === 0) {
+      updateFileList();
+    }
   }
 
   function removeFile(filePath) {
@@ -100,6 +152,43 @@ export function initializeFileHandling(state, domElements) {
     
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
+      const fileName = getFileName(filePath);
+      
+      // Get video metadata (lazy load - don't await)
+      window.electronAPI.getVideoMetadata(filePath)
+        .then(videoMetadata => {
+          if (videoMetadata && videoMetadata.video) {
+            const metadataDetails = item.querySelector('.video-metadata-details');
+            if (metadataDetails) {
+              const v = videoMetadata.video;
+              const a = videoMetadata.audio;
+              metadataDetails.innerHTML = `
+                <div class="metadata-row">
+                  <span class="metadata-label">Resolution:</span>
+                  <span class="metadata-value">${v.width}×${v.height}</span>
+                </div>
+                <div class="metadata-row">
+                  <span class="metadata-label">Codec:</span>
+                  <span class="metadata-value">${v.codec.toUpperCase()}</span>
+                </div>
+                <div class="metadata-row">
+                  <span class="metadata-label">FPS:</span>
+                  <span class="metadata-value">${v.fps ? v.fps.toFixed(2) : 'N/A'}</span>
+                </div>
+                ${a ? `
+                <div class="metadata-row">
+                  <span class="metadata-label">Audio:</span>
+                  <span class="metadata-value">${a.codec.toUpperCase()} ${a.channels}ch</span>
+                </div>
+                ` : ''}
+              `;
+              metadataDetails.style.display = 'block';
+            }
+          }
+        })
+        .catch(error => {
+          console.error(`Error getting video metadata for ${filePath}:`, error);
+        });
       
       // Generate thumbnail (lazy load - don't await)
       let thumbnailHtml = '<div class="file-thumbnail-placeholder">🎬</div>';
@@ -126,28 +215,47 @@ export function initializeFileHandling(state, domElements) {
           ${thumbnailHtml}
         </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
           <div class="file-meta">
             <span>Size: ${metadata.sizeFormatted}</span>
             <span>Modified: ${formatDate(metadata.modified)}</span>
           </div>
+          <div class="video-metadata-details" style="display: none; margin-top: 8px; font-size: 11px; color: var(--text-secondary);"></div>
         </div>
         <div class="file-actions">
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeHtml(filePath)}" data-name="${escapeHtml(fileName)}">✂️ Trim</button>` : ''}
           <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
         </div>
       `;
     } catch (error) {
+      const fileName = getFileName(filePath);
+      
       item.innerHTML = `
         <div class="file-thumbnail-container">
           <div class="file-thumbnail-placeholder">🎬</div>
         </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
         </div>
         <div class="file-actions">
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeHtml(filePath)}" data-name="${escapeHtml(fileName)}">✂️ Trim</button>` : ''}
           <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
         </div>
       `;
+    }
+
+    // Add trim button handler if trimVideo module is available
+    if (trimVideo) {
+      const trimBtn = item.querySelector('.btn-trim');
+      if (trimBtn) {
+        trimBtn.addEventListener('click', () => {
+          const file = trimBtn.getAttribute('data-file');
+          const name = trimBtn.getAttribute('data-name');
+          // Get directory from file path
+          const directory = getDirectoryPath(filePath);
+          trimVideo.showTrimVideoModal(file, name, directory);
+        });
+      }
     }
 
     // Add remove button handler

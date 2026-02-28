@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
+const { formatFileSize } = require('./src/main-utils');
 
 let mainWindow;
 let ffmpegPath = null;
@@ -226,31 +227,6 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
   return videoFiles;
 });
 
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-// Extract session ID from GoPro filename
-function extractSessionId(filename) {
-  // Pattern: GX??????.MP4 -> extract last 4 digits
-  const gxMatch = filename.match(/GX\d{2}(\d{4})\.MP4$/i);
-  if (gxMatch) return gxMatch[1];
-  
-  // Pattern: GP??????.MP4 -> extract last 4 digits
-  const gpMatch = filename.match(/GP\d{2}(\d{4})\.MP4$/i);
-  if (gpMatch) return gpMatch[1];
-  
-  // Pattern: GOPR????.MP4 -> extract 4 digits
-  const goprMatch = filename.match(/GOPR(\d{4})\.MP4$/i);
-  if (goprMatch) return goprMatch[1];
-  
-  return null;
-}
-
 // Import video grouping functions
 const { analyzeAndGroupVideos } = require('./src/video-grouping');
 
@@ -261,6 +237,7 @@ const {
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,
+  setLastOutputDestination,
   applyDateTokens
 } = require('./src/preferences');
 
@@ -312,6 +289,93 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
         // Don't fail completely, just return 0 duration
         console.error(`ffprobe failed for ${filePath}: ${errorOutput}`);
         resolve(0);
+      }
+    });
+  });
+});
+
+// Get detailed video metadata using ffprobe
+ipcMain.handle('get-video-metadata', async (event, videoPath) => {
+  // Validate videoPath
+  if (!videoPath || typeof videoPath !== 'string') {
+    throw new Error('Invalid video path');
+  }
+
+  return new Promise((resolve, reject) => {
+    const ffprobeCmd = getFFprobePath();
+    const env = { ...process.env };
+    if (ffprobeCmd.includes('.app/Contents/Resources')) {
+      env.PATH = '/usr/bin:/bin';
+    } else {
+      env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+    }
+
+    // Get comprehensive video metadata
+    const ffprobe = spawn(ffprobeCmd, [
+      '-v', 'error',
+      '-print_format', 'json',
+      '-show_format',
+      '-show_streams',
+      videoPath
+    ], { env });
+
+    let output = '';
+    let errorOutput = '';
+
+    ffprobe.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    ffprobe.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    ffprobe.on('error', (error) => {
+      if (error.code === 'ENOENT') {
+        reject(new Error('ffprobe not found'));
+      } else {
+        reject(error);
+      }
+    });
+
+    ffprobe.on('close', async (code) => {
+      if (code === 0) {
+        try {
+          const metadata = JSON.parse(output);
+          const videoStream = metadata.streams?.find(s => s.codec_type === 'video');
+          const audioStream = metadata.streams?.find(s => s.codec_type === 'audio');
+          const format = metadata.format || {};
+
+          // Extract useful metadata
+          const result = {
+            duration: parseFloat(format.duration) || 0,
+            size: parseInt(format.size) || 0,
+            bitrate: parseInt(format.bit_rate) || 0,
+            video: videoStream ? {
+              codec: videoStream.codec_name || 'unknown',
+              codecLongName: videoStream.codec_long_name || 'unknown',
+              width: videoStream.width || 0,
+              height: videoStream.height || 0,
+              fps: videoStream.r_frame_rate ? eval(videoStream.r_frame_rate) : 0, // e.g., "30/1" -> 30
+              bitrate: parseInt(videoStream.bit_rate) || 0,
+              pixelFormat: videoStream.pix_fmt || 'unknown'
+            } : null,
+            audio: audioStream ? {
+              codec: audioStream.codec_name || 'unknown',
+              codecLongName: audioStream.codec_long_name || 'unknown',
+              sampleRate: parseInt(audioStream.sample_rate) || 0,
+              channels: audioStream.channels || 0,
+              bitrate: parseInt(audioStream.bit_rate) || 0
+            } : null,
+            container: format.format_name || 'unknown'
+          };
+
+          resolve(result);
+        } catch (error) {
+          reject(new Error(`Failed to parse ffprobe output: ${error.message}`));
+        }
+      } else {
+        reject(new Error(`ffprobe exited with code ${code}: ${errorOutput}`));
       }
     });
   });
@@ -503,7 +567,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           );
         }
         
-        ffmpegArgs.push(outputPath);
+        ffmpegArgs.push('-y', outputPath); // -y: overwrite output without prompting
         
         const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
@@ -714,6 +778,7 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
               '-t', duration,
               '-c', 'copy', // Use copy to avoid re-encoding (faster)
               '-avoid_negative_ts', 'make_zero',
+              '-y', // Overwrite output without prompting
               outputPath
             ], {
               shell: true,
@@ -754,6 +819,89 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
       }
       
       resolve({ success: true, results });
+    } catch (error) {
+      reject(error);
+    }
+  });
+});
+
+// Trim video to specific start and end times
+// options: { inputPath: string, outputPath: string, startTime: number (seconds), endTime: number (seconds) }
+ipcMain.handle('trim-video', async (event, options) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const { inputPath, outputPath, startTime, endTime } = options;
+      
+      // Validate inputs
+      if (!inputPath || !outputPath) {
+        reject(new Error('Input and output paths are required'));
+        return;
+      }
+      
+      if (startTime < 0 || endTime <= startTime) {
+        reject(new Error('Invalid trim times'));
+        return;
+      }
+      
+      // Calculate duration
+      const duration = endTime - startTime;
+      
+      // Ensure output directory exists
+      const outputDir = path.dirname(outputPath);
+      await fs.mkdir(outputDir, { recursive: true });
+      
+      const ffmpegCmd = getFFmpegPath();
+      
+      // Convert seconds to HH:MM:SS format for ffmpeg
+      const formatTime = (seconds) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      };
+      
+      const startTimeFormatted = formatTime(startTime);
+      const durationFormatted = formatTime(duration);
+      
+      console.log(`[trim-video] Trimming ${inputPath} from ${startTimeFormatted} for ${durationFormatted}`);
+      
+      const ffmpeg = spawn(ffmpegCmd, [
+        '-i', inputPath,
+        '-ss', startTimeFormatted,
+        '-t', durationFormatted,
+        '-c', 'copy', // Use copy to avoid re-encoding (faster)
+        '-avoid_negative_ts', 'make_zero',
+        outputPath
+      ], {
+        shell: true,
+        env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+      });
+      
+      let errorOutput = '';
+      
+      ffmpeg.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+        console.log(`[trim-video] FFmpeg stderr: ${data.toString().trim()}`);
+      });
+      
+      ffmpeg.on('error', (error) => {
+        if (error.code === 'ENOENT') {
+          reject(new Error('ffmpeg not found. Please install ffmpeg.'));
+        } else {
+          reject(error);
+        }
+      });
+      
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          console.log(`[trim-video] ✅ Trim completed successfully: ${outputPath}`);
+          resolve({ success: true, outputPath });
+        } else {
+          console.error(`[trim-video] ❌ FFmpeg failed with code ${code}`);
+          console.error(`[trim-video] Error output:\n${errorOutput}`);
+          reject(new Error(`ffmpeg failed: ${errorOutput}`));
+        }
+      });
     } catch (error) {
       reject(error);
     }
