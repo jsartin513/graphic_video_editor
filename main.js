@@ -1283,8 +1283,12 @@ ipcMain.handle('set-date-format', async (event, format) => {
 });
 
 // Set preferred video quality
+const ALLOWED_QUALITIES = new Set(['copy', 'high', 'medium', 'low']);
 ipcMain.handle('set-preferred-quality', async (event, quality) => {
   try {
+    if (typeof quality !== 'string' || !ALLOWED_QUALITIES.has(quality)) {
+      throw new Error(`Invalid quality value: ${String(quality)}`);
+    }
     const prefs = await loadPreferences();
     const updated = setPreferredQuality(prefs, quality);
     await savePreferences(updated);
@@ -1298,8 +1302,17 @@ ipcMain.handle('set-preferred-quality', async (event, quality) => {
 // Set last output destination
 ipcMain.handle('set-last-output-destination', async (event, destination) => {
   try {
+    // Validate destination: allow only null or a non-empty absolute path string
+    let safeDestination = null;
+    if (!destination) {
+      safeDestination = null;
+    } else if (typeof destination === 'string' && path.isAbsolute(destination)) {
+      safeDestination = destination;
+    } else {
+      throw new Error('Invalid output destination');
+    }
     const prefs = await loadPreferences();
-    const updated = setLastOutputDestination(prefs, destination);
+    const updated = setLastOutputDestination(prefs, safeDestination);
     await savePreferences(updated);
     return { success: true, preferences: updated };
   } catch (error) {

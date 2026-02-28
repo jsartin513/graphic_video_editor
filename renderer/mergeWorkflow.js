@@ -320,6 +320,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         // Save the selected output destination to preferences
         try {
           await window.electronAPI.setLastOutputDestination(result.path);
+          if (userPreferences) userPreferences.lastOutputDestination = result.path;
         } catch (prefError) {
           console.error('Error saving output destination preference:', prefError);
         }
@@ -338,6 +339,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     // Clear the saved output destination preference
     try {
       await window.electronAPI.setLastOutputDestination(null);
+      if (userPreferences) userPreferences.lastOutputDestination = null;
     } catch (error) {
       console.error('Error clearing output destination preference:', error);
     }
