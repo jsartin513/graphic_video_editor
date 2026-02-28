@@ -253,6 +253,124 @@ body {
   color: var(--text-secondary);
 }
 
+/* Recent Directories Section */
+.recent-directories-section {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.recent-directories-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.recent-directories-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.recent-directories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-directory-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recent-directory-item:hover {
+  background: var(--bg-primary);
+  border-color: var(--accent-primary);
+  transform: translateX(4px);
+}
+
+.recent-directory-item:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.recent-directory-item.pinned {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.1) 0%, rgba(0, 122, 255, 0.05) 100%);
+  border-color: var(--accent-primary);
+}
+
+.recent-directory-item.pinned:hover {
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.15) 0%, rgba(0, 122, 255, 0.08) 100%);
+}
+
+.recent-directory-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recent-directory-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.recent-directory-path {
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-directory-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.recent-directory-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.btn-pin, .btn-unpin {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 16px;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-pin:hover, .btn-unpin:hover {
+  background: var(--bg-primary);
+}
+
+.btn-pin:focus-visible, .btn-unpin:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .file-list-container {
   background: var(--bg-secondary);
   border-radius: 12px;

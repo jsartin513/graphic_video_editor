@@ -8,6 +8,9 @@ let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
 
+// Supported video extensions
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
+
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
 
@@ -114,6 +117,18 @@ ipcMain.handle('select-files', async () => {
     return { canceled: true, files: [] };
   }
 
+  // Track directory of first selected file
+  if (result.filePaths.length > 0) {
+    const dirPath = path.dirname(result.filePaths[0]);
+    try {
+      const prefs = await loadPreferences();
+      const updated = addRecentDirectory(prefs, dirPath);
+      await savePreferences(updated);
+    } catch (error) {
+      console.error('Error tracking recent directory:', error);
+    }
+  }
+
   return { canceled: false, files: result.filePaths };
 });
 
@@ -128,8 +143,18 @@ ipcMain.handle('select-folder', async () => {
     return { canceled: true, files: [] };
   }
 
+  // Track selected folder
+  if (result.filePaths.length > 0) {
+    try {
+      const prefs = await loadPreferences();
+      const updated = addRecentDirectory(prefs, result.filePaths[0]);
+      await savePreferences(updated);
+    } catch (error) {
+      console.error('Error tracking recent directory:', error);
+    }
+  }
+
   // Recursively find all video files in the folder
-  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
   const videoFiles = [];
 
   async function scanDirectory(dirPath) {
@@ -143,7 +168,7 @@ ipcMain.handle('select-folder', async () => {
           await scanDirectory(fullPath);
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name);
-          if (videoExtensions.includes(ext)) {
+          if (VIDEO_EXTENSIONS.includes(ext)) {
             videoFiles.push(fullPath);
           }
         }
@@ -183,7 +208,6 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
 
 // Handle processing dropped files/folders
 ipcMain.handle('process-dropped-paths', async (event, paths) => {
-  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
   const videoFiles = [];
 
   async function scanDirectory(dirPath) {
@@ -197,7 +221,7 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
           await scanDirectory(fullPath);
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name);
-          if (videoExtensions.includes(ext)) {
+          if (VIDEO_EXTENSIONS.includes(ext)) {
             videoFiles.push(fullPath);
           }
         }
@@ -212,10 +236,27 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
       const stats = await fs.stat(droppedPath);
       if (stats.isDirectory()) {
         await scanDirectory(droppedPath);
+        // Track dropped directory
+        try {
+          const prefs = await loadPreferences();
+          const updated = addRecentDirectory(prefs, droppedPath);
+          await savePreferences(updated);
+        } catch (error) {
+          console.error('Error tracking recent directory:', error);
+        }
       } else if (stats.isFile()) {
         const ext = path.extname(droppedPath);
-        if (videoExtensions.includes(ext)) {
+        if (VIDEO_EXTENSIONS.includes(ext)) {
           videoFiles.push(droppedPath);
+          // Track directory of dropped file
+          const dirPath = path.dirname(droppedPath);
+          try {
+            const prefs = await loadPreferences();
+            const updated = addRecentDirectory(prefs, dirPath);
+            await savePreferences(updated);
+          } catch (error) {
+            console.error('Error tracking recent directory:', error);
+          }
         }
       }
     } catch (error) {
@@ -260,7 +301,12 @@ const {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
-  applyDateTokens
+  applyDateTokens,
+  addRecentDirectory,
+  pinDirectory,
+  unpinDirectory,
+  clearRecentDirectories,
+  cleanupDirectories
 } = require('./src/preferences');
 
 // Analyze and group video files by session ID and directory
@@ -1046,6 +1092,123 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
     return { result };
   } catch (error) {
     console.error('Error applying date tokens:', error);
+    throw error;
+  }
+});
+
+// Add a directory to recent directories
+ipcMain.handle('add-recent-directory', async (event, dirPath) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = addRecentDirectory(prefs, dirPath);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error adding recent directory:', error);
+    throw error;
+  }
+});
+
+// Pin a directory
+ipcMain.handle('pin-directory', async (event, dirPath) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = pinDirectory(prefs, dirPath);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error pinning directory:', error);
+    throw error;
+  }
+});
+
+// Unpin a directory
+ipcMain.handle('unpin-directory', async (event, dirPath) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = unpinDirectory(prefs, dirPath);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error unpinning directory:', error);
+    throw error;
+  }
+});
+
+// Clear all recent directories
+ipcMain.handle('clear-recent-directories', async () => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = clearRecentDirectories(prefs);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error clearing recent directories:', error);
+    throw error;
+  }
+});
+
+// Cleanup invalid directories
+ipcMain.handle('cleanup-directories', async () => {
+  try {
+    const prefs = await loadPreferences();
+    const existsCheck = async (dirPath) => {
+      try {
+        await fs.access(dirPath);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const updated = await cleanupDirectories(prefs, existsCheck);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error cleaning up directories:', error);
+    throw error;
+  }
+});
+
+// Open a recent directory and scan for video files
+ipcMain.handle('open-recent-directory', async (event, dirPath) => {
+  try {
+    // Verify directory exists
+    await fs.access(dirPath);
+    
+    // Update recent directories
+    const prefs = await loadPreferences();
+    const updated = addRecentDirectory(prefs, dirPath);
+    await savePreferences(updated);
+    
+    // Scan for video files
+    const videoFiles = [];
+    
+    async function scanDirectory(scanDirPath) {
+      try {
+        const entries = await fs.readdir(scanDirPath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(scanDirPath, entry.name);
+          
+          if (entry.isDirectory()) {
+            await scanDirectory(fullPath);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name);
+            if (VIDEO_EXTENSIONS.includes(ext)) {
+              videoFiles.push(fullPath);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error scanning directory ${scanDirPath}:`, error);
+      }
+    }
+    
+    await scanDirectory(dirPath);
+    
+    return { success: true, files: videoFiles };
+  } catch (error) {
+    console.error('Error opening recent directory:', error);
     throw error;
   }
 });
