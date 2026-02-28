@@ -1,22 +1,31 @@
-// Utility functions
+// CommonJS utilities: provides Node-compatible implementations of renderer/utils.js.
+// Note: escapeHtml uses regex (not DOM) so it can run in non-browser environments (e.g. Node, tests).
+//
 
-export function getFileName(filePath) {
+function getFileName(filePath) {
   const parts = filePath.split(/[/\\]/);
   return parts[parts.length - 1];
 }
 
-export function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+function escapeHtml(text) {
+  // Server-side implementation without DOM
+  const str = String(text);
+
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
 }
 
-export function formatDate(dateString) {
+function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatDuration(seconds) {
+function formatDuration(seconds) {
   if (seconds === null || seconds === undefined || isNaN(seconds) || (typeof seconds === 'string' && seconds.trim() === '')) return 'Unknown';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -28,29 +37,7 @@ export function formatDuration(seconds) {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function getDirectoryPath(filePath) {
-  if (typeof filePath !== 'string' || filePath.length === 0) return '.';
-  const lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
-
-  if (lastSep < 0) {
-    return '.';
-  }
-
-  if (lastSep === 0) {
-    // POSIX root, e.g. "/video.mp4"
-    return '/';
-  }
-
-  // Handle Windows drive root, e.g. "C:\\video.mp4" or "C:/video.mp4"
-  if (lastSep === 2 && filePath[1] === ':') {
-    // Preserve the trailing separator so we return "C:\\" or "C:/"
-    return filePath.substring(0, lastSep + 1);
-  }
-
-  return filePath.substring(0, lastSep);
-}
-
-export function getDirectoryName(filePath) {
+function getDirectoryName(filePath) {
   // Handle non-string or empty paths with a meaningful default
   if (typeof filePath !== 'string' || filePath.length === 0) {
     return 'root';
@@ -71,3 +58,10 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
+module.exports = {
+  getFileName,
+  escapeHtml,
+  formatDate,
+  formatDuration,
+  getDirectoryName
+};

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
+const { formatFileSize } = require('./src/main-utils');
 
 let mainWindow;
 let ffmpegPath = null;
@@ -225,31 +226,6 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
 
   return videoFiles;
 });
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-// Extract session ID from GoPro filename
-function extractSessionId(filename) {
-  // Pattern: GX??????.MP4 -> extract last 4 digits
-  const gxMatch = filename.match(/GX\d{2}(\d{4})\.MP4$/i);
-  if (gxMatch) return gxMatch[1];
-  
-  // Pattern: GP??????.MP4 -> extract last 4 digits
-  const gpMatch = filename.match(/GP\d{2}(\d{4})\.MP4$/i);
-  if (gpMatch) return gpMatch[1];
-  
-  // Pattern: GOPR????.MP4 -> extract 4 digits
-  const goprMatch = filename.match(/GOPR(\d{4})\.MP4$/i);
-  if (goprMatch) return goprMatch[1];
-  
-  return null;
-}
 
 // Import video grouping functions
 const { analyzeAndGroupVideos } = require('./src/video-grouping');
