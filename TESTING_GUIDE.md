@@ -113,14 +113,17 @@ Integration tests verify that multiple modules work together:
 ```javascript
 test('complete workflow: group videos, apply preferences, generate filename', () => {
   // Step 1: Group videos
+  const files = ['video1.mp4', 'video2.mp4'];
   const groups = analyzeAndGroupVideos(files);
-  
-  // Step 2: Load preferences
-  let prefs = addRecentPattern(prefs, 'Trip_{date}_Session{sessionId}');
-  
-  // Step 3: Apply pattern
-  let filename = applyDateTokens(pattern, date);
-  
+
+  // Step 2: Load and update preferences with a recent pattern
+  let prefs = { recentPatterns: [] };
+  prefs = addRecentPattern(prefs, 'Trip_{date}_Session{sessionId}');
+
+  // Step 3: Apply pattern to a specific date
+  const pattern = 'Trip_{date}_Session{sessionId}';
+  const date = '2024-01-15';
+  const filename = applyDateTokens(pattern, date);
   // Step 4: Verify final result
   expect(filename).toContain('Trip_2024-01-15');
 });
