@@ -49,14 +49,3 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
-// CommonJS exports for testing
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    getFileName,
-    escapeHtml,
-    formatDate,
-    formatDuration,
-    getDirectoryName
-  };
-}
-
