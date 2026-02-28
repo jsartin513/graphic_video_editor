@@ -346,6 +346,23 @@ ipcMain.handle('get-video-metadata', async (event, videoPath) => {
           const audioStream = metadata.streams?.find(s => s.codec_type === 'audio');
           const format = metadata.format || {};
 
+          // Helper function to safely parse frame rate fraction
+          const parseFPS = (framerateStr) => {
+            if (!framerateStr || typeof framerateStr !== 'string') return 0;
+            const parts = framerateStr.split('/');
+            if (parts.length === 2) {
+              const numerator = parseFloat(parts[0]);
+              const denominator = parseFloat(parts[1]);
+              if (denominator !== 0 && !isNaN(numerator) && !isNaN(denominator)) {
+                return numerator / denominator;
+              }
+              // Invalid fraction (e.g., denominator is 0 or NaN)
+              return 0;
+            }
+            // Single number (no fraction)
+            return parseFloat(framerateStr) || 0;
+          };
+
           // Extract useful metadata
           const result = {
             duration: parseFloat(format.duration) || 0,
@@ -356,7 +373,7 @@ ipcMain.handle('get-video-metadata', async (event, videoPath) => {
               codecLongName: videoStream.codec_long_name || 'unknown',
               width: videoStream.width || 0,
               height: videoStream.height || 0,
-              fps: videoStream.r_frame_rate ? eval(videoStream.r_frame_rate) : 0, // e.g., "30/1" -> 30
+              fps: parseFPS(videoStream.r_frame_rate), // e.g., "30/1" -> 30
               bitrate: parseInt(videoStream.bit_rate) || 0,
               pixelFormat: videoStream.pix_fmt || 'unknown'
             } : null,
