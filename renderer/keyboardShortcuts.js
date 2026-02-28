@@ -143,13 +143,16 @@ export function getModifierDisplay() {
  * Format keyboard shortcut for display
  * @param {string} key - The key name
  * @param {boolean} useModifier - Whether to include modifier
- * @returns {string} Formatted shortcut (e.g., "⌘O" or "Ctrl+O")
+ * @param {boolean} useShift - Whether to include Shift
+ * @returns {string} Formatted shortcut (e.g., "⌘O", "Ctrl+O", "⌘⇧S", or "Ctrl+Shift+S")
  */
-export function formatShortcut(key, useModifier = true) {
-  const modifier = useModifier ? getModifierDisplay() : '';
+export function formatShortcut(key, useModifier = true, useShift = false) {
   const isMac = getPlatform() === 'mac';
-  const separator = isMac ? '' : '+';
-  return modifier ? `${modifier}${separator}${key.toUpperCase()}` : key.toUpperCase();
+  const parts = [];
+  if (useModifier) parts.push(getModifierDisplay());
+  if (useShift) parts.push(isMac ? '⇧' : 'Shift');
+  parts.push(key.toUpperCase());
+  return isMac ? parts.join('') : parts.join('+');
 }
 
 /**
@@ -163,6 +166,7 @@ export function updateShortcutHints() {
   const shortcuts = {
     'selectFilesBtn': formatShortcut('O'),
     'selectFolderBtn': formatShortcut('D'),
+    'splitVideoBtn': formatShortcut('S', true, true),
     'prepareMergeBtn': `${formatShortcut('M')} or Enter`
   };
 
