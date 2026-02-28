@@ -11,3 +11,6 @@ build/icon.icns
 .env.local
 .env.*.local
 
+# Test coverage
+coverage/
+.nyc_output/
