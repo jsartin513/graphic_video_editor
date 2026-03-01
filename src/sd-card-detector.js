@@ -12,9 +12,10 @@ class SDCardDetector extends EventEmitter {
   constructor(volumesPath = '/Volumes') {
     super();
     this.volumesPath = volumesPath;
-    this.watcher = null;
     this.knownVolumes = new Set();
+    this.knownGoProVolumes = new Set();
     this.checkInterval = null;
+    this.isScanning = false;
     // List of volume names to exclude (common system volumes)
     this.excludedVolumes = new Set(['Macintosh HD', 'Preboot', 'Recovery', 'VM', 'Update']);
   }
@@ -29,7 +30,9 @@ class SDCardDetector extends EventEmitter {
     // Set up periodic checking (every 2 seconds)
     // Using polling instead of fs.watch for better reliability on macOS
     this.checkInterval = setInterval(() => {
-      this.scanVolumes();
+      if (!this.isScanning) {
+        this.scanVolumes();
+      }
     }, 2000);
 
     console.log('[SDCardDetector] Started monitoring for SD cards');
@@ -43,10 +46,6 @@ class SDCardDetector extends EventEmitter {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
-    if (this.watcher) {
-      this.watcher.close();
-      this.watcher = null;
-    }
     console.log('[SDCardDetector] Stopped monitoring');
   }
 
@@ -54,6 +53,10 @@ class SDCardDetector extends EventEmitter {
    * Scan the /Volumes directory for new SD cards
    */
   async scanVolumes() {
+    if (this.isScanning) {
+      return;
+    }
+    this.isScanning = true;
     try {
       // Check if /Volumes directory exists
       if (!fsSync.existsSync(this.volumesPath)) {
@@ -72,6 +75,7 @@ class SDCardDetector extends EventEmitter {
           const isGoPro = await this.isGoProSDCard(volumePath);
           if (isGoPro) {
             console.log(`[SDCardDetector] Detected GoPro SD card: ${volume}`);
+            this.knownGoProVolumes.add(volume);
             this.emit('sd-card-detected', {
               name: volume,
               path: volumePath,
@@ -86,14 +90,19 @@ class SDCardDetector extends EventEmitter {
       // Remove volumes that are no longer mounted
       for (const volume of this.knownVolumes) {
         if (!currentVolumes.has(volume)) {
-          console.log(`[SDCardDetector] SD card removed: ${volume}`);
           this.knownVolumes.delete(volume);
-          this.emit('sd-card-removed', { name: volume });
+          if (this.knownGoProVolumes.has(volume)) {
+            console.log(`[SDCardDetector] GoPro SD card removed: ${volume}`);
+            this.knownGoProVolumes.delete(volume);
+            this.emit('sd-card-removed', { name: volume });
+          }
         }
       }
     } catch (error) {
       // Silently ignore errors (e.g., permission issues)
       console.error('[SDCardDetector] Error scanning volumes:', error.message);
+    } finally {
+      this.isScanning = false;
     }
   }
 

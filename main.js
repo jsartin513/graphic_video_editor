@@ -1071,6 +1071,9 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
  * Initialize SD card detection
  */
 async function initializeSDCardDetection() {
+  if (process.platform !== 'darwin') {
+    return;
+  }
   try {
     const prefs = await loadPreferences();
     
@@ -1125,6 +1128,9 @@ ipcMain.handle('get-gopro-sd-cards', async () => {
 
 // Open SD card directory
 ipcMain.handle('open-sd-card-directory', async (event, sdCardPath) => {
+  if (typeof sdCardPath !== 'string' || !sdCardPath.trim()) {
+    return { success: false, error: 'Invalid SD card path' };
+  }
   try {
     const dcimPath = path.join(sdCardPath, 'DCIM');
     
