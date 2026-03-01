@@ -8,6 +8,7 @@ import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShor
 import { getFileName, getDirectoryPath } from './utils.js';
 import { initializeFailedOperations } from './failedOperations.js';
 import { initializeUndoRedo } from './undoRedo.js';
+import { initializeVideoComparison } from './videoComparison.js';
 
 // Shared application state
 const state = {
@@ -30,6 +31,7 @@ const domElements = {
   fileList: document.getElementById('fileList'),
   fileCount: document.getElementById('fileCount'),
   prepareMergeBtn: document.getElementById('prepareMergeBtn'),
+  compareVideosBtn: document.getElementById('compareVideosBtn'),
   
   // SD Card notification
   sdCardNotification: document.getElementById('sdCardNotification'),
@@ -151,6 +153,7 @@ const trimVideo = initializeTrimVideo(domElements, state);
 fileHandling = initializeFileHandling(state, domElements, trimVideo, undoRedo);
 const failedOperations = initializeFailedOperations(domElements);
 mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo);
+initializeVideoComparison(state, domElements);
 
 // Set up lazy loading for prerequisites
 window.electronAPI.onPrerequisitesMissing(async (event, status) => {
