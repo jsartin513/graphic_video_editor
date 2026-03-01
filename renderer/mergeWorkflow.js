@@ -1,8 +1,10 @@
 // Video merging workflow functionality
 
-import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
+import { showError, enhanceError } from './errorHandler.js';
+import { showErrorDialog } from './errorDialog.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, undoRedo = null) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo = null) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -44,28 +46,54 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     if (state.selectedFiles.length === 0) return;
     
     try {
+      // Ensure preferences are loaded before applying export settings
+      await loadUserPreferences();
+
       // Analyze videos and group by session ID
       state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
       
       if (state.videoGroups.length === 0) {
-        alert('No GoPro video files found. Please select files matching GoPro naming patterns:\n- GX??????.MP4\n- GP??????.MP4\n- GOPR????.MP4');
+        showError('No GoPro video files found', {
+          operation: 'Analyze Videos',
+          suggestions: [
+            'Ensure files match GoPro naming patterns:',
+            '• GX??????.MP4 (e.g. GX010001, GXAA0123)',
+            '• GP??????.MP4',
+            '• GOPR????.MP4'
+          ]
+        });
         return;
       }
       
-      // Calculate durations and file sizes for each group
+      // Calculate durations and file sizes for each group (fetch in parallel)
       let hasDurations = false;
+      
+      // Create array of all files to fetch durations for
+      const allFiles = state.videoGroups.flatMap(group => 
+        group.files.map(filePath => ({ group, filePath }))
+      );
+      
+      // Fetch all durations in parallel
+      const durationPromises = allFiles.map(({ filePath }) =>
+        window.electronAPI.getVideoDuration(filePath)
+          .catch(error => {
+            console.error(`Error getting duration for ${filePath}:`, error);
+            return 0;
+          })
+      );
+      
+      const durations = await Promise.all(durationPromises);
+      
+      // Aggregate durations by group
+      let fileIndex = 0;
       for (const group of state.videoGroups) {
         let totalDuration = 0;
-        for (const filePath of group.files) {
-          try {
-            const duration = await window.electronAPI.getVideoDuration(filePath);
-            if (duration > 0) {
-              hasDurations = true;
-            }
-            totalDuration += duration;
-          } catch (error) {
-            console.error(`Error getting duration for ${filePath}:`, error);
+        for (let i = 0; i < group.files.length; i++) {
+          const duration = durations[fileIndex++];
+          if (duration > 0) {
+            hasDurations = true;
           }
+          totalDuration += duration;
         }
         group.totalDuration = totalDuration;
         
@@ -93,6 +121,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         console.warn('Could not retrieve video durations. ffprobe may not be installed.');
       }
       
+      // Derive patterns from selected filenames and save to recent suggestions
+      try {
+        const allFiles = state.videoGroups.flatMap(g => g.files);
+        await window.electronAPI.savePatternsFromSelectedFiles(allFiles);
+        await loadUserPreferences();
+      } catch (err) {
+        console.error('Error saving patterns from filenames:', err);
+      }
+      
       // Show preview screen
       showPreviewScreen();
       
@@ -106,8 +143,41 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       }
     } catch (error) {
       console.error('Error preparing merge:', error);
-      alert('Error analyzing videos: ' + error.message);
+      showError(error, {
+        operation: 'Analyze Videos',
+        filePath: state.selectedFiles.length > 0 ? state.selectedFiles[0] : undefined
+      });
     }
+  }
+
+  // Track whether multiple directories are present (used by renderPreviewList)
+  let hasMultipleDirectories = false;
+
+  // Render (or re-render) the preview list, preserving current selections
+  function renderPreviewList() {
+    // Save selected groups by sessionId so selections survive a reorder
+    const selectedSessions = new Set(
+      Array.from(state.selectedGroups)
+        .map(i => state.videoGroups[i]?.sessionId)
+        .filter(id => id !== undefined)
+    );
+
+    previewList.innerHTML = '';
+    state.selectedGroups.clear();
+
+    // Performance optimization: Use DocumentFragment for batch DOM updates
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < state.videoGroups.length; i++) {
+      const group = state.videoGroups[i];
+      if (selectedSessions.has(group.sessionId)) {
+        state.selectedGroups.add(i);
+      }
+      const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
+      fragment.appendChild(previewItem);
+    }
+    previewList.appendChild(fragment);
+
+    updateBatchControls();
   }
 
   // Show preview screen
@@ -136,24 +206,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       // Normalize path separators so Set comparison is consistent across platforms
       return dir.replace(/\\/g, '/');
     }));
-    const hasMultipleDirectories = directories.size > 1;
-    
-      previewList.innerHTML = '';
-      
-      // Initialize all groups as selected by default
-      state.selectedGroups.clear();
-      for (let i = 0; i < state.videoGroups.length; i++) {
-        state.selectedGroups.add(i);
-      }
-      
-      for (let i = 0; i < state.videoGroups.length; i++) {
-        const group = state.videoGroups[i];
-        const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
-        previewList.appendChild(previewItem);
-      }
-      
-      updateBatchControls();
+    hasMultipleDirectories = directories.size > 1;
+
+    // Initialize all groups as selected by default
+    state.selectedGroups.clear();
+    for (let i = 0; i < state.videoGroups.length; i++) {
+      state.selectedGroups.add(i);
     }
+
+    renderPreviewList();
+  }
 
   // Create preview item
   function createPreviewItem(group, index, showDirectory = false) {
@@ -192,6 +254,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       ).join('');
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
+    
+    // Make item draggable for reordering
+    item.draggable = true;
+    item.dataset.index = index;
     
     item.innerHTML = `
       <div class="preview-item-header">
@@ -303,6 +369,51 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         console.error('Error saving pattern:', error);
       }
     });
+
+    // Drag-to-reorder event handlers
+    item.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index));
+      item.classList.add('dragging');
+      state.draggedGroupIndex = index;
+    });
+
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      document.querySelectorAll('.preview-item.drag-over-item').forEach(el => {
+        el.classList.remove('drag-over-item');
+      });
+      delete state.draggedGroupIndex;
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (state.draggedGroupIndex !== undefined && state.draggedGroupIndex !== index) {
+        item.classList.add('drag-over-item');
+      }
+    });
+
+    item.addEventListener('dragleave', (e) => {
+      if (!item.contains(e.relatedTarget)) {
+        item.classList.remove('drag-over-item');
+      }
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over-item');
+
+      if (state.draggedGroupIndex !== undefined && state.draggedGroupIndex !== index) {
+        const draggedGroup = state.videoGroups[state.draggedGroupIndex];
+        state.videoGroups.splice(state.draggedGroupIndex, 1);
+        // Adjust target index if the dragged item was before it (splice shifts indices down by 1)
+        const insertIndex = state.draggedGroupIndex < index ? index - 1 : index;
+        state.videoGroups.splice(insertIndex, 0, draggedGroup);
+        renderPreviewList();
+      }
+    });
     
     return item;
   }
@@ -321,17 +432,35 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       if (!result.canceled && result.path) {
         state.selectedOutputDestination = result.path;
         updateOutputDestinationDisplay();
+        
+        // Save the selected output destination to preferences
+        try {
+          await window.electronAPI.setLastOutputDestination(result.path);
+          if (userPreferences) userPreferences.lastOutputDestination = result.path;
+        } catch (prefError) {
+          console.error('Error saving output destination preference:', prefError);
+        }
       }
     } catch (error) {
       console.error('Error selecting output destination:', error);
-      alert('Error selecting output destination: ' + error.message);
+      showError(error, {
+        operation: 'Select Output Destination'
+      });
     }
   }
 
   // Handle use default destination
-  function handleUseDefaultDestination() {
+  async function handleUseDefaultDestination() {
     state.selectedOutputDestination = null;
     updateOutputDestinationDisplay();
+    
+    // Clear the saved output destination preference
+    try {
+      await window.electronAPI.setLastOutputDestination(null);
+      if (userPreferences) userPreferences.lastOutputDestination = null;
+    } catch (error) {
+      console.error('Error clearing output destination preference:', error);
+    }
   }
 
   // Update output destination display
@@ -353,22 +482,54 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
   }
   
+  // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
+  async function syncAndApplyTokensFromInputs(indicesToMerge) {
+    for (const index of indicesToMerge) {
+      const input = document.querySelector(`.filename-input[data-index="${index}"]`);
+      const group = state.videoGroups[index];
+      let value = input ? input.value.trim() : (group.outputFilename || '').replace(/\.MP4$/i, '');
+      if (!value) value = `PROCESSED${group.sessionId}`;
+      value = value.replace(/\.MP4$/i, '');
+
+      if (value.includes('{')) {
+        try {
+          const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat);
+          if (result && result.result) value = result.result;
+        } catch (error) {
+          console.error('Error applying date tokens:', error);
+        }
+      }
+      value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      group.outputFilename = value + '.MP4';
+    }
+  }
+
   // Handle Merge Selected button (batch merge)
   async function handleBatchMerge(selectedIndices = null) {
     const indicesToMerge = selectedIndices || Array.from(state.selectedGroups).sort((a, b) => a - b);
     
     if (indicesToMerge.length === 0) {
-      alert('Please select at least one video group to merge.');
+      showError('No videos selected', {
+        operation: 'Merge Videos',
+        suggestions: ['Select at least one video group to merge']
+      }, null);
       return;
     }
+    
+    // Sync from DOM and apply tokens before validating (handles Merge clicked while cursor still in filename input)
+    await syncAndApplyTokensFromInputs(indicesToMerge);
     
     // Validate filenames for selected groups only
     for (const index of indicesToMerge) {
       const group = state.videoGroups[index];
-      if (!group.outputFilename || !group.outputFilename.trim()) {
-        alert(`Please provide a filename for Session ${group.sessionId}.`);
-        return;
-      }
+        if (!group.outputFilename || !group.outputFilename.trim()) {
+          showError(`Missing filename for Session ${group.sessionId}`, {
+            operation: 'Merge Videos',
+            suggestions: ['Enter a filename for this video group before merging']
+          });
+          return;
+        }
     }
     
     // Get output directory (use custom if selected, otherwise default)
@@ -382,7 +543,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[indicesToMerge[0]].files[0]);
       }
     } catch (error) {
-      alert('Error creating output directory: ' + error.message);
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
       return;
     }
     
@@ -406,7 +568,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     for (let i = 0; i < indicesToMerge.length; i++) {
       const index = indicesToMerge[i];
       const group = state.videoGroups[index];
-      const outputPath = outputDir + '/' + group.outputFilename;
+      const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${group.outputFilename}`;
       currentGroupIndex = i;
       currentGroup = group;
       
@@ -419,12 +581,18 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
+        const enhanced = enhanceError(error, {
+          operation: 'Merge Videos',
+          sessionId: group.sessionId,
+          outputPath: outputPath
+        });
         const failedResult = { 
           success: false, 
           sessionId: group.sessionId, 
-          error: error.message,
+          error: enhanced.userMessage,
+          errorDetails: enhanced,
           files: group.files,
-          outputPath: path.join(outputDir, group.outputFilename)
+          outputPath
         };
         results.push(failedResult);
         
@@ -433,7 +601,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           await window.electronAPI.addFailedOperation({
             sessionId: group.sessionId,
             files: group.files,
-            outputPath: path.join(outputDir, group.outputFilename),
+            outputPath,
             error: error.message,
             timestamp: Date.now()
           });
@@ -460,8 +628,13 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       : `All ${completed} videos processed successfully`;
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
     
+    // Update failed operations button visibility
+    if (failedOperations && failedOperations.updateFailedOperationsButton) {
+      failedOperations.updateFailedOperationsButton();
+    }
+    
     // Show results
-    showMergeResults(results, outputDir);
+    await showMergeResults(results, outputDir);
   }
   
   // Update batch controls based on selection
@@ -563,8 +736,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressText.textContent = progressMessage;
   }
 
+  const MIN_DURATION_FOR_SPLIT_SECONDS = 40 * 60; // 40 minutes
+
   // Show merge results
-  function showMergeResults(results, outputDir) {
+  async function showMergeResults(results, outputDir) {
     const successCount = results.filter(r => r.success).length;
     const failCount = results.filter(r => !r.success).length;
     const totalCount = results.length;
@@ -580,6 +755,25 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressText.textContent = failCount === 0 
       ? `Successfully merged ${successCount} video${successCount !== 1 ? 's' : ''}` 
       : `Completed: ${successCount} succeeded, ${failCount} failed`;
+    
+    // Fetch duration for each successful result (to decide whether to show Split button)
+    const durationsByIndex = new Map();
+    const durationPromises = results.map((result, index) => {
+      if (!result.success) {
+        return Promise.resolve(null);
+      }
+      return window.electronAPI
+        .getVideoDuration(result.outputPath)
+        .then((dur) => ({ index, duration: dur }))
+        .catch(() => ({ index, duration: null }));
+    });
+    const settledDurations = await Promise.allSettled(durationPromises);
+    for (const settled of settledDurations) {
+      if (settled.status === 'fulfilled' && settled.value !== null && settled.value.duration !== null) {
+        const { index, duration } = settled.value;
+        durationsByIndex.set(index, duration);
+      }
+    }
     
     // Build results HTML with improved design
     let resultsHtml = `
@@ -624,18 +818,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         ` : ''}
     `;
     
-    // Add successful results with split buttons
+    // Add successful results with split and trim buttons (split only if video is at least 40 minutes)
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success) {
         const filename = getFileName(result.outputPath);
+        const durationSeconds = durationsByIndex.get(i) ?? 0;
+        const showSplitBtn = durationSeconds >= MIN_DURATION_FOR_SPLIT_SECONDS;
         resultsHtml += `
           <div class="result-item success">
             <span class="result-icon">✓</span>
             <span class="result-name">${escapeHtml(filename)}</span>
-            <button class="btn-split-video" data-index="${i}" data-video-path="${escapeHtml(result.outputPath)}" data-video-name="${escapeHtml(filename)}">
-              ✂️ Split
+            <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">
+              ✂️ Trim
             </button>
+            ${showSplitBtn ? `<button class="btn-split-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">✂️ Split</button>` : ''}
           </div>
         `;
       }
@@ -655,10 +852,24 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       
       for (const result of results) {
         if (!result.success) {
+          const errorDisplay = result.errorDetails || { userMessage: result.error, suggestions: [] };
           resultsHtml += `
-            <div class="result-item error">
-              <span class="result-icon">✗</span>
-              <span class="result-name">Session ${result.sessionId}: ${escapeHtml(result.error)}</span>
+            <div class="result-item error" data-session-id="${result.sessionId}">
+              <div class="error-item-header">
+                <span class="result-icon">✗</span>
+                <span class="result-name">Session ${result.sessionId}: ${escapeHtml(errorDisplay.userMessage || result.error)}</span>
+              </div>
+              ${errorDisplay.suggestions && errorDisplay.suggestions.length > 0 ? `
+                <div class="error-item-suggestions">
+                  <strong>Suggestions:</strong>
+                  <ul>
+                    ${errorDisplay.suggestions.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              <button class="btn btn-small error-retry-btn" data-result-index="${results.indexOf(result)}" title="Show detailed error information">
+                View Details
+              </button>
             </div>
           `;
         }
@@ -724,10 +935,36 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
 
     // Add event listeners for split video buttons
     document.querySelectorAll('.btn-split-video').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const videoPath = e.target.getAttribute('data-video-path');
+        const videoName = e.target.getAttribute('data-video-name');
+        // Lazy load split video module when user clicks split button
+        const splitVideo = await loadSplitVideoModule();
+        splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+      });
+    });
+
+    // Add event listeners for trim video buttons
+    document.querySelectorAll('.btn-trim-video').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const videoPath = e.target.getAttribute('data-video-path');
         const videoName = e.target.getAttribute('data-video-name');
-        splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+        trimVideo.showTrimVideoModal(videoPath, videoName, outputDir);
+      });
+    });
+    
+    // Add event listeners for error detail buttons
+    document.querySelectorAll('.error-retry-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const resultIndex = parseInt(e.target.getAttribute('data-result-index'));
+        const result = results[resultIndex];
+        if (result && !result.success && result.errorDetails) {
+          showError(result.errorDetails?.original || result.error, {
+            operation: 'Merge Videos',
+            sessionId: result.sessionId,
+            outputPath: result.outputPath
+          });
+        }
       });
     });
   }
