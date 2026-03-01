@@ -2,7 +2,7 @@
 
 import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo, failedOperations) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -496,6 +496,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       ? `Batch complete: ${completed} succeeded, ${failed} failed`
       : `All ${completed} videos processed successfully`;
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
+    
+    // Update failed operations button visibility
+    if (failedOperations && failedOperations.updateFailedOperationsButton) {
+      failedOperations.updateFailedOperationsButton();
+    }
     
     // Show results
     await showMergeResults(results, outputDir);

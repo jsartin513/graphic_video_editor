@@ -8,6 +8,7 @@ import { initializeTrimVideo } from './trimVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
 import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
+import { initializeFailedOperations } from './failedOperations.js';
 
 // Shared application state
 const state = {
@@ -73,14 +74,25 @@ const domElements = {
   splitProgress: document.getElementById('splitProgress'),
   splitProgressBar: document.getElementById('splitProgressBar'),
   splitProgressText: document.getElementById('splitProgressText'),
-  splitResult: document.getElementById('splitResult')
+  splitResult: document.getElementById('splitResult'),
+
+  // Failed Operations Modal
+  viewFailedBtn: document.getElementById('viewFailedBtn'),
+  failedOpsModal: document.getElementById('failedOpsModal'),
+  closeFailedOpsModalBtn: document.getElementById('closeFailedOpsModalBtn'),
+  closeFailedOpsBtn: document.getElementById('closeFailedOpsBtn'),
+  failedOpsList: document.getElementById('failedOpsList'),
+  noFailedOps: document.getElementById('noFailedOps'),
+  clearAllFailedBtn: document.getElementById('clearAllFailedBtn'),
+  failedBadge: document.getElementById('failedBadge')
 };
 
 // Initialize all modules
 const trimVideo = initializeTrimVideo(domElements, state);
 const fileHandling = initializeFileHandling(state, domElements, trimVideo);
 const splitVideo = initializeSplitVideo(domElements, state);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo);
+const failedOperations = initializeFailedOperations(domElements, state);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo, failedOperations);
 const prerequisites = initializePrerequisites(domElements);
 
 // Split Video button (start screen)
