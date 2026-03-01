@@ -1406,7 +1406,19 @@ ipcMain.handle('install-prerequisites', async () => {
 // Load user preferences
 ipcMain.handle('load-preferences', async () => {
   try {
-    return await loadPreferences();
+    const prefs = await loadPreferences();
+    // Validate saved output destination: if path no longer exists, clear it
+    if (prefs.lastOutputDestination) {
+      try {
+        const stat = await fs.stat(prefs.lastOutputDestination);
+        if (!stat.isDirectory()) {
+          prefs.lastOutputDestination = null;
+        }
+      } catch {
+        prefs.lastOutputDestination = null;
+      }
+    }
+    return prefs;
   } catch (error) {
     console.error('Error loading preferences:', error);
     throw error;

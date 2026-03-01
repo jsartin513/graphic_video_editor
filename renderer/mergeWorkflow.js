@@ -44,6 +44,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     if (state.selectedFiles.length === 0) return;
     
     try {
+      // Ensure preferences are loaded before applying export settings
+      await loadUserPreferences();
+
       // Analyze videos and group by session ID
       state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
       
