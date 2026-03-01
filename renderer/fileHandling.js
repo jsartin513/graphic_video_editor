@@ -1,9 +1,9 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDate, getDirectoryPath } from './utils.js';
 
 // State will be managed in the main renderer.js
-export function initializeFileHandling(state, domElements) {
+export function initializeFileHandling(state, domElements, trimVideo = null) {
   const {
     selectFilesBtn,
     selectFolderBtn,
@@ -152,9 +152,9 @@ export function initializeFileHandling(state, domElements) {
     
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
+      const fileName = getFileName(filePath);
       
       // Get video metadata (lazy load - don't await)
-      let videoMetadataHtml = '';
       window.electronAPI.getVideoMetadata(filePath)
         .then(videoMetadata => {
           if (videoMetadata && videoMetadata.video) {
@@ -215,7 +215,7 @@ export function initializeFileHandling(state, domElements) {
           ${thumbnailHtml}
         </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
           <div class="file-meta">
             <span>Size: ${metadata.sizeFormatted}</span>
             <span>Modified: ${formatDate(metadata.modified)}</span>
@@ -223,26 +223,116 @@ export function initializeFileHandling(state, domElements) {
           <div class="video-metadata-details" style="display: none; margin-top: 8px; font-size: 11px; color: var(--text-secondary);"></div>
         </div>
         <div class="file-actions">
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}">Remove</button>
         </div>
       `;
     } catch (error) {
+      const fileName = getFileName(filePath);
+      
       item.innerHTML = `
         <div class="file-thumbnail-container">
           <div class="file-thumbnail-placeholder">🎬</div>
         </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
         </div>
         <div class="file-actions">
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}">Remove</button>
         </div>
       `;
+    }
+
+    // Add trim button handler if trimVideo module is available
+    if (trimVideo) {
+      const trimBtn = item.querySelector('.btn-trim');
+      if (trimBtn) {
+        trimBtn.addEventListener('click', () => {
+          const file = trimBtn.getAttribute('data-file');
+          const name = trimBtn.getAttribute('data-name');
+          // Get directory from file path
+          const directory = getDirectoryPath(filePath);
+          trimVideo.showTrimVideoModal(file, name, directory);
+        });
+      }
     }
 
     // Add remove button handler
     const removeBtn = item.querySelector('.btn-remove');
     removeBtn.addEventListener('click', () => removeFile(filePath));
+
+    // Make item draggable for reordering
+    item.draggable = true;
+    item.setAttribute('data-file-index', state.selectedFiles.indexOf(filePath));
+    item.classList.add('draggable-item');
+    
+    // Drag event handlers
+    item.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', filePath);
+      item.classList.add('dragging');
+      
+      // Store the dragged item reference
+      state.draggedItem = item;
+      state.draggedIndex = state.selectedFiles.indexOf(filePath);
+    });
+    
+    item.addEventListener('dragend', (e) => {
+      item.classList.remove('dragging');
+      
+      // Clear drop indicators
+      document.querySelectorAll('.drag-over-item').forEach(el => {
+        el.classList.remove('drag-over-item');
+      });
+      
+      delete state.draggedItem;
+      delete state.draggedIndex;
+    });
+    
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      // Only show drop indicator if dragging over a different item
+      if (state.draggedItem && item !== state.draggedItem) {
+        item.classList.add('drag-over-item');
+      }
+    });
+    
+    item.addEventListener('dragleave', (e) => {
+      // Only remove indicator if not dragging over a child element
+      if (!item.contains(e.relatedTarget)) {
+        item.classList.remove('drag-over-item');
+      }
+    });
+    
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over-item');
+      
+      if (state.draggedItem && state.draggedIndex !== undefined) {
+        const draggedFilePath = state.selectedFiles[state.draggedIndex];
+        const dropIndex = state.selectedFiles.indexOf(filePath);
+        
+        if (draggedFilePath && dropIndex !== -1 && state.draggedIndex !== dropIndex) {
+          // Reorder files in state
+          const originalIndex = state.draggedIndex;
+          state.selectedFiles.splice(originalIndex, 1);
+          const targetIndex = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
+          state.selectedFiles.splice(targetIndex, 0, draggedFilePath);
+          
+          // Save state for undo/redo if available (will be integrated when undo/redo feature is merged)
+          if (typeof undoRedo !== 'undefined' && undoRedo) {
+            undoRedo.saveState(`Reordered files`);
+          }
+          
+          // Update UI
+          updateFileList();
+        }
+      }
+    });
 
     return item;
   }
