@@ -33,7 +33,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Initialize preferences
   loadUserPreferences();
 
-  // Audio normalization state
+  // Quality selection state
+  let selectedQuality = 'copy'; // Default to copy (fastest)
+  
+  // Audio normalization state (load from preferences)
   let normalizeAudio = false;
 
   // Handle Prepare Merge button
@@ -89,6 +92,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     // Reset output destination to default when showing preview
     state.selectedOutputDestination = null;
     updateOutputDestinationDisplay();
+    
+    // Load audio normalization preference
+    if (userPreferences && typeof userPreferences.normalizeAudio === 'boolean') {
+      normalizeAudio = userPreferences.normalizeAudio;
+      const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+      if (normalizeAudioCheckbox) {
+        normalizeAudioCheckbox.checked = normalizeAudio;
+      }
+    }
     
     // Check if we have multiple directories (for display purposes)
     const directories = new Set(state.videoGroups.map(g => {
@@ -318,7 +330,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, normalizeAudio);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
@@ -538,9 +550,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Audio normalization checkbox handler
   const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
   if (normalizeAudioCheckbox) {
-    normalizeAudioCheckbox.addEventListener('change', (e) => {
+    normalizeAudioCheckbox.addEventListener('change', async (e) => {
       normalizeAudio = e.target.checked;
-      console.log('Audio normalization:', normalizeAudio ? 'enabled' : 'disabled');
+      // Save preference
+      try {
+        const prefs = await window.electronAPI.loadPreferences();
+        prefs.normalizeAudio = normalizeAudio;
+        await window.electronAPI.savePreferences(prefs);
+      } catch (error) {
+        console.error('Error saving audio normalization preference:', error);
+      }
     });
   }
 

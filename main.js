@@ -317,7 +317,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath, normalizeAudio = false) => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', normalizeAudio = false) => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
