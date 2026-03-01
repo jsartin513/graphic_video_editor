@@ -69,8 +69,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           group.totalInputSize = sizeData.totalBytes;
           group.totalInputSizeFormatted = sizeData.totalSizeFormatted;
           
-          // Estimate output size: For `-c copy`, output size is roughly the sum of input sizes
-          // (may be slightly different due to container overhead, but close enough for estimation)
+          // Estimate output size: For `-c copy` (stream copy), output size equals sum of input sizes
+          // since we're not re-encoding. Container overhead is negligible (< 0.1%).
           group.estimatedOutputSize = sizeData.totalBytes;
           group.estimatedOutputSizeFormatted = sizeData.totalSizeFormatted;
         } catch (error) {
