@@ -404,7 +404,13 @@ ipcMain.handle('generate-thumbnail', async (event, videoPath, timestamp = 1) => 
   }
 });
 
-// Get total file size for multiple files
+/**
+ * Get total file size for multiple files
+ * @param {Event} event - IPC event
+ * @param {string[]} filePaths - Array of file paths to calculate total size for
+ * @returns {Promise<{totalBytes: number, totalSizeFormatted: string}>} Object with total bytes and formatted string
+ * @throws {Error} If all files fail to stat
+ */
 ipcMain.handle('get-total-file-size', async (event, filePaths) => {
   if (!Array.isArray(filePaths) || filePaths.length === 0) {
     return { totalBytes: 0, totalSizeFormatted: '0 Bytes' };
