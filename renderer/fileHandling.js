@@ -124,6 +124,8 @@ export function initializeFileHandling(state, domElements, trimVideo = null) {
 
   function removeFile(filePath) {
     state.selectedFiles = state.selectedFiles.filter(f => f !== filePath);
+    // Clear cache entry for removed file
+    metadataCache.delete(filePath);
     updateFileList();
   }
 
@@ -144,10 +146,13 @@ export function initializeFileHandling(state, domElements, trimVideo = null) {
     const items = await Promise.all(
       state.selectedFiles.map(filePath => createFileItem(filePath))
     );
+    // Performance optimization: Use DocumentFragment for batch DOM updates
+    const fragment = document.createDocumentFragment();
     for (const item of items) {
-      fileList.appendChild(item);
+      fragment.appendChild(item);
     }
-    
+    fileList.appendChild(fragment);
+
     // Perform compatibility check if we have multiple files
     if (state.selectedFiles.length > 1) {
       await checkCompatibility(items);
@@ -418,7 +423,6 @@ export function initializeFileHandling(state, domElements, trimVideo = null) {
         trimBtn.addEventListener('click', () => {
           const file = trimBtn.getAttribute('data-file');
           const name = trimBtn.getAttribute('data-name');
-          // Get directory from file path
           const directory = getDirectoryPath(filePath);
           trimVideo.showTrimVideoModal(file, name, directory);
         });

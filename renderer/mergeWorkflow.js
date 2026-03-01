@@ -65,20 +65,35 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         return;
       }
       
-      // Calculate durations and file sizes for each group
+      // Calculate durations and file sizes for each group (fetch in parallel)
       let hasDurations = false;
+      
+      // Create array of all files to fetch durations for
+      const allFiles = state.videoGroups.flatMap(group => 
+        group.files.map(filePath => ({ group, filePath }))
+      );
+      
+      // Fetch all durations in parallel
+      const durationPromises = allFiles.map(({ filePath }) =>
+        window.electronAPI.getVideoDuration(filePath)
+          .catch(error => {
+            console.error(`Error getting duration for ${filePath}:`, error);
+            return 0;
+          })
+      );
+      
+      const durations = await Promise.all(durationPromises);
+      
+      // Aggregate durations by group
+      let fileIndex = 0;
       for (const group of state.videoGroups) {
         let totalDuration = 0;
-        for (const filePath of group.files) {
-          try {
-            const duration = await window.electronAPI.getVideoDuration(filePath);
-            if (duration > 0) {
-              hasDurations = true;
-            }
-            totalDuration += duration;
-          } catch (error) {
-            console.error(`Error getting duration for ${filePath}:`, error);
+        for (let i = 0; i < group.files.length; i++) {
+          const duration = durations[fileIndex++];
+          if (duration > 0) {
+            hasDurations = true;
           }
+          totalDuration += duration;
         }
         group.totalDuration = totalDuration;
         
@@ -150,14 +165,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     previewList.innerHTML = '';
     state.selectedGroups.clear();
 
+    // Performance optimization: Use DocumentFragment for batch DOM updates
+    const fragment = document.createDocumentFragment();
     for (let i = 0; i < state.videoGroups.length; i++) {
       const group = state.videoGroups[i];
       if (selectedSessions.has(group.sessionId)) {
         state.selectedGroups.add(i);
       }
       const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
-      previewList.appendChild(previewItem);
+      fragment.appendChild(previewItem);
     }
+    previewList.appendChild(fragment);
 
     updateBatchControls();
   }
@@ -197,7 +215,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
 
     renderPreviewList();
-    }
+  }
 
   // Create preview item
   function createPreviewItem(group, index, showDirectory = false) {
