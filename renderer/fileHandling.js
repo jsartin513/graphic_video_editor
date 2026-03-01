@@ -300,8 +300,10 @@ export function initializeFileHandling(state, domElements) {
         
         if (draggedFilePath && dropIndex !== -1 && state.draggedIndex !== dropIndex) {
           // Reorder files in state
-          state.selectedFiles.splice(state.draggedIndex, 1);
-          state.selectedFiles.splice(dropIndex, 0, draggedFilePath);
+          const originalIndex = state.draggedIndex;
+          state.selectedFiles.splice(originalIndex, 1);
+          const targetIndex = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
+          state.selectedFiles.splice(targetIndex, 0, draggedFilePath);
           
           // Save state for undo/redo if available (will be integrated when undo/redo feature is merged)
           if (typeof undoRedo !== 'undefined' && undoRedo) {
