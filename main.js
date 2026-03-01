@@ -378,7 +378,6 @@ ipcMain.handle('get-video-metadata', async (event, videoPath) => {
     throw new Error('Invalid video path');
   }
 
-
   return new Promise((resolve, reject) => {
     const ffprobeCmd = getFFprobePath();
     const env = { ...process.env };
