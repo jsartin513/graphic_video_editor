@@ -38,11 +38,10 @@ function derivePatternFromFilename(filename) {
   const sessionId = extractSessionId(filename);
   if (!sessionId) return null;
   const base = filename.replace(/\.MP4$/i, '');
-  const pattern = base.replace(sessionId, '{sessionId}');
-  if (pattern.includes('{sessionId}')) {
-    return pattern;
-  }
-  return null;
+  // The sessionId is always the last 4 characters of the base; use slice to avoid
+  // replacing an earlier occurrence of the same digit sequence in the prefix.
+  const prefix = base.slice(0, -sessionId.length);
+  return `${prefix}{sessionId}`;
 }
 
 /**

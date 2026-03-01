@@ -1504,8 +1504,10 @@ ipcMain.handle('save-patterns-from-selected-files', async (event, filePaths) => 
       if (pattern && !seen.has(pattern)) {
         seen.add(pattern);
         prefs = addRecentPattern(prefs, pattern);
-        await savePreferences(prefs);
       }
+    }
+    if (seen.size > 0) {
+      await savePreferences(prefs);
     }
     return { success: true, saved: seen.size };
   } catch (error) {
