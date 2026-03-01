@@ -3,9 +3,7 @@
 
 import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
-import { initializeSplitVideo } from './splitVideo.js';
 import { initializeTrimVideo } from './trimVideo.js';
-import { initializePrerequisites } from './prerequisites.js';
 import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
 import { initializeFailedOperations } from './failedOperations.js';
@@ -87,15 +85,39 @@ const domElements = {
   failedBadge: document.getElementById('failedBadge')
 };
 
-// Initialize all modules
+// Lazy-loaded modules (code splitting)
+let splitVideoModule = null;
+let prerequisitesModule = null;
+
+async function loadSplitVideoModule() {
+  if (!splitVideoModule) {
+    const module = await import('./splitVideo.js');
+    splitVideoModule = module.initializeSplitVideo(domElements, state);
+  }
+  return splitVideoModule;
+}
+
+async function loadPrerequisitesModule() {
+  if (!prerequisitesModule) {
+    const module = await import('./prerequisites.js');
+    prerequisitesModule = module.initializePrerequisites(domElements);
+  }
+  return prerequisitesModule;
+}
+
+// Initialize core modules (always loaded)
 const trimVideo = initializeTrimVideo(domElements, state);
 const fileHandling = initializeFileHandling(state, domElements, trimVideo);
-const splitVideo = initializeSplitVideo(domElements, state);
 const failedOperations = initializeFailedOperations(domElements);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo, failedOperations);
-const prerequisites = initializePrerequisites(domElements);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations);
 
-// Split Video button (start screen)
+// Set up lazy loading for prerequisites
+window.electronAPI.onPrerequisitesMissing(async (event, status) => {
+  const prerequisites = await loadPrerequisitesModule();
+  prerequisites.showPrerequisitesModal(status);
+});
+
+// Split Video button (start screen) - lazy loads splitVideo on first click
 const splitVideoBtn = document.getElementById('splitVideoBtn');
 if (splitVideoBtn) {
   splitVideoBtn.addEventListener('click', async () => {
@@ -105,6 +127,7 @@ if (splitVideoBtn) {
       const videoPath = result.files[0];
       const videoName = getFileName(videoPath);
       const outputDir = getDirectoryPath(videoPath);
+      const splitVideo = await loadSplitVideoModule();
       splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
     } catch (error) {
       console.error('Error opening split video:', error);
