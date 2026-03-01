@@ -51,7 +51,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
       
       if (state.videoGroups.length === 0) {
-        alert('No GoPro video files found. Please select files matching GoPro naming patterns:\n- GX??????.MP4\n- GP??????.MP4\n- GOPR????.MP4');
+        alert('No GoPro video files found. Please select files matching GoPro naming patterns:\n- GX??????.MP4 (e.g. GX010001, GXAA0123)\n- GP??????.MP4\n- GOPR????.MP4');
         return;
       }
       
@@ -94,6 +94,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Warn if no durations were found (likely ffprobe not installed)
       if (!hasDurations && state.videoGroups.length > 0) {
         console.warn('Could not retrieve video durations. ffprobe may not be installed.');
+      }
+      
+      // Derive patterns from selected filenames and save to recent suggestions
+      try {
+        const allFiles = state.videoGroups.flatMap(g => g.files);
+        await window.electronAPI.savePatternsFromSelectedFiles(allFiles);
+        await loadUserPreferences();
+      } catch (err) {
+        console.error('Error saving patterns from filenames:', err);
       }
       
       // Show preview screen
