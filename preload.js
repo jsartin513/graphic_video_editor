@@ -55,6 +55,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('sd-card-detected');
     ipcRenderer.removeAllListeners('sd-card-removed');
   },
+  // Logger API
+  getLogs: (filename, maxLines) => ipcRenderer.invoke('get-logs', filename, maxLines),
+  getLogFiles: () => ipcRenderer.invoke('get-log-files'),
+  clearLogs: () => ipcRenderer.invoke('clear-logs'),
+  exportLogs: (destinationPath) => ipcRenderer.invoke('export-logs', destinationPath),
+  getDebugMode: () => ipcRenderer.invoke('get-debug-mode'),
+  setDebugMode: (enabled) => ipcRenderer.invoke('set-debug-mode', enabled),
   // Error recovery API
   addFailedOperation: (operation) => ipcRenderer.invoke('add-failed-operation', operation),
   removeFailedOperation: (sessionId, outputPath) => ipcRenderer.invoke('remove-failed-operation', sessionId, outputPath),
