@@ -11,6 +11,7 @@ const { logger } = require('./src/logger');
 let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
+let sdCardDetector = null;
 
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
@@ -90,12 +91,16 @@ app.whenReady().then(async () => {
     checkPrerequisites();
   }, 500);
 
+  // Initialize SD card detection
+  await initializeSDCardDetection();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
       setTimeout(() => {
         checkPrerequisites();
       }, 500);
+      initializeSDCardDetection();
     }
   });
 });
@@ -113,6 +118,12 @@ async function checkPrerequisites() {
 }
 
 app.on('window-all-closed', () => {
+  // Stop SD card detection and clear reference so it can be restarted on activate
+  if (sdCardDetector) {
+    sdCardDetector.stop();
+    sdCardDetector = null;
+  }
+  
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -254,14 +265,20 @@ const {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  applyDateTokens,
+  addSDCardPath,
+  setAutoDetectSDCards,
+  setShowSDCardNotifications,
   setPreferredQuality,
   setLastOutputDestination,
-  applyDateTokens,
   addFailedOperation,
   removeFailedOperation,
   getFailedOperations,
   clearFailedOperations
 } = require('./src/preferences');
+
+// Import SD Card Detector
+const { SDCardDetector } = require('./src/sd-card-detector');
 
 // Analyze and group video files by session ID and directory
 // Files from different subdirectories with the same session ID are processed separately
@@ -1602,6 +1619,174 @@ ipcMain.handle('set-debug-mode', async (event, enabled) => {
   }
 });
 
+// SD Card Detection Functions
+
+/**
+ * Initialize SD card detection
+ */
+async function initializeSDCardDetection() {
+  if (process.platform !== 'darwin') {
+    return;
+  }
+  try {
+    const prefs = await loadPreferences();
+    
+    // Only initialize if auto-detect is enabled
+    if (prefs.autoDetectSDCards) {
+      sdCardDetector = new SDCardDetector();
+      
+      // Listen for SD card detection events
+      sdCardDetector.on('sd-card-detected', async (sdCard) => {
+        console.log('[SD Card] Detected:', sdCard.name);
+        
+        // Save to preferences
+        const currentPrefs = await loadPreferences();
+        const updatedPrefs = addSDCardPath(currentPrefs, sdCard.path);
+        await savePreferences(updatedPrefs);
+        
+        // Notify renderer if notifications are enabled
+        if (currentPrefs.showSDCardNotifications && mainWindow) {
+          mainWindow.webContents.send('sd-card-detected', sdCard);
+        }
+      });
+      
+      sdCardDetector.on('sd-card-removed', (sdCard) => {
+        console.log('[SD Card] Removed:', sdCard.name);
+        if (mainWindow) {
+          mainWindow.webContents.send('sd-card-removed', sdCard);
+        }
+      });
+      
+      // Start monitoring
+      sdCardDetector.start();
+      
+      console.log('[SD Card] Auto-detection initialized');
+    }
+  } catch (error) {
+    console.error('[SD Card] Error initializing detection:', error);
+  }
+}
+
+// Get currently connected GoPro SD cards
+ipcMain.handle('get-gopro-sd-cards', async () => {
+  try {
+    if (!sdCardDetector) {
+      sdCardDetector = new SDCardDetector();
+    }
+    return await sdCardDetector.getGoProSDCards();
+  } catch (error) {
+    console.error('Error getting GoPro SD cards:', error);
+    return [];
+  }
+});
+
+// Open SD card directory
+ipcMain.handle('open-sd-card-directory', async (event, sdCardPath) => {
+  if (typeof sdCardPath !== 'string' || !sdCardPath.trim()) {
+    return { success: false, error: 'Invalid SD card path' };
+  }
+  try {
+    const dcimPath = path.join(sdCardPath, 'DCIM');
+    
+    // Check if DCIM exists, otherwise use the root SD card path
+    const targetPath = fsSync.existsSync(dcimPath) ? dcimPath : sdCardPath;
+    
+    // Open in Finder (shell.openPath returns error string, empty on success)
+    const { shell } = require('electron');
+    const openError = await shell.openPath(targetPath);
+    if (openError) {
+      console.error('Error opening SD card directory via shell.openPath:', openError);
+      return { success: false, error: openError };
+    }
+    return { success: true, path: targetPath };
+  } catch (error) {
+    console.error('Error opening SD card directory:', error);
+    throw error;
+  }
+});
+
+// Load SD card files into the app
+ipcMain.handle('load-sd-card-files', async (event, sdCardPath) => {
+  if (typeof sdCardPath !== 'string' || !sdCardPath.trim()) {
+    return { success: false, error: 'Invalid SD card path', files: [] };
+  }
+  try {
+    const dcimPath = path.join(sdCardPath, 'DCIM');
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
+    const videoFiles = [];
+
+    async function scanDirectory(dirPath) {
+      try {
+        const entries = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(dirPath, entry.name);
+          
+          if (entry.isDirectory()) {
+            await scanDirectory(fullPath);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name);
+            if (videoExtensions.includes(ext)) {
+              videoFiles.push(fullPath);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error scanning directory ${dirPath}:`, error);
+      }
+    }
+
+    // Scan DCIM directory if it exists
+    if (fsSync.existsSync(dcimPath)) {
+      await scanDirectory(dcimPath);
+    }
+
+    return { success: true, files: videoFiles };
+  } catch (error) {
+    console.error('Error loading SD card files:', error);
+    throw error;
+  }
+});
+
+// Toggle SD card auto-detection
+ipcMain.handle('set-auto-detect-sd-cards', async (event, enabled) => {
+  try {
+    // Ensure `enabled` is a proper boolean before using or persisting it
+    let normalizedEnabled;
+    if (typeof enabled === 'boolean') {
+      normalizedEnabled = enabled;
+    } else if (typeof enabled === 'string') {
+      const lower = enabled.trim().toLowerCase();
+      if (lower === 'true') {
+        normalizedEnabled = true;
+      } else if (lower === 'false') {
+        normalizedEnabled = false;
+      } else {
+        normalizedEnabled = Boolean(enabled);
+      }
+    } else {
+      normalizedEnabled = Boolean(enabled);
+    }
+
+    const prefs = await loadPreferences();
+    const updated = setAutoDetectSDCards(prefs, normalizedEnabled);
+    await savePreferences(updated);
+    
+    // Start or stop detection based on setting
+    if (normalizedEnabled && !sdCardDetector) {
+      await initializeSDCardDetection();
+    } else if (!normalizedEnabled && sdCardDetector) {
+      sdCardDetector.stop();
+      sdCardDetector = null;
+    }
+    
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting auto-detect SD cards:', error);
+    throw error;
+  }
+});
+
 // Add a failed operation for recovery
 function sanitizeFailedOperation(operation) {
   const MAX_STRING_LENGTH = 1024;
@@ -1666,6 +1851,35 @@ ipcMain.handle('add-failed-operation', async (event, operation) => {
     return { success: true };
   } catch (error) {
     logger.error('Error adding failed operation', { error: error.message });
+    throw error;
+  }
+});
+
+// Toggle SD card notifications
+ipcMain.handle('set-show-sd-card-notifications', async (event, enabled) => {
+  try {
+    // Ensure `enabled` is a proper boolean before persisting
+    let normalizedEnabled;
+    if (typeof enabled === 'boolean') {
+      normalizedEnabled = enabled;
+    } else if (typeof enabled === 'string') {
+      const lower = enabled.trim().toLowerCase();
+      if (lower === 'true') {
+        normalizedEnabled = true;
+      } else if (lower === 'false') {
+        normalizedEnabled = false;
+      } else {
+        normalizedEnabled = Boolean(enabled);
+      }
+    } else {
+      normalizedEnabled = Boolean(enabled);
+    }
+    const prefs = await loadPreferences();
+    const updated = setShowSDCardNotifications(prefs, normalizedEnabled);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting SD card notifications:', error);
     throw error;
   }
 });
