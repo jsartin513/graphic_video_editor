@@ -665,14 +665,6 @@ body {
   line-height: 1.4;
 }
 
-  background: transparent;
-  border: none;
-  color: var(--accent-primary);
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-  text-decoration: underline;
-  min-height: 32px;
 }
 
 .btn-text:hover {
