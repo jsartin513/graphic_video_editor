@@ -4,7 +4,7 @@ import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName }
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo = null) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -353,6 +353,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
       state.videoGroups[index].outputFilename = value + '.MP4';
       e.target.value = value;
+      
+      // Save state for undo/redo on filename change
+      if (undoRedo && originalPattern) {
+        undoRedo.saveState(`Changed filename to ${value}`);
+      }
       
       // Save the original pattern (with tokens) to preferences, not the replaced value
       // This allows users to reuse patterns with date tokens
