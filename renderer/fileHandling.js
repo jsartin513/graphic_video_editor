@@ -179,16 +179,18 @@ export function initializeFileHandling(state, domElements) {
 
   // Load thumbnail for a specific file
   async function loadThumbnail(filePath, thumbnailEl) {
+    // Check cache first before incrementing counter
+    if (thumbnailCache.has(filePath)) {
+      const cachedDataUrl = thumbnailCache.get(filePath);
+      updateThumbnailElement(thumbnailEl, cachedDataUrl);
+      // Process next item in queue since we didn't actually start a request
+      processThumbnailQueue();
+      return;
+    }
+    
     activeThumbnailRequests++;
     
     try {
-      // Check cache first
-      if (thumbnailCache.has(filePath)) {
-        const cachedDataUrl = thumbnailCache.get(filePath);
-        updateThumbnailElement(thumbnailEl, cachedDataUrl);
-        return;
-      }
-
       // Generate thumbnail
       const dataUrl = await window.electronAPI.generateThumbnail(filePath, 1);
       
