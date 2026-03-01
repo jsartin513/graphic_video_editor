@@ -100,7 +100,31 @@ export function initializeFileHandling(state, domElements) {
     
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
+      
+      // Generate thumbnail (lazy load - don't await)
+      let thumbnailHtml = '<div class="file-thumbnail-placeholder">🎬</div>';
+      window.electronAPI.generateThumbnail(filePath, 1)
+        .then(thumbnailDataUrl => {
+          const thumbnailImg = item.querySelector('.file-thumbnail');
+          if (thumbnailImg) {
+            thumbnailImg.src = thumbnailDataUrl;
+            thumbnailImg.style.display = 'block';
+            const placeholder = item.querySelector('.file-thumbnail-placeholder');
+            if (placeholder) {
+              placeholder.style.display = 'none';
+            }
+          }
+        })
+        .catch(error => {
+          console.error(`Error generating thumbnail for ${filePath}:`, error);
+          // Keep placeholder if thumbnail generation fails
+        });
+      
       item.innerHTML = `
+        <div class="file-thumbnail-container">
+          <img class="file-thumbnail" src="" alt="Video thumbnail" style="display: none;">
+          ${thumbnailHtml}
+        </div>
         <div class="file-info">
           <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
           <div class="file-meta">
@@ -114,6 +138,9 @@ export function initializeFileHandling(state, domElements) {
       `;
     } catch (error) {
       item.innerHTML = `
+        <div class="file-thumbnail-container">
+          <div class="file-thumbnail-placeholder">🎬</div>
+        </div>
         <div class="file-info">
           <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
         </div>

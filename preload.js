@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   processDroppedPaths: (paths) => ipcRenderer.invoke('process-dropped-paths', paths),
   analyzeVideos: (filePaths) => ipcRenderer.invoke('analyze-videos', filePaths),
   getVideoDuration: (filePath) => ipcRenderer.invoke('get-video-duration', filePath),
+  generateThumbnail: (videoPath, timestamp) => ipcRenderer.invoke('generate-thumbnail', videoPath, timestamp),
+  getTotalFileSize: (filePaths) => ipcRenderer.invoke('get-total-file-size', filePaths),
   mergeVideos: (filePaths, outputPath) => ipcRenderer.invoke('merge-videos', filePaths, outputPath),
   splitVideo: (videoPath, splits, outputDir) => ipcRenderer.invoke('split-video', videoPath, splits, outputDir),
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
@@ -20,6 +22,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removePrerequisitesListener: () => {
     ipcRenderer.removeAllListeners('prerequisites-missing');
+  },
+  onMergeProgress: (callback) => {
+    ipcRenderer.on('merge-progress', (event, data) => callback(data));
+  },
+  removeMergeProgressListener: () => {
+    ipcRenderer.removeAllListeners('merge-progress');
   },
   // Preferences API
   loadPreferences: () => ipcRenderer.invoke('load-preferences'),
