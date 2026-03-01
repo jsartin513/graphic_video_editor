@@ -665,17 +665,6 @@ body {
   line-height: 1.4;
 }
 
-}
-
-.btn-text:hover {
-  color: var(--accent-primary-hover);
-}
-
-.btn-text:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
 .preview-actions {
   display: flex;
   justify-content: space-between;
