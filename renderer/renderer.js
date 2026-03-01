@@ -7,6 +7,7 @@ import { initializeTrimVideo } from './trimVideo.js';
 import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
 import { initializeFailedOperations } from './failedOperations.js';
+import { initializeRecentDirectories } from './recentDirectories.js';
 import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
 
@@ -153,6 +154,7 @@ const trimVideo = initializeTrimVideo(domElements, state);
 fileHandling = initializeFileHandling(state, domElements, trimVideo, undoRedo);
 const failedOperations = initializeFailedOperations(domElements);
 mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo);
+const recentDirectories = initializeRecentDirectories(state, domElements, fileHandling);
 initializeVideoComparison(state, domElements);
 
 // Set up lazy loading for prerequisites

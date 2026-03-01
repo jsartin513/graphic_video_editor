@@ -30,6 +30,9 @@ const DEFAULT_PREFERENCES = {
     { name: 'European (DD-MM-YYYY)', format: 'DD-MM-YYYY' },
     { name: 'Compact (YYYYMMDD)', format: 'YYYYMMDD' }
   ],
+  recentDirectories: [], // Recent folders/files accessed
+  pinnedDirectories: [], // User-pinned directories for quick access
+  maxRecentDirectories: 10,
   // SD Card detection settings
   autoDetectSDCards: true,
   knownSDCardPaths: [],
@@ -53,7 +56,10 @@ async function loadPreferences() {
       ...DEFAULT_PREFERENCES,
       ...prefs,
       // Ensure dateFormats includes defaults
-      dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats
+      dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
+      // Ensure recent directories arrays exist
+      recentDirectories: prefs.recentDirectories || [],
+      pinnedDirectories: prefs.pinnedDirectories || []
     };
   } catch (error) {
     if (error.code === 'ENOENT') {
@@ -207,6 +213,46 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD') 
 }
 
 /**
+ * Add a directory to recent directories
+ * @param {Object} preferences - Current preferences
+ * @param {string} dirPath - The directory path to add
+ * @returns {Object} Updated preferences
+ */
+function addRecentDirectory(preferences, dirPath) {
+  if (!dirPath || typeof dirPath !== 'string') {
+    return preferences;
+  }
+
+  const recentDirs = preferences.recentDirectories || [];
+  const pinnedDirs = preferences.pinnedDirectories || [];
+
+  // Don't add to recent if it's already pinned
+  if (pinnedDirs.some(item => item.path === dirPath)) {
+    return preferences;
+  }
+
+  // Remove directory if it already exists (to move it to the front)
+  const filtered = recentDirs.filter(item => item.path !== dirPath);
+
+  // Add to front of array with current timestamp
+  const newItem = {
+    path: dirPath,
+    lastUsed: new Date().toISOString()
+  };
+  const updated = [newItem, ...filtered];
+
+  // Keep only the most recent N directories (by lastUsed, newest first)
+  const maxDirs = preferences.maxRecentDirectories || DEFAULT_PREFERENCES.maxRecentDirectories;
+  const sorted = [...updated].sort((a, b) => new Date(b.lastUsed) - new Date(a.lastUsed));
+  const trimmed = sorted.slice(0, maxDirs);
+
+  return {
+    ...preferences,
+    recentDirectories: trimmed
+  };
+}
+
+/**
  * Add an SD card path to known SD card paths
  * @param {Object} preferences - Current preferences
  * @param {string} sdCardPath - The SD card path to remember
@@ -216,20 +262,54 @@ function addSDCardPath(preferences, sdCardPath) {
   if (!sdCardPath || typeof sdCardPath !== 'string') {
     return preferences;
   }
-  
+
   // Remove if already exists
   const filtered = (preferences.knownSDCardPaths || []).filter(p => p !== sdCardPath);
-  
+
   // Add to front of array
   const updated = [sdCardPath, ...filtered];
-  
+
   // Keep only the most recent 10 paths
   const trimmed = updated.slice(0, 10);
-  
+
   return {
     ...preferences,
     knownSDCardPaths: trimmed,
     lastSDCardPath: sdCardPath
+  };
+}
+
+/**
+ * Pin a directory for quick access
+ * @param {Object} preferences - Current preferences
+ * @param {string} dirPath - The directory path to pin
+ * @returns {Object} Updated preferences
+ */
+function pinDirectory(preferences, dirPath) {
+  if (!dirPath || typeof dirPath !== 'string') {
+    return preferences;
+  }
+
+  const pinnedDirs = preferences.pinnedDirectories || [];
+
+  // Don't add if already pinned
+  if (pinnedDirs.some(item => item.path === dirPath)) {
+    return preferences;
+  }
+
+  // Add to pinned with current timestamp
+  const newItem = {
+    path: dirPath,
+    pinnedAt: new Date().toISOString()
+  };
+
+  // Remove from recent directories if present
+  const recentDirs = (preferences.recentDirectories || []).filter(item => item.path !== dirPath);
+
+  return {
+    ...preferences,
+    pinnedDirectories: [...pinnedDirs, newItem],
+    recentDirectories: recentDirs
   };
 }
 
@@ -255,12 +335,12 @@ function addFailedOperation(preferences, operation) {
     ? preferences.failedOperations
     : [];
   const failedOps = [...existingFailedOps];
-  
+
   // Check if this operation already exists (by sessionId and outputPath)
   const existingIndex = failedOps.findIndex(
     op => op.sessionId === operation.sessionId && op.outputPath === operation.outputPath
   );
-  
+
   if (existingIndex >= 0) {
     // Update existing operation
     failedOps[existingIndex] = {
@@ -276,15 +356,34 @@ function addFailedOperation(preferences, operation) {
       retryCount: 0
     });
   }
-  
+
   // Keep only the most recent MAX_FAILED_OPERATIONS entries
   const trimmed = failedOps
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, MAX_FAILED_OPERATIONS);
-  
+
   return {
     ...preferences,
     failedOperations: trimmed
+  };
+}
+
+/**
+ * Unpin a directory
+ * @param {Object} preferences - Current preferences
+ * @param {string} dirPath - The directory path to unpin
+ * @returns {Object} Updated preferences
+ */
+function unpinDirectory(preferences, dirPath) {
+  if (!dirPath || typeof dirPath !== 'string') {
+    return preferences;
+  }
+
+  const pinnedDirs = (preferences.pinnedDirectories || []).filter(item => item.path !== dirPath);
+
+  return {
+    ...preferences,
+    pinnedDirectories: pinnedDirs
   };
 }
 
@@ -302,6 +401,52 @@ function setAutoDetectSDCards(preferences, enabled) {
 }
 
 /**
+ * Clear all recent directories
+ * @param {Object} preferences - Current preferences
+ * @returns {Object} Updated preferences
+ */
+function clearRecentDirectories(preferences) {
+  return {
+    ...preferences,
+    recentDirectories: []
+  };
+}
+
+/**
+ * Remove invalid/non-existent directories from recent and pinned lists
+ * @param {Object} preferences - Current preferences
+ * @param {Function} existsCheck - Async function to check if path exists
+ * @returns {Promise<Object>} Updated preferences
+ */
+async function cleanupDirectories(preferences, existsCheck) {
+  const recentDirs = preferences.recentDirectories || [];
+  const pinnedDirs = preferences.pinnedDirectories || [];
+
+  const validRecent = [];
+  const validPinned = [];
+
+  // Check recent directories
+  for (const item of recentDirs) {
+    if (await existsCheck(item.path)) {
+      validRecent.push(item);
+    }
+  }
+
+  // Check pinned directories
+  for (const item of pinnedDirs) {
+    if (await existsCheck(item.path)) {
+      validPinned.push(item);
+    }
+  }
+
+  return {
+    ...preferences,
+    recentDirectories: validRecent,
+    pinnedDirectories: validPinned
+  };
+}
+
+/**
  * Remove a failed operation from preferences
  * @param {Object} preferences - Current preferences
  * @param {string} sessionId - Session ID of the operation to remove
@@ -310,7 +455,7 @@ function setAutoDetectSDCards(preferences, enabled) {
  */
 function removeFailedOperation(preferences, sessionId, outputPath) {
   const failedOps = Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
-  
+
   return {
     ...preferences,
     failedOperations: failedOps.filter(
@@ -363,6 +508,11 @@ module.exports = {
   setLastOutputDestination,
   formatDate,
   applyDateTokens,
+  addRecentDirectory,
+  pinDirectory,
+  unpinDirectory,
+  clearRecentDirectories,
+  cleanupDirectories,
   addSDCardPath,
   setAutoDetectSDCards,
   setShowSDCardNotifications,
