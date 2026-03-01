@@ -406,7 +406,7 @@ ipcMain.handle('generate-thumbnail', async (event, videoPath, timestamp = 1) => 
 
 /**
  * Get total file size for multiple files
- * @param {Event} event - IPC event
+ * @param {Event} event - IPC event (required by Electron IPC handler signature, not used)
  * @param {string[]} filePaths - Array of file paths to calculate total size for
  * @returns {Promise<{totalBytes: number, totalSizeFormatted: string}>} Object with total bytes and formatted string
  * @throws {Error} If all files fail to stat
