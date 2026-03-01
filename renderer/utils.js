@@ -46,3 +46,24 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
+export function formatBitrate(bitrate) {
+  if (!bitrate || isNaN(bitrate)) return 'Unknown';
+  const kbps = bitrate / 1000;
+  const mbps = kbps / 1000;
+  
+  if (mbps >= 1) {
+    return `${mbps.toFixed(2)} Mbps`;
+  }
+  return `${kbps.toFixed(0)} Kbps`;
+}
+
+export function formatResolution(width, height) {
+  if (!width || !height) return 'Unknown';
+  return `${width}x${height}`;
+}
+
+export function formatFrameRate(fps) {
+  if (!fps || isNaN(fps)) return 'Unknown';
+  return `${fps} fps`;
+}
+

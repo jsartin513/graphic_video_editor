@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFiles: () => ipcRenderer.invoke('select-files'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   getFileMetadata: (filePath) => ipcRenderer.invoke('get-file-metadata', filePath),
+  getVideoMetadataDetailed: (filePath) => ipcRenderer.invoke('get-video-metadata-detailed', filePath),
   processDroppedPaths: (paths) => ipcRenderer.invoke('process-dropped-paths', paths),
   analyzeVideos: (filePaths) => ipcRenderer.invoke('analyze-videos', filePaths),
   getVideoDuration: (filePath) => ipcRenderer.invoke('get-video-duration', filePath),

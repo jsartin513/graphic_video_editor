@@ -316,6 +316,87 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
   });
 });
 
+// Get comprehensive video metadata using ffprobe
+ipcMain.handle('get-video-metadata-detailed', async (event, filePath) => {
+  return new Promise((resolve) => {
+    const ffprobeCmd = getFFprobePath();
+    const ffprobe = spawn(ffprobeCmd, [
+      '-v', 'error',
+      '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height,r_frame_rate,codec_name,bit_rate:format=duration,size,bit_rate',
+      '-of', 'json',
+      filePath
+    ], { 
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
+    
+    let output = '';
+    let errorOutput = '';
+    
+    ffprobe.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    ffprobe.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+    
+    ffprobe.on('error', (error) => {
+      console.error('ffprobe error:', error);
+      resolve(null);
+    });
+    
+    ffprobe.on('close', (code) => {
+      if (code === 0 && output) {
+        try {
+          const data = JSON.parse(output);
+          const stream = data.streams && data.streams[0];
+          const format = data.format || {};
+          
+          // Parse frame rate (e.g., "30000/1001" -> 29.97)
+          let fps = null;
+          if (stream && stream.r_frame_rate) {
+            const parts = stream.r_frame_rate.split('/');
+            if (parts.length === 2) {
+              const [num, den] = parts.map(Number);
+              if (!isNaN(num) && !isNaN(den) && den !== 0) {
+                fps = num / den;
+              }
+            } else if (parts.length === 1) {
+              const num = Number(parts[0]);
+              if (!isNaN(num)) {
+                fps = num;
+              }
+            }
+          }
+          
+          // Consolidate bitrate - prefer format bitrate over stream bitrate
+          const bitrate = format.bit_rate ? parseInt(format.bit_rate) : 
+                         (stream?.bit_rate ? parseInt(stream.bit_rate) : null);
+          
+          const metadata = {
+            width: stream?.width || null,
+            height: stream?.height || null,
+            fps: fps ? Math.round(fps * 100) / 100 : null,
+            videoCodec: stream?.codec_name || null,
+            bitrate: bitrate,
+            duration: format.duration ? parseFloat(format.duration) : null,
+            fileSize: format.size ? parseInt(format.size) : null
+          };
+          
+          resolve(metadata);
+        } catch (error) {
+          console.error(`Error parsing ffprobe output for ${filePath}:`, error);
+          resolve(null);
+        }
+      } else {
+        console.error(`ffprobe failed for ${filePath}: ${errorOutput}`);
+        resolve(null);
+      }
+    });
+  });
+});
+
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
