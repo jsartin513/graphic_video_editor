@@ -260,6 +260,7 @@ const {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredOutputFormat,
   applyDateTokens
 } = require('./src/preferences');
 
@@ -317,7 +318,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, format = 'mp4') => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
@@ -338,6 +339,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
         console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        console.log(`[merge-videos] Output format: ${format}`);
         
         // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
         const env = { ...process.env };
@@ -353,13 +355,33 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         
-        const ffmpeg = spawn(ffmpegCmd, [
+        // Build ffmpeg arguments based on format
+        const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
-          '-i', tempFileList,
-          '-c', 'copy',
-          outputPath
-        ], { 
+          '-i', tempFileList
+        ];
+        
+        // Add format-specific codec settings
+        // For most formats, we can use codec copy for speed
+        // But some formats may need specific codecs
+        if (format === 'mp4' || format === 'mov' || format === 'm4v') {
+          // MP4/MOV/M4V: Use copy, works well with H.264
+          ffmpegArgs.push('-c', 'copy');
+        } else if (format === 'mkv') {
+          // MKV: Use copy, supports most codecs
+          ffmpegArgs.push('-c', 'copy');
+        } else if (format === 'avi') {
+          // AVI: Use copy, but may need re-encoding for some codecs
+          ffmpegArgs.push('-c', 'copy');
+        } else {
+          // Default: use copy
+          ffmpegArgs.push('-c', 'copy');
+        }
+        
+        ffmpegArgs.push(outputPath);
+        
+        const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
         });
         
@@ -1034,6 +1056,19 @@ ipcMain.handle('set-date-format', async (event, format) => {
     return { success: true, preferences: updated };
   } catch (error) {
     console.error('Error setting date format:', error);
+    throw error;
+  }
+});
+
+// Set preferred output format
+ipcMain.handle('set-output-format', async (event, format) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredOutputFormat(prefs, format);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting output format:', error);
     throw error;
   }
 });

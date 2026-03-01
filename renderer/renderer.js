@@ -42,6 +42,9 @@ const domElements = {
   selectOutputDestinationBtn: document.getElementById('selectOutputDestinationBtn'),
   useDefaultDestinationBtn: document.getElementById('useDefaultDestinationBtn'),
   
+  // Format selector
+  formatSelect: document.getElementById('formatSelect'),
+  
   // Prerequisites modal
   prerequisitesModal: document.getElementById('prerequisitesModal'),
   installBtn: document.getElementById('installBtn'),

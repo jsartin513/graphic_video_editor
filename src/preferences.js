@@ -19,6 +19,7 @@ const DEFAULT_PREFERENCES = {
   maxRecentPatterns: 10,
   preferredDateFormat: 'YYYY-MM-DD', // ISO format by default
   lastUsedPattern: null,
+  preferredOutputFormat: 'mp4', // Default to MP4 for best compatibility
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
     { name: 'US (MM-DD-YYYY)', format: 'MM-DD-YYYY' },
@@ -113,6 +114,19 @@ function setPreferredDateFormat(preferences, format) {
 }
 
 /**
+ * Set the preferred output format
+ * @param {Object} preferences - Current preferences
+ * @param {string} format - The output format (e.g., 'mp4', 'mov', 'mkv')
+ * @returns {Object} Updated preferences
+ */
+function setPreferredOutputFormat(preferences, format) {
+  return {
+    ...preferences,
+    preferredOutputFormat: format
+  };
+}
+
+/**
  * Format a date using the specified format string
  * @param {Date} date - The date to format
  * @param {string} format - Format string (supports YYYY, MM, DD, YY, M, D)
@@ -161,6 +175,7 @@ module.exports = {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredOutputFormat,
   formatDate,
   applyDateTokens,
   DEFAULT_PREFERENCES

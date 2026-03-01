@@ -17,14 +17,24 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     progressDetails,
     outputDestinationPath,
     selectOutputDestinationBtn,
-    useDefaultDestinationBtn
+    useDefaultDestinationBtn,
+    formatSelect
   } = domElements;
 
   // Load preferences on initialization
   let userPreferences = null;
+  let selectedFormat = 'mp4'; // Default format
+  
   async function loadUserPreferences() {
     try {
       userPreferences = await window.electronAPI.loadPreferences();
+      // Set format from preferences
+      if (userPreferences && userPreferences.preferredOutputFormat) {
+        selectedFormat = userPreferences.preferredOutputFormat;
+        if (formatSelect) {
+          formatSelect.value = selectedFormat;
+        }
+      }
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
@@ -32,6 +42,42 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   
   // Initialize preferences
   loadUserPreferences();
+  
+  // Helper function to get file extension based on format
+  function getFileExtension(format = selectedFormat) {
+    return `.${format.toUpperCase()}`;
+  }
+  
+  // Handle format selection change
+  function handleFormatChange() {
+    selectedFormat = formatSelect.value;
+    
+    // Save format preference
+    window.electronAPI.setOutputFormat(selectedFormat).catch(error => {
+      console.error('Error saving output format:', error);
+    });
+    
+    // Update all filename hints and output filenames
+    const filenameHints = document.querySelectorAll('.filename-hint');
+    filenameHints.forEach(hint => {
+      hint.textContent = getFileExtension();
+    });
+    
+    // Update all output filenames with new extension
+    state.videoGroups.forEach((group, index) => {
+      const currentName = group.outputFilename || `PROCESSED${group.sessionId}`;
+      // Remove old extension
+      const nameWithoutExt = currentName.replace(/\.[^.]+$/, '');
+      // Add new extension
+      group.outputFilename = nameWithoutExt + getFileExtension();
+      
+      // Update input field if it exists
+      const input = document.querySelector(`.filename-input[data-index="${index}"]`);
+      if (input) {
+        input.value = nameWithoutExt;
+      }
+    });
+  }
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -143,7 +189,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     if (userPreferences && userPreferences.recentFilenamePatterns && userPreferences.recentFilenamePatterns.length > 0) {
       const datalistId = `patterns-${index}`;
       const options = userPreferences.recentFilenamePatterns.map(pattern => 
-        `<option value="${escapeHtml(pattern.replace(/\.MP4$/i, ''))}">`
+        `<option value="${escapeHtml(pattern.replace(/\.[^.]+$/i, ''))}">`
       ).join('');
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
@@ -164,9 +210,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
                    data-index="${index}"
                    list="patterns-${index}"
                    value="${escapeHtml(group.outputFilename)}"
-                   placeholder="PROCESSED${group.sessionId}.MP4">
+                   placeholder="PROCESSED${group.sessionId}${getFileExtension()}">
             ${patternsDatalist}
-            <span class="filename-hint">.MP4</span>
+            <span class="filename-hint">${getFileExtension()}</span>
           </div>
           <div class="filename-help">
             <small>💡 Use date tokens: {date}, {year}, {month}, {day}</small>
@@ -184,9 +230,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     input.addEventListener('input', (e) => {
       const value = e.target.value.trim();
       if (value) {
-        // Remove .MP4 extension if user added it
-        const cleanValue = value.replace(/\.MP4$/i, '');
-        state.videoGroups[index].outputFilename = cleanValue + '.MP4';
+        // Remove extension if user added it
+        const cleanValue = value.replace(/\.[^.]+$/i, '');
+        state.videoGroups[index].outputFilename = cleanValue + getFileExtension();
       }
     });
     
@@ -196,8 +242,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       if (!value) {
         value = `PROCESSED${group.sessionId}`;
       }
-      // Remove .MP4 if present
-      value = value.replace(/\.MP4$/i, '');
+      // Remove extension if present
+      value = value.replace(/\.[^.]+$/i, '');
       
       // Store the original pattern before token replacement for preferences
       const originalPattern = value;
@@ -218,7 +264,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       // Remove invalid characters but preserve hyphens and underscores
       // This happens after date token replacement to preserve date formatting
       value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
-      state.videoGroups[index].outputFilename = value + '.MP4';
+      state.videoGroups[index].outputFilename = value + getFileExtension();
       e.target.value = value;
       
       // Save the original pattern (with tokens) to preferences, not the replaced value
@@ -315,7 +361,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedFormat);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
@@ -531,6 +577,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   mergeBtn.addEventListener('click', handleMerge);
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  
+  // Add format selector event listener
+  if (formatSelect) {
+    formatSelect.addEventListener('change', handleFormatChange);
+  }
 
   return { updateOutputDestinationDisplay };
 }
