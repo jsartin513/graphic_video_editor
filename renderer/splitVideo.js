@@ -162,8 +162,14 @@ export function initializeSplitVideo(domElements) {
     } catch (error) {
       progressBar.style.width = '100%';
       progressText.textContent = 'Split failed!';
+      
+      // Map error and show user-friendly dialog
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
+      
+      // Also show in result div
       resultDiv.className = 'split-result error';
-      resultDiv.innerHTML = `<p>✗ Error: ${escapeHtml(error.message)}</p>`;
+      resultDiv.innerHTML = `<p>✗ Error: ${escapeHtml(mappedError.userMessage)}</p>`;
       resultDiv.style.display = 'block';
       executeBtn.disabled = false;
       cancelBtn.disabled = false;

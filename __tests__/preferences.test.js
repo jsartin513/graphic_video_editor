@@ -3,6 +3,10 @@ const {
   setPreferredDateFormat,
   formatDate,
   applyDateTokens,
+  addFailedOperation,
+  removeFailedOperation,
+  getFailedOperations,
+  clearFailedOperations,
   DEFAULT_PREFERENCES
 } = require('../src/preferences');
 
@@ -187,5 +191,122 @@ describe('applyDateTokens', () => {
   test('handles null pattern', () => {
     const result = applyDateTokens(null);
     expect(result).toBeNull();
+  });
+});
+
+describe('addFailedOperation', () => {
+  const basePrefs = { ...DEFAULT_PREFERENCES };
+  const op1 = {
+    sessionId: 'session-1',
+    outputPath: '/tmp/out.mp4',
+    files: ['/tmp/a.mp4', '/tmp/b.mp4'],
+    error: 'Merge failed',
+    timestamp: 1000
+  };
+
+  test('adds a new failed operation', () => {
+    const result = addFailedOperation(basePrefs, op1);
+    expect(result.failedOperations).toHaveLength(1);
+    expect(result.failedOperations[0].sessionId).toBe('session-1');
+    expect(result.failedOperations[0].retryCount).toBe(0);
+  });
+
+  test('does not mutate the original preferences object', () => {
+    const prefs = { ...basePrefs, failedOperations: [op1] };
+    const original = [...prefs.failedOperations];
+    addFailedOperation(prefs, { ...op1, sessionId: 'session-2' });
+    expect(prefs.failedOperations).toEqual(original);
+  });
+
+  test('deduplicates by sessionId + outputPath and increments retryCount', () => {
+    const prefs = addFailedOperation(basePrefs, op1);
+    const result = addFailedOperation(prefs, { ...op1, error: 'Second failure' });
+    expect(result.failedOperations).toHaveLength(1);
+    expect(result.failedOperations[0].retryCount).toBe(1);
+    expect(result.failedOperations[0].error).toBe('Second failure');
+  });
+
+  test('keeps entries from different sessionId as separate records', () => {
+    const prefs = addFailedOperation(basePrefs, op1);
+    const result = addFailedOperation(prefs, { ...op1, sessionId: 'session-2' });
+    expect(result.failedOperations).toHaveLength(2);
+  });
+
+  test('ignores operation without sessionId', () => {
+    const result = addFailedOperation(basePrefs, { outputPath: '/tmp/out.mp4' });
+    expect(result).toBe(basePrefs);
+  });
+
+  test('enforces max history of 50 entries', () => {
+    let prefs = { ...basePrefs };
+    for (let i = 0; i < 55; i++) {
+      prefs = addFailedOperation(prefs, {
+        sessionId: `session-${i}`,
+        outputPath: `/tmp/out${i}.mp4`,
+        files: [],
+        error: 'err',
+        timestamp: i
+      });
+    }
+    expect(prefs.failedOperations.length).toBeLessThanOrEqual(50);
+  });
+});
+
+describe('removeFailedOperation', () => {
+  const op1 = {
+    sessionId: 'session-1',
+    outputPath: '/tmp/out.mp4',
+    files: [],
+    error: 'err',
+    timestamp: 1000,
+    retryCount: 0
+  };
+  const op2 = {
+    sessionId: 'session-2',
+    outputPath: '/tmp/out2.mp4',
+    files: [],
+    error: 'err',
+    timestamp: 2000,
+    retryCount: 0
+  };
+
+  test('removes the matching operation', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, failedOperations: [op1, op2] };
+    const result = removeFailedOperation(prefs, 'session-1', '/tmp/out.mp4');
+    expect(result.failedOperations).toHaveLength(1);
+    expect(result.failedOperations[0].sessionId).toBe('session-2');
+  });
+
+  test('does nothing when operation not found', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, failedOperations: [op1] };
+    const result = removeFailedOperation(prefs, 'nonexistent', '/tmp/out.mp4');
+    expect(result.failedOperations).toHaveLength(1);
+  });
+
+  test('handles empty failedOperations', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = removeFailedOperation(prefs, 'session-1', '/tmp/out.mp4');
+    expect(result.failedOperations).toEqual([]);
+  });
+});
+
+describe('getFailedOperations', () => {
+  test('returns the failedOperations array', () => {
+    const op = { sessionId: 's1', outputPath: '/tmp/out.mp4', files: [], error: 'err', timestamp: 1, retryCount: 0 };
+    const prefs = { ...DEFAULT_PREFERENCES, failedOperations: [op] };
+    expect(getFailedOperations(prefs)).toEqual([op]);
+  });
+
+  test('returns empty array when not set', () => {
+    expect(getFailedOperations({ ...DEFAULT_PREFERENCES })).toEqual([]);
+  });
+});
+
+describe('clearFailedOperations', () => {
+  test('clears all failed operations', () => {
+    const op = { sessionId: 's1', outputPath: '/tmp/out.mp4', files: [], error: 'err', timestamp: 1, retryCount: 0 };
+    const prefs = { ...DEFAULT_PREFERENCES, failedOperations: [op] };
+    const result = clearFailedOperations(prefs);
+    expect(result.failedOperations).toEqual([]);
   });
 });
