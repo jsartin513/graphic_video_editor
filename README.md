@@ -7,6 +7,12 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - Select multiple video files via file picker dialog
 - Select a folder containing video files (recursively scans for videos)
 - Drag and drop video files or folders directly into the app
+- **Detailed video metadata viewing** - View resolution, frame rate, codec, bitrate, and duration
+- **Expandable metadata details** - Toggle detailed properties for each video
+- **Compatibility checking** - Automatic detection of mismatched video properties
+- **Visual warnings** - Highlights videos with incompatible properties before merging
+- **Auto-detect GoPro SD cards** - Automatically detects when GoPro SD cards are inserted
+- **SD card notifications** - Get notified when a GoPro SD card is detected with quick actions
 - View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
 - **Recent folders** - Quick access to recently used directories
@@ -69,11 +75,41 @@ npm start
 - `src/` - Core modules
   - `video-grouping.js` - Groups GoPro videos by session ID
   - `preferences.js` - User preferences storage and management
+  - `sd-card-detector.js` - SD card detection and monitoring
 - `renderer/` - UI files
   - `index.html` - Main HTML structure
   - `styles.css` - Application styling
   - `renderer.js` - UI logic and event handlers
   - `mergeWorkflow.js` - Video merging workflow with preferences
+
+## Video Metadata Viewing
+
+The app provides detailed information about each video file to help you make informed decisions before merging:
+
+### Basic Metadata
+Each video displays:
+- File size
+- Modification date
+- Duration
+- Resolution (width x height)
+
+### Detailed Metadata
+Click "Show Details" on any video to see comprehensive properties:
+- **Resolution**: Full video dimensions
+- **Frame Rate**: Frames per second (fps)
+- **Video Codec**: Encoding format (e.g., h264, hevc)
+- **Bitrate**: Data rate in Mbps or Kbps
+- **Duration**: Total video length
+- **File Size**: Storage space required
+
+### Compatibility Checking
+When multiple videos are selected, the app automatically:
+- Compares video properties across all files
+- Highlights videos with mismatched properties (resolution, frame rate, codec)
+- Shows warning indicators on incompatible videos
+- Displays a summary banner explaining potential issues
+
+**Note**: Videos with different properties may require re-encoding during merge, which can affect quality and processing time.
 
 ## User Preferences
 
@@ -94,6 +130,43 @@ The app automatically tracks folders and directories you've recently accessed, m
 - **Privacy**: Clear recent folders at any time with the "Clear" button
 
 Recent folders appear at the top of the main screen when available. Pinned folders are shown first with a 📌 icon, followed by recent folders with a 📂 icon.
+
+## SD Card Auto-Detection
+
+The application automatically detects when a GoPro SD card is inserted into your Mac. When detected:
+- A notification banner appears at the top of the app
+- You can quickly open the SD card folder in Finder
+- You can instantly load all videos from the SD card into the app
+- The app remembers recently used SD cards for future reference
+
+**Features:**
+- Automatically monitors the `/Volumes/` directory for new SD cards
+- Detects GoPro directory structure (DCIM folder with GoPro video files)
+- Provides quick actions: "Open Folder" and "Load Videos"
+- Stores SD card paths in preferences for easy access
+
+**Settings:**
+- Auto-detection can be enabled/disabled in preferences
+- Notifications can be customized through preferences
+
+## Testing
+
+The project includes comprehensive unit and integration tests:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+**Test Coverage**: High coverage across multiple unit and integration test suites (see coverage reports for current metrics).
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
 
 ## Development
 
@@ -163,4 +236,10 @@ brew install ffmpeg
 The built DMG file can be distributed to users. When they open it, they can drag the app to their Applications folder.
 
 **Note**: The app requires ffmpeg to be installed on the user's system. Make sure to include this requirement in your distribution notes.
+
+## Troubleshooting
+
+If you encounter any errors or issues while using the app, please refer to the [Troubleshooting Guide](TROUBLESHOOTING.md) for detailed solutions to common problems.
+
+The app includes user-friendly error messages with actionable suggestions to help you resolve issues quickly.
 
