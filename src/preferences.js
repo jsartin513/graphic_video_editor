@@ -188,8 +188,11 @@ function addFailedOperation(preferences, operation) {
   ) {
     return preferences;
   }
-  
-  const failedOps = [...(preferences.failedOperations || [])];
+
+  const existingFailedOps = Array.isArray(preferences.failedOperations)
+    ? preferences.failedOperations
+    : [];
+  const failedOps = [...existingFailedOps];
   
   // Check if this operation already exists (by sessionId and outputPath)
   const existingIndex = failedOps.findIndex(
