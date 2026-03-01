@@ -108,6 +108,35 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
       previewList.appendChild(previewItem);
     }
+    
+    // Load thumbnails for preview items
+    loadPreviewThumbnails();
+  }
+  
+  // Load thumbnails for preview items
+  async function loadPreviewThumbnails() {
+    const thumbnailElements = previewList.querySelectorAll('.preview-thumbnail.loading');
+    
+    for (const thumbnailEl of thumbnailElements) {
+      const filePath = thumbnailEl.getAttribute('data-filepath');
+      if (filePath) {
+        loadPreviewThumbnail(filePath, thumbnailEl);
+      }
+    }
+  }
+  
+  // Load a single preview thumbnail
+  async function loadPreviewThumbnail(filePath, thumbnailEl) {
+    try {
+      const dataUrl = await window.electronAPI.generateThumbnail(filePath, 1);
+      thumbnailEl.classList.remove('loading');
+      thumbnailEl.innerHTML = `<img src="${dataUrl}" alt="Video thumbnail" />`;
+    } catch (error) {
+      console.error(`Failed to generate preview thumbnail for ${filePath}:`, error);
+      thumbnailEl.classList.remove('loading');
+      thumbnailEl.classList.add('error');
+      thumbnailEl.innerHTML = '<div class="thumbnail-error">📹</div>';
+    }
   }
 
   // Create preview item
@@ -148,8 +177,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
     
+    // Get first file for thumbnail
+    const firstFile = group.files[0];
+    
     item.innerHTML = `
       <div class="preview-item-header">
+        <div class="preview-thumbnail-container">
+          <div class="preview-thumbnail loading" data-filepath="${escapeHtml(firstFile)}">
+            <div class="thumbnail-spinner"></div>
+          </div>
+        </div>
         <div class="preview-item-info">
           <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
           <span class="preview-item-meta">${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}</span>

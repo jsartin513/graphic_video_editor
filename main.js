@@ -316,6 +316,62 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
   });
 });
 
+// Generate thumbnail for video at specified time (in seconds)
+ipcMain.handle('generate-thumbnail', async (event, filePath, timeInSeconds = 1) => {
+  return new Promise((resolve, reject) => {
+    const ffmpegCmd = getFFmpegPath();
+    
+    // Validate time parameter
+    const seekTime = Math.max(0, timeInSeconds || 1);
+    
+    // Use ffmpeg to extract a frame at the specified time
+    // Output as PNG to stdout
+    const ffmpeg = spawn(ffmpegCmd, [
+      '-ss', seekTime.toString(),
+      '-i', filePath,
+      '-vframes', '1',
+      '-f', 'image2pipe',
+      '-vcodec', 'png',
+      '-'
+    ], {
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
+    
+    const chunks = [];
+    let errorOutput = '';
+    
+    ffmpeg.stdout.on('data', (data) => {
+      chunks.push(data);
+    });
+    
+    ffmpeg.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+    
+    ffmpeg.on('error', (error) => {
+      if (error.code === 'ENOENT') {
+        console.error('ffmpeg not found. Please install ffmpeg.');
+        reject(new Error('ffmpeg not found'));
+      } else {
+        reject(error);
+      }
+    });
+    
+    ffmpeg.on('close', (code) => {
+      if (code === 0 && chunks.length > 0) {
+        // Combine all chunks and convert to base64
+        const buffer = Buffer.concat(chunks);
+        const base64 = buffer.toString('base64');
+        const dataUrl = `data:image/png;base64,${base64}`;
+        resolve(dataUrl);
+      } else {
+        console.error(`ffmpeg thumbnail generation failed for ${filePath}: ${errorOutput}`);
+        reject(new Error(`Thumbnail generation failed: ${errorOutput}`));
+      }
+    });
+  });
+});
+
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
   return new Promise((resolve, reject) => {
