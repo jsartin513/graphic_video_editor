@@ -5,6 +5,7 @@ import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeSplitVideo } from './splitVideo.js';
 import { initializePrerequisites } from './prerequisites.js';
+import { initializeVideoComparison } from './videoComparison.js';
 
 // Shared application state
 const state = {
@@ -24,6 +25,7 @@ const domElements = {
   fileList: document.getElementById('fileList'),
   fileCount: document.getElementById('fileCount'),
   prepareMergeBtn: document.getElementById('prepareMergeBtn'),
+  compareVideosBtn: document.getElementById('compareVideosBtn'),
   
   // Preview screen
   previewScreen: document.getElementById('previewScreen'),
@@ -75,6 +77,7 @@ const fileHandling = initializeFileHandling(state, domElements);
 const splitVideo = initializeSplitVideo(domElements, state);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
 const prerequisites = initializePrerequisites(domElements);
+const videoComparison = initializeVideoComparison(state, domElements);
 
 // Make state accessible for debugging
 window.appState = state;
