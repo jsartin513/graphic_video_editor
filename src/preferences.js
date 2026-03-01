@@ -180,7 +180,12 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD') 
 const MAX_FAILED_OPERATIONS = 50;
 
 function addFailedOperation(preferences, operation) {
-  if (!operation || !operation.sessionId) {
+  if (
+    !operation ||
+    !operation.sessionId ||
+    typeof operation.outputPath !== 'string' ||
+    operation.outputPath.trim() === ''
+  ) {
     return preferences;
   }
   
