@@ -4,7 +4,7 @@ import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName }
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo = null) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -17,18 +17,29 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     progressBar,
     progressText,
     progressDetails,
+    cancelMergeBtn,
     outputDestinationPath,
     selectOutputDestinationBtn,
-    useDefaultDestinationBtn
+    useDefaultDestinationBtn,
+    qualitySelect,
+    formatSelect
   } = domElements;
 
   // Load preferences on initialization
   let userPreferences = null;
+  let selectedQuality = 'copy'; // Default to copy (fastest)
+  let selectedFormat = 'mp4'; // Default format
+  
   async function loadUserPreferences() {
     try {
       userPreferences = await window.electronAPI.loadPreferences();
       if (userPreferences && userPreferences.preferredQuality) {
         selectedQuality = userPreferences.preferredQuality;
+        if (qualitySelect) qualitySelect.value = selectedQuality;
+      }
+      if (userPreferences && userPreferences.preferredFormat) {
+        selectedFormat = userPreferences.preferredFormat;
+        if (formatSelect) formatSelect.value = selectedFormat;
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -37,9 +48,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   
   // Initialize preferences
   loadUserPreferences();
-  
-  // Quality selection state
-  let selectedQuality = 'copy'; // Default to copy (fastest)
+
+  let normalizeAudio = false; // Audio normalization option
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -139,6 +149,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         if (qualitySelect) {
           qualitySelect.value = userPreferences.preferredQuality;
           selectedQuality = userPreferences.preferredQuality;
+        }
+      }
+      
+      // Load and set format preference
+      if (userPreferences && userPreferences.preferredFormat) {
+        const formatSelect = document.getElementById('formatSelect');
+        if (formatSelect) {
+          formatSelect.value = userPreferences.preferredFormat;
+          selectedFormat = userPreferences.preferredFormat;
         }
       }
     } catch (error) {
@@ -250,7 +269,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     if (userPreferences && userPreferences.recentFilenamePatterns && userPreferences.recentFilenamePatterns.length > 0) {
       const datalistId = `patterns-${index}`;
       const options = userPreferences.recentFilenamePatterns.map(pattern => 
-        `<option value="${escapeHtml(pattern.replace(/\.MP4$/i, ''))}">`
+        `<option value="${escapeHtml(removeExtension(pattern))}">`
       ).join('');
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
@@ -286,9 +305,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
                    data-index="${index}"
                    list="patterns-${index}"
                    value="${escapeHtml(group.outputFilename)}"
-                   placeholder="PROCESSED${group.sessionId}.MP4">
+                   placeholder="PROCESSED${group.sessionId}.${selectedFormat}">
             ${patternsDatalist}
-            <span class="filename-hint">.MP4</span>
+            <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
           <div class="filename-help">
             <small>💡 Use date tokens: {date}, {year}, {month}, {day}</small>
@@ -306,9 +325,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     input.addEventListener('input', (e) => {
       const value = e.target.value.trim();
       if (value) {
-        // Remove .MP4 extension if user added it
-        const cleanValue = value.replace(/\.MP4$/i, '');
-        state.videoGroups[index].outputFilename = cleanValue + '.MP4';
+        // Remove any video extension if user added it
+        const cleanValue = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+        state.videoGroups[index].outputFilename = cleanValue + '.' + selectedFormat.toLowerCase();
+        // Update hint
+        const hint = item.querySelector(`#filename-hint-${index}`);
+        if (hint) hint.textContent = '.' + selectedFormat.toUpperCase();
       }
     });
     
@@ -329,8 +351,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       if (!value) {
         value = `PROCESSED${group.sessionId}`;
       }
-      // Remove .MP4 if present
-      value = value.replace(/\.MP4$/i, '');
+      // Remove any video extension if present
+      value = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
       
       // Store the original pattern before token replacement for preferences
       const originalPattern = value;
@@ -351,8 +373,18 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Remove invalid characters but preserve hyphens and underscores
       // This happens after date token replacement to preserve date formatting
       value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
-      state.videoGroups[index].outputFilename = value + '.MP4';
+      const extension = '.' + selectedFormat.toLowerCase();
+      state.videoGroups[index].outputFilename = value + extension;
       e.target.value = value;
+
+      // Update hint to show current format
+      const hint = item.querySelector(`#filename-hint-${index}`);
+      if (hint) hint.textContent = extension.toUpperCase();
+
+      // Save state for undo/redo on filename change
+      if (undoRedo && originalPattern) {
+        undoRedo.saveState(`Changed filename to ${value}`);
+      }
       
       // Save the original pattern (with tokens) to preferences, not the replaced value
       // This allows users to reuse patterns with date tokens
@@ -476,7 +508,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     // Merge all groups
     await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
   }
-  
+
   // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
   async function syncAndApplyTokensFromInputs(indicesToMerge) {
     for (const index of indicesToMerge) {
@@ -558,39 +590,55 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     
     const results = [];
     let completed = 0;
+    let wasCancelled = false;
     let failed = 0;
-    
+
     for (let i = 0; i < indicesToMerge.length; i++) {
       const index = indicesToMerge[i];
       const group = state.videoGroups[index];
-      const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${group.outputFilename}`;
+      
+      // Ensure output filename has the correct extension for selected format
+      let outputFilename = group.outputFilename;
+      const baseName = outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+      outputFilename = baseName + '.' + selectedFormat.toLowerCase();
+      
+      const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${outputFilename}`;
       currentGroupIndex = i;
       currentGroup = group;
       
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
+
+        // Check if error is due to cancellation
+        if (error.message && error.message.includes('cancelled')) {
+          wasCancelled = true;
+          results.push({ success: false, sessionId: group.sessionId, error: 'Cancelled', cancelled: true });
+          updateProgress(i + 1, state.videoGroups.length, 'Operation cancelled');
+          break; // Stop processing remaining groups
+        }
+
         const enhanced = enhanceError(error, {
           operation: 'Merge Videos',
           sessionId: group.sessionId,
           outputPath: outputPath
         });
-        const failedResult = { 
-          success: false, 
-          sessionId: group.sessionId, 
+        const failedResult = {
+          success: false,
+          sessionId: group.sessionId,
           error: enhanced.userMessage,
           errorDetails: enhanced,
           files: group.files,
           outputPath
         };
         results.push(failedResult);
-        
+
         // Save failed operation for recovery
         try {
           await window.electronAPI.addFailedOperation({
@@ -605,7 +653,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
         failed++;
         updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
-        
+
         // Stop on error if configured
         if (state.stopOnError) {
           updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`);
@@ -613,25 +661,32 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
       }
     }
-    
+
+    // Hide cancel button when merge is complete or cancelled
+    if (cancelMergeBtn) {
+      cancelMergeBtn.style.display = 'none';
+    }
+
     // Clean up progress listener
     currentGroup = null;
     window.electronAPI.removeMergeProgressListener();
-    
-    const statusText = failed > 0 
-      ? `Batch complete: ${completed} succeeded, ${failed} failed`
-      : `All ${completed} videos processed successfully`;
+
+    const statusText = wasCancelled
+      ? 'Operation cancelled'
+      : failed > 0
+        ? `Batch complete: ${completed} succeeded, ${failed} failed`
+        : `All ${completed} videos processed successfully`;
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
-    
+
     // Update failed operations button visibility
     if (failedOperations && failedOperations.updateFailedOperationsButton) {
       failedOperations.updateFailedOperationsButton();
     }
-    
+
     // Show results
     await showMergeResults(results, outputDir);
   }
-  
+
   // Update batch controls based on selection
   function updateBatchControls() {
     const selectedCount = state.selectedGroups.size;
@@ -666,6 +721,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     previewScreen.style.display = 'none';
     progressScreen.style.display = 'block';
     progressBar.style.width = '0%';
+    
+    // Show and enable cancel button
+    if (cancelMergeBtn) {
+      cancelMergeBtn.style.display = 'inline-block';
+      cancelMergeBtn.disabled = false;
+    }
   }
 
   // Update progress (group-level)
@@ -977,7 +1038,97 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     });
   }
-  
+
+  // Format selector change handler
+  const formatSelect = document.getElementById('formatSelect');
+  if (formatSelect) {
+    formatSelect.addEventListener('change', async (e) => {
+      selectedFormat = e.target.value;
+
+      // Update all filename hints to reflect new format
+      document.querySelectorAll('[id^="filename-hint-"]').forEach(hint => {
+        hint.textContent = '.' + selectedFormat.toUpperCase();
+      });
+
+      // Update all output filenames to use new extension
+      state.videoGroups.forEach((group, index) => {
+        const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+        group.outputFilename = baseName + '.' + selectedFormat.toLowerCase();
+
+        // Update input field value if it exists
+        const input = document.querySelector(`.filename-input[data-index="${index}"]`);
+        if (input) {
+          input.value = baseName;
+        }
+      });
+
+      // Save preference
+      try {
+        await window.electronAPI.setPreferredFormat(selectedFormat);
+      } catch (error) {
+        console.error('Error saving format preference:', error);
+      }
+    });
+  }
+
+  // Audio normalization checkbox handler
+  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+  if (normalizeAudioCheckbox) {
+    normalizeAudioCheckbox.addEventListener('change', (e) => {
+      normalizeAudio = e.target.checked;
+    });
+  }
+
+  // Handle cancel merge
+  async function handleCancelMerge() {
+    // Show confirmation dialog
+    const confirmed = confirm('Are you sure you want to cancel the merge operation?\n\nAny progress will be lost.');
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    // Disable cancel button to prevent multiple clicks
+    if (cancelMergeBtn) {
+      cancelMergeBtn.disabled = true;
+      cancelMergeBtn.textContent = 'Cancelling...';
+    }
+    
+    try {
+      const result = await window.electronAPI.cancelMerge();
+      
+      if (result.success) {
+        progressText.textContent = 'Merge cancelled by user';
+        
+        // Hide cancel button after cancellation
+        if (cancelMergeBtn) {
+          cancelMergeBtn.style.display = 'none';
+        }
+        
+        // Show a message and allow user to go back
+        setTimeout(() => {
+          alert('Merge operation was cancelled. You can go back and start over.');
+          handleBack();
+        }, 1000);
+      } else {
+        // Re-enable button if cancellation failed
+        if (cancelMergeBtn) {
+          cancelMergeBtn.disabled = false;
+          cancelMergeBtn.textContent = 'Cancel';
+        }
+        alert(result.message || 'Could not cancel operation');
+      }
+    } catch (error) {
+      console.error('Error cancelling merge:', error);
+      // Re-enable button if error occurred
+      if (cancelMergeBtn) {
+        cancelMergeBtn.disabled = false;
+        cancelMergeBtn.textContent = 'Cancel';
+      }
+      alert('Error cancelling merge: ' + error.message);
+    }
+  }
+
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
@@ -998,6 +1149,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+
+  if (cancelMergeBtn) {
+    cancelMergeBtn.addEventListener('click', handleCancelMerge);
+  }
+  // qualitySelect and formatSelect already have listeners attached above (getElementById blocks)
 
   return { updateOutputDestinationDisplay };
 }

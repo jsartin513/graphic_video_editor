@@ -87,6 +87,18 @@
         <div class="file-list-header">
           <h2>Selected Videos</h2>
           <span id="fileCount" class="file-count" aria-live="polite">0 files</span>
+          <div class="undo-redo-controls">
+            <button id="undoBtn" class="btn btn-icon" aria-label="Undo last action" disabled title="Nothing to undo">
+              <span class="btn-icon" aria-hidden="true">↶</span>
+              Undo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘Z</span>
+            </button>
+            <button id="redoBtn" class="btn btn-icon" aria-label="Redo last action" disabled title="Nothing to redo">
+              <span class="btn-icon" aria-hidden="true">↷</span>
+              Redo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘⇧Z</span>
+            </button>
+          </div>
         </div>
         <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">
@@ -134,6 +146,27 @@
             </select>
             <small class="quality-hint">Higher quality = larger file size, longer processing time</small>
           </div>
+          <div class="audio-controls">
+            <label class="audio-option">
+              <input type="checkbox" id="normalizeAudioCheckbox">
+              <span>Normalize Audio Levels (EBU R128)</span>
+            </label>
+            <small class="audio-hint">Normalizes audio to consistent levels across all videos</small>
+          </div>
+        </div>
+        
+        <div class="format-section">
+          <label class="format-label">Export Format:</label>
+          <div class="format-controls">
+            <select id="formatSelect" class="format-select" aria-label="Select export format">
+              <option value="mp4">MP4 (H.264, Most Compatible)</option>
+              <option value="mov">MOV (QuickTime, macOS/iOS)</option>
+              <option value="mkv">MKV (Matroska, Open Format)</option>
+              <option value="avi">AVI (Legacy Windows)</option>
+              <option value="m4v">M4V (iTunes/Apple)</option>
+            </select>
+            <small class="format-hint">MP4 recommended for best compatibility</small>
+          </div>
         </div>
         
         <div class="preview-actions">
@@ -171,6 +204,11 @@
           </div>
           <p id="progressText" class="progress-text" aria-live="polite">Preparing...</p>
           <div id="progressDetails" class="progress-details" aria-live="polite"></div>
+          <div class="progress-actions">
+            <button id="cancelMergeBtn" class="btn btn-secondary" aria-label="Cancel merge operation" style="display: none;">
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </main>

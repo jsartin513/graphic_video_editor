@@ -8,6 +8,7 @@ import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShor
 import { getFileName, getDirectoryPath } from './utils.js';
 import { initializeFailedOperations } from './failedOperations.js';
 import { initializeRecentDirectories } from './recentDirectories.js';
+import { initializeUndoRedo } from './undoRedo.js';
 
 // Shared application state
 const state = {
@@ -49,11 +50,18 @@ const domElements = {
   progressBar: document.getElementById('progressBar'),
   progressText: document.getElementById('progressText'),
   progressDetails: document.getElementById('progressDetails'),
+  cancelMergeBtn: document.getElementById('cancelMergeBtn'),
   
   // Output destination
   outputDestinationPath: document.getElementById('outputDestinationPath'),
   selectOutputDestinationBtn: document.getElementById('selectOutputDestinationBtn'),
   useDefaultDestinationBtn: document.getElementById('useDefaultDestinationBtn'),
+  
+  // Quality selector
+  qualitySelect: document.getElementById('qualitySelect'),
+  
+  // Format selector
+  formatSelect: document.getElementById('formatSelect'),
   
   // Prerequisites modal
   prerequisitesModal: document.getElementById('prerequisitesModal'),
@@ -90,7 +98,11 @@ const domElements = {
   failedOpsList: document.getElementById('failedOpsList'),
   noFailedOps: document.getElementById('noFailedOps'),
   clearAllFailedBtn: document.getElementById('clearAllFailedBtn'),
-  failedBadge: document.getElementById('failedBadge')
+  failedBadge: document.getElementById('failedBadge'),
+
+  // Undo/Redo
+  undoBtn: document.getElementById('undoBtn'),
+  redoBtn: document.getElementById('redoBtn')
 };
 
 // Lazy-loaded modules (code splitting)
@@ -113,11 +125,33 @@ async function loadPrerequisitesModule() {
   return prerequisitesModule;
 }
 
+// Create a closure that will access modules from outer scope (for undo/redo callback)
+let fileHandling, mergeWorkflow;
+function createUpdateStateCallback() {
+  return (restoredState) => {
+    if (fileHandling && typeof fileHandling.updateFileList === 'function') {
+      fileHandling.updateFileList();
+    }
+    if (restoredState.videoGroups && restoredState.videoGroups.length > 0) {
+      if (mergeWorkflow && typeof mergeWorkflow.updatePreviewList === 'function') {
+        mergeWorkflow.updatePreviewList();
+      }
+    }
+    const fileCount = document.getElementById('fileCount');
+    if (fileCount) {
+      fileCount.textContent = `${restoredState.selectedFiles.length} file${restoredState.selectedFiles.length !== 1 ? 's' : ''}`;
+    }
+  };
+}
+
+// Initialize undo/redo first (needed by fileHandling and mergeWorkflow)
+const undoRedo = initializeUndoRedo(state, createUpdateStateCallback(), domElements);
+
 // Initialize core modules (always loaded)
 const trimVideo = initializeTrimVideo(domElements, state);
-const fileHandling = initializeFileHandling(state, domElements, trimVideo);
+fileHandling = initializeFileHandling(state, domElements, trimVideo, undoRedo);
 const failedOperations = initializeFailedOperations(domElements);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations);
+mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo);
 const recentDirectories = initializeRecentDirectories(state, domElements, fileHandling);
 
 // Set up lazy loading for prerequisites
@@ -144,10 +178,17 @@ if (splitVideoBtn) {
   });
 }
 
+// Wire up undo/redo button handlers
+if (domElements.undoBtn) {
+  domElements.undoBtn.addEventListener('click', () => undoRedo.performUndo());
+}
+if (domElements.redoBtn) {
+  domElements.redoBtn.addEventListener('click', () => undoRedo.performRedo());
+}
+
 // Initialize keyboard shortcuts
 const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
   cancelMerge: mergeWorkflow?.cancelMerge || (() => {
-    // Fallback: try to cancel via IPC if available
     if (window.electronAPI?.cancelMerge) {
       window.electronAPI.cancelMerge();
     }
