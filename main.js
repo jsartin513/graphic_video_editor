@@ -1185,14 +1185,31 @@ ipcMain.handle('load-sd-card-files', async (event, sdCardPath) => {
 // Toggle SD card auto-detection
 ipcMain.handle('set-auto-detect-sd-cards', async (event, enabled) => {
   try {
+    // Ensure `enabled` is a proper boolean before using or persisting it
+    let normalizedEnabled;
+    if (typeof enabled === 'boolean') {
+      normalizedEnabled = enabled;
+    } else if (typeof enabled === 'string') {
+      const lower = enabled.trim().toLowerCase();
+      if (lower === 'true') {
+        normalizedEnabled = true;
+      } else if (lower === 'false') {
+        normalizedEnabled = false;
+      } else {
+        normalizedEnabled = Boolean(enabled);
+      }
+    } else {
+      normalizedEnabled = Boolean(enabled);
+    }
+
     const prefs = await loadPreferences();
-    const updated = setAutoDetectSDCards(prefs, enabled);
+    const updated = setAutoDetectSDCards(prefs, normalizedEnabled);
     await savePreferences(updated);
     
     // Start or stop detection based on setting
-    if (enabled && !sdCardDetector) {
+    if (normalizedEnabled && !sdCardDetector) {
       await initializeSDCardDetection();
-    } else if (!enabled && sdCardDetector) {
+    } else if (!normalizedEnabled && sdCardDetector) {
       sdCardDetector.stop();
       sdCardDetector = null;
     }
