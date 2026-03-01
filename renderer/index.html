@@ -21,10 +21,12 @@
         <button id="selectFilesBtn" class="btn btn-primary" aria-label="Select video files">
           <span class="btn-icon" aria-hidden="true">📁</span>
           Select Files
+          <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘O</span>
         </button>
         <button id="selectFolderBtn" class="btn btn-secondary" aria-label="Select folder containing videos">
           <span class="btn-icon" aria-hidden="true">📂</span>
           Select Folder
+          <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘D</span>
         </button>
       </div>
 
@@ -46,6 +48,7 @@
           <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Prepare merge of selected videos">
             <span class="btn-icon" aria-hidden="true">▶</span>
             Prepare Merge
+            <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘M</span>
           </button>
         </div>
       </div>
@@ -75,23 +78,47 @@
           </div>
         </div>
         
-        <div class="audio-normalization-section">
-          <label class="audio-normalization-label">
-            <input type="checkbox" id="normalizeAudioCheckbox" aria-label="Normalize audio levels">
-            <span>Normalize audio levels</span>
-          </label>
-          <small class="audio-normalization-hint">Normalizes audio to consistent levels across all videos (EBU R128 standard)</small>
+        <div class="quality-section">
+          <label class="quality-label">Video Quality:</label>
+          <div class="quality-controls">
+            <select id="qualitySelect" class="quality-select" aria-label="Select video quality">
+              <option value="copy">Copy (Fastest, No Re-encoding)</option>
+              <option value="high">High Quality (CRF 18, Slower)</option>
+              <option value="medium">Medium Quality (CRF 23, Balanced)</option>
+              <option value="low">Low Quality (CRF 28, Smaller File)</option>
+            </select>
+            <small class="quality-hint">Higher quality = larger file size, longer processing time</small>
+          </div>
+          <div class="audio-controls">
+            <label class="audio-option">
+              <input type="checkbox" id="normalizeAudioCheckbox" aria-label="Normalize audio levels">
+              <span>Normalize Audio Levels (EBU R128)</span>
+            </label>
+            <small class="audio-hint">Normalizes audio to consistent levels across all videos</small>
+          </div>
         </div>
         
         <div class="preview-actions">
-          <button id="backBtn" class="btn btn-secondary" aria-label="Go back to file selection">
-            <span class="btn-icon" aria-hidden="true">←</span>
-            Back
-          </button>
-          <button id="mergeBtn" class="btn btn-primary" aria-label="Start merging videos">
-            <span class="btn-icon" aria-hidden="true">🎬</span>
-            Merge Videos
-          </button>
+          <div class="batch-controls">
+            <label class="batch-option">
+              <input type="checkbox" id="stopOnErrorCheckbox" checked>
+              <span>Stop on error</span>
+            </label>
+          </div>
+          <div class="preview-action-buttons">
+            <button id="backBtn" class="btn btn-secondary" aria-label="Go back to file selection">
+              <span class="btn-icon" aria-hidden="true">←</span>
+              Back
+            </button>
+            <button id="mergeSelectedBtn" class="btn btn-secondary" style="display: none;" aria-label="Merge selected videos">
+              <span class="btn-icon" aria-hidden="true">🎬</span>
+              Merge Selected
+            </button>
+            <button id="mergeBtn" class="btn btn-primary" aria-label="Start merging videos">
+              <span class="btn-icon" aria-hidden="true">🎬</span>
+              Merge All Videos
+            </button>
+          </div>
         </div>
       </div>
 

@@ -19,6 +19,8 @@ const DEFAULT_PREFERENCES = {
   maxRecentPatterns: 10,
   preferredDateFormat: 'YYYY-MM-DD', // ISO format by default
   lastUsedPattern: null,
+  preferredQuality: 'copy', // Default to copy (fastest, no re-encoding)
+  lastOutputDestination: null, // Last selected output directory (null = use default)
   normalizeAudio: false, // Audio normalization default off
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
@@ -114,6 +116,32 @@ function setPreferredDateFormat(preferences, format) {
 }
 
 /**
+ * Set the preferred video quality
+ * @param {Object} preferences - Current preferences
+ * @param {string} quality - The quality option ('copy', 'high', 'medium', 'low')
+ * @returns {Object} Updated preferences
+ */
+function setPreferredQuality(preferences, quality) {
+  return {
+    ...preferences,
+    preferredQuality: quality
+  };
+}
+
+/**
+ * Set the last used output destination
+ * @param {Object} preferences - Current preferences
+ * @param {string|null} destination - The output destination path (null = use default)
+ * @returns {Object} Updated preferences
+ */
+function setLastOutputDestination(preferences, destination) {
+  return {
+    ...preferences,
+    lastOutputDestination: destination
+  };
+}
+
+/**
  * Format a date using the specified format string
  * @param {Date} date - The date to format
  * @param {string} format - Format string (supports YYYY, MM, DD, YY, M, D)
@@ -162,6 +190,8 @@ module.exports = {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredQuality,
+  setLastOutputDestination,
   formatDate,
   applyDateTokens,
   DEFAULT_PREFERENCES

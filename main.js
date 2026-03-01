@@ -260,6 +260,8 @@ const {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredQuality,
+  setLastOutputDestination,
   applyDateTokens
 } = require('./src/preferences');
 
@@ -316,6 +318,211 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
   });
 });
 
+// Get detailed video metadata using ffprobe
+ipcMain.handle('get-video-metadata', async (event, videoPath) => {
+  // Validate videoPath
+  if (!videoPath || typeof videoPath !== 'string') {
+    throw new Error('Invalid video path');
+  }
+
+  return new Promise((resolve, reject) => {
+    const ffprobeCmd = getFFprobePath();
+    const env = { ...process.env };
+    if (ffprobeCmd.includes('.app/Contents/Resources')) {
+      env.PATH = '/usr/bin:/bin';
+    } else {
+      env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+    }
+
+    // Get comprehensive video metadata
+    const ffprobe = spawn(ffprobeCmd, [
+      '-v', 'error',
+      '-print_format', 'json',
+      '-show_format',
+      '-show_streams',
+      videoPath
+    ], { env });
+
+    let output = '';
+    let errorOutput = '';
+
+    ffprobe.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    ffprobe.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    ffprobe.on('error', (error) => {
+      if (error.code === 'ENOENT') {
+        reject(new Error('ffprobe not found'));
+      } else {
+        reject(error);
+      }
+    });
+
+    ffprobe.on('close', async (code) => {
+      if (code === 0) {
+        try {
+          const metadata = JSON.parse(output);
+          const videoStream = metadata.streams?.find(s => s.codec_type === 'video');
+          const audioStream = metadata.streams?.find(s => s.codec_type === 'audio');
+          const format = metadata.format || {};
+
+          // Extract useful metadata
+          const result = {
+            duration: parseFloat(format.duration) || 0,
+            size: parseInt(format.size) || 0,
+            bitrate: parseInt(format.bit_rate) || 0,
+            video: videoStream ? {
+              codec: videoStream.codec_name || 'unknown',
+              codecLongName: videoStream.codec_long_name || 'unknown',
+              width: videoStream.width || 0,
+              height: videoStream.height || 0,
+              fps: videoStream.r_frame_rate ? eval(videoStream.r_frame_rate) : 0, // e.g., "30/1" -> 30
+              bitrate: parseInt(videoStream.bit_rate) || 0,
+              pixelFormat: videoStream.pix_fmt || 'unknown'
+            } : null,
+            audio: audioStream ? {
+              codec: audioStream.codec_name || 'unknown',
+              codecLongName: audioStream.codec_long_name || 'unknown',
+              sampleRate: parseInt(audioStream.sample_rate) || 0,
+              channels: audioStream.channels || 0,
+              bitrate: parseInt(audioStream.bit_rate) || 0
+            } : null,
+            container: format.format_name || 'unknown'
+          };
+
+          resolve(result);
+        } catch (error) {
+          reject(new Error(`Failed to parse ffprobe output: ${error.message}`));
+        }
+      } else {
+        reject(new Error(`ffprobe exited with code ${code}: ${errorOutput}`));
+      }
+    });
+  });
+});
+
+// Generate thumbnail for a video file
+ipcMain.handle('generate-thumbnail', async (event, videoPath, timestamp = 1) => {
+  // Validate videoPath
+  if (!videoPath || typeof videoPath !== 'string') {
+    throw new Error('Invalid video path');
+  }
+  
+  try {
+    // Check if thumbnail cache directory exists, create if not
+    const os = require('os');
+    const cacheDir = path.join(os.tmpdir(), 'video-merger-thumbnails');
+    await fs.mkdir(cacheDir, { recursive: true });
+    
+    // Create a cache key based on file path, size, and mtime
+    const stats = await fs.stat(videoPath);
+    const cacheKey = require('crypto')
+      .createHash('md5')
+      .update(`${videoPath}-${stats.size}-${stats.mtime.getTime()}-${timestamp}`)
+      .digest('hex');
+    
+    const thumbnailPath = path.join(cacheDir, `${cacheKey}.jpg`);
+    
+    // Check if thumbnail already exists
+    try {
+      await fs.access(thumbnailPath);
+      // Thumbnail exists, return as data URL
+      const imageData = await fs.readFile(thumbnailPath);
+      return `data:image/jpeg;base64,${imageData.toString('base64')}`;
+    } catch {
+      // Thumbnail doesn't exist, generate it
+    }
+    
+    // Generate thumbnail using ffmpeg
+    const ffmpegCmd = getFFmpegPath();
+    const env = { ...process.env };
+    if (ffmpegCmd.includes('.app/Contents/Resources')) {
+      env.PATH = '/usr/bin:/bin';
+    } else {
+      env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
+    }
+    
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn(ffmpegCmd, [
+        '-ss', timestamp.toString(), // Seek to timestamp
+        '-i', videoPath,
+        '-vframes', '1', // Extract 1 frame
+        '-vf', 'scale=320:-1', // Scale to width 320, maintain aspect ratio
+        '-q:v', '2', // High quality
+        '-f', 'image2', // Output format
+        '-y', // Overwrite output file
+        thumbnailPath
+      ], { env });
+      
+      let errorOutput = '';
+      
+      ffmpeg.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+      
+      ffmpeg.on('error', (error) => {
+        if (error.code === 'ENOENT') {
+          reject(new Error('ffmpeg not found'));
+        } else {
+          reject(error);
+        }
+      });
+      
+      ffmpeg.on('close', async (code) => {
+        if (code === 0) {
+          try {
+            // Read the generated thumbnail and return as data URL
+            const imageData = await fs.readFile(thumbnailPath);
+            const dataUrl = `data:image/jpeg;base64,${imageData.toString('base64')}`;
+            resolve(dataUrl);
+          } catch (error) {
+            reject(new Error(`Failed to read generated thumbnail: ${error.message}`));
+          }
+        } else {
+          reject(new Error(`ffmpeg exited with code ${code}: ${errorOutput}`));
+        }
+      });
+    });
+  } catch (error) {
+    console.error(`Error generating thumbnail for ${videoPath}:`, error);
+    throw error;
+  }
+});
+
+// Get total file size for multiple files
+ipcMain.handle('get-total-file-size', async (event, filePaths) => {
+  if (!Array.isArray(filePaths) || filePaths.length === 0) {
+    return { totalBytes: 0, totalSizeFormatted: '0 Bytes' };
+  }
+  
+  let totalBytes = 0;
+  const errors = [];
+  
+  for (const filePath of filePaths) {
+    try {
+      const stats = await fs.stat(filePath);
+      totalBytes += stats.size;
+    } catch (error) {
+      console.error(`Error getting file size for ${filePath}:`, error);
+      errors.push(filePath);
+    }
+  }
+  
+  if (errors.length > 0 && errors.length === filePaths.length) {
+    // All files failed
+    throw new Error(`Could not get file sizes for any of the ${filePaths.length} files`);
+  }
+  
+  return {
+    totalBytes,
+    totalSizeFormatted: formatFileSize(totalBytes)
+  };
+});
+
 // Merge videos using ffmpeg
 ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', normalizeAudio = false) => {
   return new Promise((resolve, reject) => {
@@ -353,28 +560,61 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         console.log(`[merge-videos] File list content (first 500 chars):\n${fileListContent.substring(0, 500)}`);
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
+        console.log(`[merge-videos] Quality option: ${qualityOption}`);
+        console.log(`[merge-videos] Audio normalization: ${normalizeAudio ? 'enabled' : 'disabled'}`);
         
-        // Build FFmpeg arguments
+        // Build ffmpeg command based on quality option
         const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
           '-i', tempFileList
         ];
         
-        // Apply audio normalization if requested
-        if (normalizeAudio) {
-          // Use loudnorm filter (EBU R128 standard) with recommended settings
-          // -c:v copy keeps video fast (no re-encoding)
-          // -c:a aac -af loudnorm re-encodes audio with normalization
-          ffmpegArgs.push(
-            '-c:v', 'copy',
-            '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
-            '-c:a', 'aac',
-            '-b:a', '192k'
-          );
-        } else {
+        if (qualityOption === 'copy') {
           // Fast copy mode (no re-encoding)
-          ffmpegArgs.push('-c', 'copy');
+          if (normalizeAudio) {
+            // Audio normalization in copy mode requires re-encoding audio only
+            ffmpegArgs.push(
+              '-c:v', 'copy',
+              '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          } else {
+            // Pure copy mode (fastest)
+            ffmpegArgs.push('-c', 'copy');
+          }
+        } else {
+          // Re-encode with quality settings
+          const qualitySettings = {
+            'high': { crf: '18', preset: 'slow' },
+            'medium': { crf: '23', preset: 'medium' },
+            'low': { crf: '28', preset: 'fast' }
+          };
+          
+          const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
+          
+          // Video codec settings
+          ffmpegArgs.push(
+            '-c:v', 'libx264',
+            '-crf', settings.crf,
+            '-preset', settings.preset
+          );
+          
+          // Audio normalization using loudnorm filter
+          if (normalizeAudio) {
+            // Use loudnorm filter for audio normalization (EBU R128 standard)
+            ffmpegArgs.push(
+              '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          } else {
+            ffmpegArgs.push(
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          }
         }
         
         ffmpegArgs.push(outputPath);
@@ -399,11 +639,108 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           stdoutOutput += data.toString();
         });
         
+        // Track progress state
+        let totalDuration = null; // Will be set if provided, otherwise calculated from video files
+        ffmpeg.startTime = Date.now();
+        
+        // Calculate total duration from input files (non-blocking, runs in background)
+        (async () => {
+          try {
+            const durationPromises = validFilePaths.map(async (filePath) => {
+              try {
+                return await new Promise((resolve) => {
+                  const ffprobeCmd = getFFprobePath();
+                  const ffprobe = spawn(ffprobeCmd, [
+                    '-v', 'error',
+                    '-show_entries', 'format=duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1',
+                    filePath
+                  ], {
+                    env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+                  });
+                  
+                  let output = '';
+                  ffprobe.stdout.on('data', (data) => { output += data.toString(); });
+                  ffprobe.on('close', (code) => {
+                    if (code === 0) {
+                      const dur = parseFloat(output.trim());
+                      resolve(isNaN(dur) ? 0 : dur);
+                    } else {
+                      resolve(0);
+                    }
+                  });
+                  ffprobe.on('error', () => resolve(0));
+                });
+              } catch {
+                return 0;
+              }
+            });
+            
+            const durations = await Promise.all(durationPromises);
+            totalDuration = durations.reduce((sum, d) => sum + d, 0);
+            if (totalDuration > 0) {
+              console.log(`[merge-videos] Total estimated duration: ${totalDuration.toFixed(2)} seconds`);
+            }
+          } catch (err) {
+            console.log('[merge-videos] Could not calculate total duration, progress will show time only');
+          }
+        })();
+
         ffmpeg.stderr.on('data', (data) => {
           const output = data.toString();
           errorOutput += output;
           // Log stderr in real-time for debugging
           console.log(`[merge-videos] FFmpeg stderr: ${output.trim()}`);
+          
+          // Parse time from FFmpeg output: time=00:00:05.00
+          const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d+)/);
+          if (timeMatch && mainWindow) {
+            const hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            const seconds = parseFloat(timeMatch[3]);
+            const currentTime = hours * 3600 + minutes * 60 + seconds;
+            
+            // Calculate progress percentage if we have total duration
+            let percent = null;
+            if (totalDuration !== null && totalDuration > 0) {
+              percent = Math.min((currentTime / totalDuration) * 100, 100);
+            }
+            
+            // Format time string for display (HH:MM:SS)
+            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${Math.floor(seconds).toString().padStart(2, '0')}`;
+            
+            // Calculate ETA if we have progress
+            let eta = null;
+            let etaStr = null;
+            if (percent !== null && percent > 0 && percent < 100 && totalDuration > 0) {
+              const elapsed = (Date.now() - ffmpeg.startTime) / 1000; // seconds
+              if (elapsed > 0 && currentTime > 0) {
+                const rate = currentTime / elapsed; // seconds per second (should be ~1.0 for real-time)
+                if (rate > 0) {
+                  const remaining = totalDuration - currentTime;
+                  eta = Math.round(remaining / rate); // seconds remaining
+                  const etaHours = Math.floor(eta / 3600);
+                  const etaMinutes = Math.floor((eta % 3600) / 60);
+                  const etaSeconds = eta % 60;
+                  if (etaHours > 0) {
+                    etaStr = `${etaHours}:${etaMinutes.toString().padStart(2, '0')}:${etaSeconds.toString().padStart(2, '0')}`;
+                  } else {
+                    etaStr = `${etaMinutes}:${etaSeconds.toString().padStart(2, '0')}`;
+                  }
+                }
+              }
+            }
+            
+            // Emit progress event to renderer
+            mainWindow.webContents.send('merge-progress', {
+              currentTime,
+              totalDuration: totalDuration || 0,
+              percent,
+              timeStr,
+              eta,
+              etaStr
+            });
+          }
         });
         
         ffmpeg.on('error', (error) => {
