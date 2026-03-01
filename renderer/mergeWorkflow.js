@@ -57,7 +57,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           operation: 'Analyze Videos',
           suggestions: [
             'Ensure files match GoPro naming patterns:',
-            '• GX??????.MP4',
+            '• GX??????.MP4 (e.g. GX010001, GXAA0123)',
             '• GP??????.MP4',
             '• GOPR????.MP4'
           ]
@@ -104,6 +104,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Warn if no durations were found (likely ffprobe not installed)
       if (!hasDurations && state.videoGroups.length > 0) {
         console.warn('Could not retrieve video durations. ffprobe may not be installed.');
+      }
+      
+      // Derive patterns from selected filenames and save to recent suggestions
+      try {
+        const allFiles = state.videoGroups.flatMap(g => g.files);
+        await window.electronAPI.savePatternsFromSelectedFiles(allFiles);
+        await loadUserPreferences();
+      } catch (err) {
+        console.error('Error saving patterns from filenames:', err);
       }
       
       // Show preview screen

@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadPreferences: () => ipcRenderer.invoke('load-preferences'),
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
+  savePatternsFromSelectedFiles: (filePaths) => ipcRenderer.invoke('save-patterns-from-selected-files', filePaths),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
   setPreferredQuality: (quality) => ipcRenderer.invoke('set-preferred-quality', quality),
   setLastOutputDestination: (destination) => ipcRenderer.invoke('set-last-output-destination', destination),
