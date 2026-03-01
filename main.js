@@ -371,6 +371,7 @@ ipcMain.handle('get-video-metadata', async (event, videoPath) => {
     throw new Error('Invalid video path');
   }
 
+
   return new Promise((resolve, reject) => {
     const ffprobeCmd = getFFprobePath();
     const env = { ...process.env };
@@ -634,6 +635,10 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         logger.debug('merge-videos: Output path', { outputPath });
         logger.debug('merge-videos: Quality option', { qualityOption });
         
+        // Normalize format to lowercase for consistent comparisons
+        const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
+        
+
         // Build ffmpeg command based on quality option and format
         const ffmpegArgs = [
           '-f', 'concat',
@@ -652,14 +657,14 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         
         // Ensure output path has correct extension
         const outputExt = path.extname(outputPath).toLowerCase().slice(1);
-        if (outputExt !== format.toLowerCase()) {
+        if (outputExt !== normalizedFormat) {
           const basePath = outputPath.replace(/\.[^/.]+$/, '');
-          outputPath = basePath + '.' + format.toLowerCase();
+          outputPath = basePath + '.' + normalizedFormat;
         }
         
         // Add format muxer if not MP4 (MP4 is default)
-        if (format.toLowerCase() !== 'mp4' && formatMuxers[format.toLowerCase()]) {
-          ffmpegArgs.push('-f', formatMuxers[format.toLowerCase()]);
+        if (normalizedFormat !== 'mp4' && formatMuxers[normalizedFormat]) {
+          ffmpegArgs.push('-f', formatMuxers[normalizedFormat]);
         }
         
         if (qualityOption === QUALITY_COPY) {
@@ -679,7 +684,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           );
           
           // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
-          if (['mp4', 'mov', 'm4v'].includes(format.toLowerCase())) {
+          if (['mp4', 'mov', 'm4v'].includes(normalizedFormat)) {
             ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
           } else {
             ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
@@ -1624,6 +1629,7 @@ ipcMain.handle('set-preferred-quality', async (event, quality) => {
     if (typeof quality !== 'string' || !ALLOWED_QUALITIES.has(quality)) {
       throw new Error(`Invalid quality value: ${String(quality)}`);
     }
+
     const prefs = await loadPreferences();
     const updated = setPreferredQuality(prefs, quality);
     await savePreferences(updated);
@@ -1643,6 +1649,7 @@ ipcMain.handle('set-preferred-format', async (event, format) => {
     return { success: true, preferences: updated };
   } catch (error) {
     console.error('Error setting preferred format:', error);
+
     throw error;
   }
 });

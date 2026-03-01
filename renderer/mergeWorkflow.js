@@ -19,19 +19,26 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     progressDetails,
     outputDestinationPath,
     selectOutputDestinationBtn,
-    useDefaultDestinationBtn
+    useDefaultDestinationBtn,
+    qualitySelect,
+    formatSelect
   } = domElements;
 
   // Load preferences on initialization
   let userPreferences = null;
+  let selectedQuality = 'copy'; // Default to copy (fastest)
+  let selectedFormat = 'mp4'; // Default format
+  
   async function loadUserPreferences() {
     try {
       userPreferences = await window.electronAPI.loadPreferences();
       if (userPreferences && userPreferences.preferredQuality) {
         selectedQuality = userPreferences.preferredQuality;
+        if (qualitySelect) qualitySelect.value = selectedQuality;
       }
       if (userPreferences && userPreferences.preferredFormat) {
         selectedFormat = userPreferences.preferredFormat;
+        if (formatSelect) formatSelect.value = selectedFormat;
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -40,10 +47,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   
   // Initialize preferences
   loadUserPreferences();
-  
-  // Quality selection state
-  let selectedQuality = 'copy'; // Default to copy (fastest)
-  let selectedFormat = 'mp4'; // Default to MP4
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -263,7 +266,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     if (userPreferences && userPreferences.recentFilenamePatterns && userPreferences.recentFilenamePatterns.length > 0) {
       const datalistId = `patterns-${index}`;
       const options = userPreferences.recentFilenamePatterns.map(pattern => 
-        `<option value="${escapeHtml(pattern.replace(/\.MP4$/i, ''))}">`
+        `<option value="${escapeHtml(removeExtension(pattern))}">`
       ).join('');
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
@@ -299,7 +302,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
                    data-index="${index}"
                    list="patterns-${index}"
                    value="${escapeHtml(group.outputFilename)}"
-                   placeholder="PROCESSED${group.sessionId}.MP4">
+                   placeholder="PROCESSED${group.sessionId}.${selectedFormat}">
             ${patternsDatalist}
             <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
@@ -1057,6 +1060,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  
+  // Add quality selector event listener
+  if (qualitySelect) {
+    qualitySelect.addEventListener('change', handleQualityChange);
+  }
+  
+  // Add format selector event listener
+  if (formatSelect) {
+    formatSelect.addEventListener('change', handleFormatChange);
+  }
 
   return { updateOutputDestinationDisplay };
 }

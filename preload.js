@@ -40,9 +40,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
   savePatternsFromSelectedFiles: (filePaths) => ipcRenderer.invoke('save-patterns-from-selected-files', filePaths),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
+  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  // Recent directories API
+  addRecentDirectory: (dirPath) => ipcRenderer.invoke('add-recent-directory', dirPath),
+  pinDirectory: (dirPath) => ipcRenderer.invoke('pin-directory', dirPath),
+  unpinDirectory: (dirPath) => ipcRenderer.invoke('unpin-directory', dirPath),
+  clearRecentDirectories: () => ipcRenderer.invoke('clear-recent-directories'),
+  cleanupDirectories: () => ipcRenderer.invoke('cleanup-directories'),
+  openRecentDirectory: (dirPath) => ipcRenderer.invoke('open-recent-directory', dirPath),
   setPreferredQuality: (quality) => ipcRenderer.invoke('set-preferred-quality', quality),
   setLastOutputDestination: (destination) => ipcRenderer.invoke('set-last-output-destination', destination),
-  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
   // SD Card Detection API
   getGoProSDCards: () => ipcRenderer.invoke('get-gopro-sd-cards'),
   openSDCardDirectory: (sdCardPath) => ipcRenderer.invoke('open-sd-card-directory', sdCardPath),
