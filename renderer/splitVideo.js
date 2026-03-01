@@ -199,7 +199,7 @@ export function initializeSplitVideo(domElements) {
       }
     } catch (error) {
       progressBar.style.width = '100%';
-      
+
       // Check if error is due to cancellation
       if (error.message && error.message.includes('cancelled')) {
         progressText.textContent = 'Split cancelled';
@@ -207,10 +207,12 @@ export function initializeSplitVideo(domElements) {
         resultDiv.innerHTML = `<p>⚠ Operation cancelled by user</p>`;
       } else {
         progressText.textContent = 'Split failed!';
+        const mappedError = await window.electronAPI.mapError(error.message || String(error));
+        showErrorDialog(mappedError);
         resultDiv.className = 'split-result error';
-        resultDiv.innerHTML = `<p>✗ Error: ${escapeHtml(error.message)}</p>`;
+        resultDiv.innerHTML = `<p>✗ Error: ${escapeHtml(mappedError.userMessage)}</p>`;
       }
-      
+
       resultDiv.style.display = 'block';
       executeBtn.disabled = false;
       cancelBtn.textContent = 'Close';
