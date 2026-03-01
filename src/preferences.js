@@ -241,9 +241,10 @@ function addRecentDirectory(preferences, dirPath) {
   };
   const updated = [newItem, ...filtered];
 
-  // Keep only the most recent N directories
+  // Keep only the most recent N directories (by lastUsed, newest first)
   const maxDirs = preferences.maxRecentDirectories || DEFAULT_PREFERENCES.maxRecentDirectories;
-  const trimmed = updated.slice(0, maxDirs);
+  const sorted = [...updated].sort((a, b) => new Date(b.lastUsed) - new Date(a.lastUsed));
+  const trimmed = sorted.slice(0, maxDirs);
 
   return {
     ...preferences,
