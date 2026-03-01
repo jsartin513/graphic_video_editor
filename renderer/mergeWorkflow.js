@@ -443,7 +443,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     for (let i = 0; i < indicesToMerge.length; i++) {
       const index = indicesToMerge[i];
       const group = state.videoGroups[index];
-      const outputPath = outputDir + '/' + group.outputFilename;
+      const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${group.outputFilename}`;
       currentGroupIndex = i;
       currentGroup = group;
       
@@ -456,7 +456,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
-        const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${group.outputFilename}`;
         const failedResult = { 
           success: false, 
           sessionId: group.sessionId, 

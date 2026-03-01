@@ -3,7 +3,7 @@
 
 import { getFileName, escapeHtml, escapeAttr, getDirectoryPath } from './utils.js';
 
-export function initializeFailedOperations(domElements, state) {
+export function initializeFailedOperations(domElements) {
   const {
     viewFailedBtn,
     failedOpsModal,
