@@ -357,6 +357,9 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         
+        // Normalize format to lowercase for consistent comparisons
+        const normalizedFormat = format.toLowerCase();
+        
         // Build ffmpeg command based on quality option and format
         const ffmpegArgs = [
           '-f', 'concat',
@@ -375,7 +378,11 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
             'low': { crf: '28', preset: 'fast' }
           };
           
-          const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
+          let settings = qualitySettings[qualityOption];
+          if (!settings) {
+            console.warn(`[merge-videos] Invalid quality option '${qualityOption}', falling back to 'medium'`);
+            settings = qualitySettings['medium'];
+          }
           
           // Video codec settings (H.264 for maximum compatibility)
           ffmpegArgs.push(
@@ -385,7 +392,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           );
           
           // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
-          if (['mp4', 'mov', 'm4v'].includes(format.toLowerCase())) {
+          if (['mp4', 'mov', 'm4v'].includes(normalizedFormat)) {
             ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
           } else {
             ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
