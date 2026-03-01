@@ -319,6 +319,7 @@ body {
   position: relative;
 }
 
+
 .draggable-item {
   cursor: grab;
 }
@@ -368,29 +369,6 @@ body {
   background: var(--bg-input);
   border-color: var(--accent-primary);
   transform: translateX(4px);
-}
-
-.file-thumbnail-container {
-  flex-shrink: 0;
-  width: 120px;
-  height: 68px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.file-thumbnail {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.file-thumbnail-placeholder {
-  font-size: 24px;
-  opacity: 0.5;
 }
 
 .file-info {
@@ -597,6 +575,8 @@ body {
 .btn-remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
 }
 
 .btn-trim {
@@ -1608,6 +1588,81 @@ body {
   .results-summary {
     flex-direction: column;
     gap: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .selection-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .selection-controls .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .file-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .output-destination-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .output-destination-display {
+    width: 100%;
+  }
+}
+
+/* Reduced motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-primary: #000000;
+    --border-secondary: #000000;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --border-primary: #ffffff;
+      --border-secondary: #ffffff;
+    }
+  }
+
+  .btn {
+    border: 2px solid;
+  }
+}
+
+/* Print styles */
+@media print {
+  .btn,
+  .modal-overlay,
+  .drop-zone {
+    display: none !important;
+  }
+
+  .app-container {
+    background: white;
+  }
+
+  .file-list,
+  .preview-list {
+    max-height: none;
   }
 }
 
