@@ -545,6 +545,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
         console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        console.log(`[merge-videos] Audio normalization: ${normalizeAudio ? 'enabled' : 'disabled'}`);
         
         // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
         const env = { ...process.env };
@@ -560,6 +561,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         console.log(`[merge-videos] Quality option: ${qualityOption}`);
+        console.log(`[merge-videos] Audio normalization: ${normalizeAudio ? 'enabled' : 'disabled'}`);
         
         // Build ffmpeg command based on quality option
         const ffmpegArgs = [

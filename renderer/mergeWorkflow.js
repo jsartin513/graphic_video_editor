@@ -38,7 +38,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   
   // Quality selection state
   let selectedQuality = 'copy'; // Default to copy (fastest)
-  let normalizeAudio = false; // Audio normalization option
+  // Audio normalization state (load from preferences)
+  let normalizeAudio = false;
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -124,6 +125,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       state.selectedOutputDestination = null;
     }
     updateOutputDestinationDisplay();
+    
+    // Load audio normalization preference
+    if (userPreferences && typeof userPreferences.normalizeAudio === 'boolean') {
+      normalizeAudio = userPreferences.normalizeAudio;
+      const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+      if (normalizeAudioCheckbox) {
+        normalizeAudioCheckbox.checked = normalizeAudio;
+      }
+    }
     
     // Check if we have multiple directories (for display purposes)
     const directories = new Set(state.videoGroups.map(g => {
@@ -742,14 +752,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     });
   }
   
-  // Audio normalization checkbox handler
-  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
-  if (normalizeAudioCheckbox) {
-    normalizeAudioCheckbox.addEventListener('change', (e) => {
-      normalizeAudio = e.target.checked;
-    });
-  }
-  
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
@@ -770,6 +772,22 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+
+  // Audio normalization checkbox handler
+  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+  if (normalizeAudioCheckbox) {
+    normalizeAudioCheckbox.addEventListener('change', async (e) => {
+      normalizeAudio = e.target.checked;
+      // Save preference
+      try {
+        const prefs = await window.electronAPI.loadPreferences();
+        prefs.normalizeAudio = normalizeAudio;
+        await window.electronAPI.savePreferences(prefs);
+      } catch (error) {
+        console.error('Error saving audio normalization preference:', error);
+      }
+    });
+  }
 
   return { updateOutputDestinationDisplay };
 }

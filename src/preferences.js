@@ -21,6 +21,7 @@ const DEFAULT_PREFERENCES = {
   lastUsedPattern: null,
   preferredQuality: 'copy', // Default to copy (fastest, no re-encoding)
   lastOutputDestination: null, // Last selected output directory (null = use default)
+  normalizeAudio: false, // Audio normalization default off
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
     { name: 'US (MM-DD-YYYY)', format: 'MM-DD-YYYY' },
