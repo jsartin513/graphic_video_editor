@@ -43,6 +43,10 @@
         </div>
         <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">
+          <button id="compareVideosBtn" class="btn btn-secondary" style="display: none;" aria-label="Compare selected videos side-by-side">
+            <span class="btn-icon" aria-hidden="true">⚖️</span>
+            Compare Videos
+          </button>
           <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Prepare merge of selected videos">
             <span class="btn-icon" aria-hidden="true">▶</span>
             Prepare Merge
@@ -221,6 +225,74 @@
         <button id="closeModalBtn" class="btn btn-secondary" aria-label="Close prerequisites dialog and continue anyway">
           Continue Anyway
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Comparison Modal -->
+  <div id="comparisonModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="comparisonModalTitle">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2 id="comparisonModalTitle">Compare Videos</h2>
+        <button id="closeComparisonModalBtn" class="modal-close-btn" aria-label="Close comparison dialog">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="comparison-controls">
+          <div class="layout-toggle">
+            <label>Layout:</label>
+            <button id="layoutSideBySide" class="btn btn-small btn-toggle active" aria-label="Side by side layout" data-layout="side-by-side">
+              <span aria-hidden="true">⬌</span> Side by Side
+            </button>
+            <button id="layoutOverUnder" class="btn btn-small btn-toggle" aria-label="Over under layout" data-layout="over-under">
+              <span aria-hidden="true">⬍</span> Over/Under
+            </button>
+          </div>
+        </div>
+        
+        <div id="comparisonContainer" class="comparison-container side-by-side">
+          <div class="video-panel">
+            <div class="video-header">
+              <span id="videoAName" class="video-name">Video A</span>
+            </div>
+            <video id="videoA" class="comparison-video" preload="metadata">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+          <div class="video-panel">
+            <div class="video-header">
+              <span id="videoBName" class="video-name">Video B</span>
+            </div>
+            <video id="videoB" class="comparison-video" preload="metadata">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </div>
+        
+        <div class="playback-controls">
+          <button id="comparisonPlayPauseBtn" class="btn btn-primary" aria-label="Play/Pause videos">
+            <span class="btn-icon" aria-hidden="true">▶</span>
+            <span id="comparisonPlayPauseText">Play</span>
+          </button>
+          <div class="timeline-container">
+            <input type="range" id="comparisonTimelineSlider" class="timeline-slider" min="0" max="100" value="0" step="0.1" aria-label="Video timeline">
+            <div class="time-display" role="timer" aria-label="Video playback time">
+              <span id="comparisonCurrentTime" aria-label="Current time">0:00</span> / <span id="comparisonTotalDuration" aria-label="Total duration">0:00</span>
+            </div>
+          </div>
+          <div class="playback-speed">
+            <label for="comparisonPlaybackSpeed">Speed:</label>
+            <select id="comparisonPlaybackSpeed" class="speed-selector" aria-label="Playback speed">
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="closeComparisonBtn" class="btn btn-secondary" aria-label="Close comparison">Close</button>
       </div>
     </div>
   </div>

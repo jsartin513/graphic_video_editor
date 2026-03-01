@@ -11,6 +11,7 @@ export function initializeFileHandling(state, domElements) {
     fileList,
     fileCount,
     prepareMergeBtn,
+    compareVideosBtn,
     fileListContainer
   } = domElements;
 
@@ -81,11 +82,24 @@ export function initializeFileHandling(state, domElements) {
     if (state.selectedFiles.length === 0) {
       fileListContainer.style.display = 'none';
       prepareMergeBtn.style.display = 'none';
+      if (compareVideosBtn) {
+        compareVideosBtn.style.display = 'none';
+      }
       return;
     }
     
     fileListContainer.style.display = 'block';
     prepareMergeBtn.style.display = 'inline-flex';
+    
+    // Show compare button only when exactly 2 files are selected
+    if (compareVideosBtn) {
+      if (state.selectedFiles.length === 2) {
+        compareVideosBtn.style.display = 'inline-flex';
+      } else {
+        compareVideosBtn.style.display = 'none';
+      }
+    }
+    
     fileCount.textContent = `${state.selectedFiles.length} file${state.selectedFiles.length !== 1 ? 's' : ''}`;
     
     for (const filePath of state.selectedFiles) {
