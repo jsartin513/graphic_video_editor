@@ -342,7 +342,11 @@ ipcMain.handle('get-video-metadata-detailed', async (event, filePath) => {
     });
     
     ffprobe.on('error', (error) => {
-      console.error('ffprobe error:', error);
+      if (error && error.code === 'ENOENT') {
+        console.error('ffprobe not found. Please install ffmpeg/ffprobe and ensure it is available in your PATH. Tried command:', ffprobeCmd);
+      } else {
+        console.error(`ffprobe error while probing ${filePath}:`, error && error.message ? error.message : error);
+      }
       resolve(null);
     });
     
