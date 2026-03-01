@@ -110,6 +110,33 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   }
 
+  // Track whether multiple directories are present (used by renderPreviewList)
+  let hasMultipleDirectories = false;
+
+  // Render (or re-render) the preview list, preserving current selections
+  function renderPreviewList() {
+    // Save selected groups by sessionId so selections survive a reorder
+    const selectedSessions = new Set(
+      Array.from(state.selectedGroups)
+        .map(i => state.videoGroups[i]?.sessionId)
+        .filter(id => id !== undefined)
+    );
+
+    previewList.innerHTML = '';
+    state.selectedGroups.clear();
+
+    for (let i = 0; i < state.videoGroups.length; i++) {
+      const group = state.videoGroups[i];
+      if (selectedSessions.has(group.sessionId)) {
+        state.selectedGroups.add(i);
+      }
+      const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
+      previewList.appendChild(previewItem);
+    }
+
+    updateBatchControls();
+  }
+
   // Show preview screen
   function showPreviewScreen() {
     state.currentScreen = 'preview';
@@ -136,23 +163,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       // Normalize path separators so Set comparison is consistent across platforms
       return dir.replace(/\\/g, '/');
     }));
-    const hasMultipleDirectories = directories.size > 1;
-    
-      previewList.innerHTML = '';
-      
-      // Initialize all groups as selected by default
-      state.selectedGroups.clear();
-      for (let i = 0; i < state.videoGroups.length; i++) {
-        state.selectedGroups.add(i);
-      }
-      
-      for (let i = 0; i < state.videoGroups.length; i++) {
-        const group = state.videoGroups[i];
-        const previewItem = createPreviewItem(group, i, hasMultipleDirectories);
-        previewList.appendChild(previewItem);
-      }
-      
-      updateBatchControls();
+    hasMultipleDirectories = directories.size > 1;
+
+    // Initialize all groups as selected by default
+    state.selectedGroups.clear();
+    for (let i = 0; i < state.videoGroups.length; i++) {
+      state.selectedGroups.add(i);
+    }
+
+    renderPreviewList();
     }
 
   // Create preview item
@@ -300,6 +319,51 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         await loadUserPreferences();
       } catch (error) {
         console.error('Error saving pattern:', error);
+      }
+    });
+
+    // Drag-to-reorder event handlers
+    item.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(index));
+      item.classList.add('dragging');
+      state.draggedGroupIndex = index;
+    });
+
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      document.querySelectorAll('.preview-item.drag-over-item').forEach(el => {
+        el.classList.remove('drag-over-item');
+      });
+      delete state.draggedGroupIndex;
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (state.draggedGroupIndex !== undefined && state.draggedGroupIndex !== index) {
+        item.classList.add('drag-over-item');
+      }
+    });
+
+    item.addEventListener('dragleave', (e) => {
+      if (!item.contains(e.relatedTarget)) {
+        item.classList.remove('drag-over-item');
+      }
+    });
+
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over-item');
+
+      if (state.draggedGroupIndex !== undefined && state.draggedGroupIndex !== index) {
+        const draggedGroup = state.videoGroups[state.draggedGroupIndex];
+        state.videoGroups.splice(state.draggedGroupIndex, 1);
+        // Adjust target index if the dragged item was before it (splice shifts indices down by 1)
+        const insertIndex = state.draggedGroupIndex < index ? index - 1 : index;
+        state.videoGroups.splice(insertIndex, 0, draggedGroup);
+        renderPreviewList();
       }
     });
     
@@ -765,9 +829,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
-  
-  // Add drag handlers for preview list
-  previewList.addEventListener('dragover', handlePreviewDragOver);
 
   return { updateOutputDestinationDisplay };
 }
