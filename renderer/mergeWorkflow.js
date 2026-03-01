@@ -1,6 +1,8 @@
 // Video merging workflow functionality
 
 import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
+import { showError, enhanceError } from './errorHandler.js';
+import { showErrorDialog } from './errorDialog.js';
 
 export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations) {
   const {
@@ -51,7 +53,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
       
       if (state.videoGroups.length === 0) {
-        alert('No GoPro video files found. Please select files matching GoPro naming patterns:\n- GX??????.MP4 (e.g. GX010001, GXAA0123)\n- GP??????.MP4\n- GOPR????.MP4');
+        showError('No GoPro video files found', {
+          operation: 'Analyze Videos',
+          suggestions: [
+            'Ensure files match GoPro naming patterns:',
+            '• GX??????.MP4 (e.g. GX010001, GXAA0123)',
+            '• GP??????.MP4',
+            '• GOPR????.MP4'
+          ]
+        });
         return;
       }
       
@@ -118,7 +128,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     } catch (error) {
       console.error('Error preparing merge:', error);
-      alert('Error analyzing videos: ' + error.message);
+      showError(error, {
+        operation: 'Analyze Videos',
+        filePath: state.selectedFiles.length > 0 ? state.selectedFiles[0] : undefined
+      });
     }
   }
 
@@ -407,7 +420,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     } catch (error) {
       console.error('Error selecting output destination:', error);
-      alert('Error selecting output destination: ' + error.message);
+      showError(error, {
+        operation: 'Select Output Destination'
+      });
     }
   }
 
@@ -472,7 +487,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     const indicesToMerge = selectedIndices || Array.from(state.selectedGroups).sort((a, b) => a - b);
     
     if (indicesToMerge.length === 0) {
-      alert('Please select at least one video group to merge.');
+      showError('No videos selected', {
+        operation: 'Merge Videos',
+        suggestions: ['Select at least one video group to merge']
+      }, null);
       return;
     }
     
@@ -482,10 +500,13 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     // Validate filenames for selected groups only
     for (const index of indicesToMerge) {
       const group = state.videoGroups[index];
-      if (!group.outputFilename || !group.outputFilename.trim()) {
-        alert(`Please provide a filename for Session ${group.sessionId}.`);
-        return;
-      }
+        if (!group.outputFilename || !group.outputFilename.trim()) {
+          showError(`Missing filename for Session ${group.sessionId}`, {
+            operation: 'Merge Videos',
+            suggestions: ['Enter a filename for this video group before merging']
+          });
+          return;
+        }
     }
     
     // Get output directory (use custom if selected, otherwise default)
@@ -499,7 +520,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[indicesToMerge[0]].files[0]);
       }
     } catch (error) {
-      alert('Error creating output directory: ' + error.message);
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
       return;
     }
     
@@ -536,10 +558,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
+        const enhanced = enhanceError(error, {
+          operation: 'Merge Videos',
+          sessionId: group.sessionId,
+          outputPath: outputPath
+        });
         const failedResult = { 
           success: false, 
           sessionId: group.sessionId, 
-          error: error.message,
+          error: enhanced.userMessage,
+          errorDetails: enhanced,
           files: group.files,
           outputPath
         };
@@ -801,10 +829,24 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       
       for (const result of results) {
         if (!result.success) {
+          const errorDisplay = result.errorDetails || { userMessage: result.error, suggestions: [] };
           resultsHtml += `
-            <div class="result-item error">
-              <span class="result-icon">✗</span>
-              <span class="result-name">Session ${result.sessionId}: ${escapeHtml(result.error)}</span>
+            <div class="result-item error" data-session-id="${result.sessionId}">
+              <div class="error-item-header">
+                <span class="result-icon">✗</span>
+                <span class="result-name">Session ${result.sessionId}: ${escapeHtml(errorDisplay.userMessage || result.error)}</span>
+              </div>
+              ${errorDisplay.suggestions && errorDisplay.suggestions.length > 0 ? `
+                <div class="error-item-suggestions">
+                  <strong>Suggestions:</strong>
+                  <ul>
+                    ${errorDisplay.suggestions.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              <button class="btn btn-small error-retry-btn" data-result-index="${results.indexOf(result)}" title="Show detailed error information">
+                View Details
+              </button>
             </div>
           `;
         }
@@ -885,6 +927,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         const videoPath = e.target.getAttribute('data-video-path');
         const videoName = e.target.getAttribute('data-video-name');
         trimVideo.showTrimVideoModal(videoPath, videoName, outputDir);
+      });
+    });
+    
+    // Add event listeners for error detail buttons
+    document.querySelectorAll('.error-retry-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const resultIndex = parseInt(e.target.getAttribute('data-result-index'));
+        const result = results[resultIndex];
+        if (result && !result.success && result.errorDetails) {
+          showError(result.errorDetails?.original || result.error, {
+            operation: 'Merge Videos',
+            sessionId: result.sessionId,
+            outputPath: result.outputPath
+          });
+        }
       });
     });
   }
