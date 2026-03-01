@@ -4,7 +4,7 @@ import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName }
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo = null) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -47,6 +47,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   
   // Initialize preferences
   loadUserPreferences();
+
+  let normalizeAudio = false; // Audio normalization option
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -373,10 +375,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       const extension = '.' + selectedFormat.toLowerCase();
       state.videoGroups[index].outputFilename = value + extension;
       e.target.value = value;
-      
+
       // Update hint to show current format
       const hint = item.querySelector(`#filename-hint-${index}`);
       if (hint) hint.textContent = extension.toUpperCase();
+
+      // Save state for undo/redo on filename change
+      if (undoRedo && originalPattern) {
+        undoRedo.saveState(`Changed filename to ${value}`);
+      }
       
       // Save the original pattern (with tokens) to preferences, not the replaced value
       // This allows users to reuse patterns with date tokens
@@ -500,7 +507,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     // Merge all groups
     await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
   }
-  
+
   // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
   async function syncAndApplyTokensFromInputs(indicesToMerge) {
     for (const index of indicesToMerge) {
@@ -600,7 +607,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
@@ -611,9 +618,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           sessionId: group.sessionId,
           outputPath: outputPath
         });
-        const failedResult = { 
-          success: false, 
-          sessionId: group.sessionId, 
+        const failedResult = {
+          success: false,
+          sessionId: group.sessionId,
           error: enhanced.userMessage,
           errorDetails: enhanced,
           files: group.files,
@@ -652,14 +659,42 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       ? `Batch complete: ${completed} succeeded, ${failed} failed`
       : `All ${completed} videos processed successfully`;
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
-    
+
     // Update failed operations button visibility
     if (failedOperations && failedOperations.updateFailedOperationsButton) {
       failedOperations.updateFailedOperationsButton();
     }
-    
+
     // Show results
     await showMergeResults(results, outputDir);
+  }
+  
+  // Update batch controls based on selection
+  function updateBatchControls() {
+    const selectedCount = state.selectedGroups.size;
+    const totalCount = state.videoGroups.length;
+    
+    // Update merge button text
+    const mergeBtn = document.getElementById('mergeBtn');
+    if (mergeBtn) {
+      if (selectedCount === totalCount) {
+        mergeBtn.textContent = 'Merge All Videos';
+      } else if (selectedCount > 0) {
+        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
+      } else {
+        mergeBtn.textContent = 'Merge Videos';
+      }
+    }
+    
+    // Show/hide merge selected button
+    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
+    if (mergeSelectedBtn) {
+      if (selectedCount > 0 && selectedCount < totalCount) {
+        mergeSelectedBtn.style.display = 'inline-flex';
+      } else {
+        mergeSelectedBtn.style.display = 'none';
+      }
+    }
   }
   
   // Update batch controls based on selection
@@ -1007,30 +1042,30 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     });
   }
-  
+
   // Format selector change handler
   const formatSelect = document.getElementById('formatSelect');
   if (formatSelect) {
     formatSelect.addEventListener('change', async (e) => {
       selectedFormat = e.target.value;
-      
+
       // Update all filename hints to reflect new format
       document.querySelectorAll('[id^="filename-hint-"]').forEach(hint => {
         hint.textContent = '.' + selectedFormat.toUpperCase();
       });
-      
+
       // Update all output filenames to use new extension
       state.videoGroups.forEach((group, index) => {
         const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
         group.outputFilename = baseName + '.' + selectedFormat.toLowerCase();
-        
+
         // Update input field value if it exists
         const input = document.querySelector(`.filename-input[data-index="${index}"]`);
         if (input) {
           input.value = baseName;
         }
       });
-      
+
       // Save preference
       try {
         await window.electronAPI.setPreferredFormat(selectedFormat);
@@ -1039,7 +1074,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     });
   }
-  
+
+  // Audio normalization checkbox handler
+  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+  if (normalizeAudioCheckbox) {
+    normalizeAudioCheckbox.addEventListener('change', (e) => {
+      normalizeAudio = e.target.checked;
+    });
+  }
+
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);

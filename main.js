@@ -588,7 +588,7 @@ ipcMain.handle('get-total-file-size', async (event, filePaths) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4') => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false) => {
   return new Promise((resolve, reject) => {
     // Validate quality option
     try {
@@ -627,17 +627,16 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           // System binary - keep original PATH
           env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
         }
-        
-        logger.debug('merge-videos: File list preview', { 
+
+        logger.debug('merge-videos: File list preview', {
           preview: fileListContent.substring(0, 500),
           fileCount: validFilePaths.length
         });
         logger.debug('merge-videos: Output path', { outputPath });
         logger.debug('merge-videos: Quality option', { qualityOption });
-        
+
         // Normalize format to lowercase for consistent comparisons
         const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
-        
 
         // Build ffmpeg command based on quality option and format
         const ffmpegArgs = [
@@ -645,7 +644,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           '-safe', '0',
           '-i', tempFileList
         ];
-        
+
         // Map format to ffmpeg muxer (if needed, otherwise auto-detect from extension)
         const formatMuxers = {
           'mp4': 'mp4',
@@ -654,45 +653,59 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           'avi': 'avi',
           'm4v': 'mp4' // M4V uses same muxer as MP4
         };
-        
+
         // Ensure output path has correct extension
         const outputExt = path.extname(outputPath).toLowerCase().slice(1);
         if (outputExt !== normalizedFormat) {
           const basePath = outputPath.replace(/\.[^/.]+$/, '');
           outputPath = basePath + '.' + normalizedFormat;
         }
-        
+
         // Add format muxer if not MP4 (MP4 is default)
         if (normalizedFormat !== 'mp4' && formatMuxers[normalizedFormat]) {
           ffmpegArgs.push('-f', formatMuxers[normalizedFormat]);
         }
-        
+
         if (qualityOption === QUALITY_COPY) {
           // Fast copy mode (no re-encoding)
-          ffmpegArgs.push('-c', 'copy');
+          if (normalizeAudio) {
+            ffmpegArgs.push(
+              '-c:v', 'copy',
+              '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
+          } else {
+            ffmpegArgs.push('-c', 'copy');
+          }
         } else {
           // Re-encode with quality settings
-          // Note: qualityOption is guaranteed to be in QUALITY_SETTINGS because
-          // it's validated against VALID_QUALITY_OPTIONS and 'copy' is handled above
           const settings = QUALITY_SETTINGS[qualityOption];
-          
+
           // Video codec settings (H.264 for maximum compatibility)
           ffmpegArgs.push(
             '-c:v', 'libx264',
             '-crf', settings.crf,
             '-preset', settings.preset
           );
-          
-          // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
-          if (['mp4', 'mov', 'm4v'].includes(normalizedFormat)) {
-            ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
+          if (normalizeAudio) {
+            ffmpegArgs.push(
+              '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+              '-c:a', 'aac',
+              '-b:a', '192k'
+            );
           } else {
-            ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
+            // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
+            if (['mp4', 'mov', 'm4v'].includes(normalizedFormat)) {
+              ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
+            } else {
+              ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
+            }
           }
         }
-        
-        ffmpegArgs.push('-y', outputPath); // -y: overwrite output without prompting
-        
+
+        ffmpegArgs.push('-y', outputPath);
+
         const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
         });
@@ -772,14 +785,14 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
             const minutes = parseInt(timeMatch[2], 10);
             const seconds = parseFloat(timeMatch[3]);
             const currentTime = hours * 3600 + minutes * 60 + seconds;
-            
+
             let percent = null;
             if (totalDuration !== null && totalDuration > 0) {
               percent = Math.min((currentTime / totalDuration) * 100, 100);
             }
             
             const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${Math.floor(seconds).toString().padStart(2, '0')}`;
-            
+
             let eta = null;
             let etaStr = null;
             if (percent !== null && percent > 0 && percent < 100 && totalDuration > 0) {

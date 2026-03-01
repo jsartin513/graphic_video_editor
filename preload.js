@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVideoMetadata: (videoPath) => ipcRenderer.invoke('get-video-metadata', videoPath),
   generateThumbnail: (videoPath, timestamp) => ipcRenderer.invoke('generate-thumbnail', videoPath, timestamp),
   getTotalFileSize: (filePaths) => ipcRenderer.invoke('get-total-file-size', filePaths),
-  mergeVideos: (filePaths, outputPath, qualityOption, format) => ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format),
+  mergeVideos: (filePaths, outputPath, qualityOption, format, normalizeAudio) => ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format, normalizeAudio),
   setPreferredFormat: (format) => ipcRenderer.invoke('set-preferred-format', format),
   splitVideo: (videoPath, splits, outputDir) => ipcRenderer.invoke('split-video', videoPath, splits, outputDir),
   trimVideo: (options) => ipcRenderer.invoke('trim-video', options),

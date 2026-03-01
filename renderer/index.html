@@ -16,6 +16,7 @@
       <p class="subtitle">Select GoPro video files to merge</p>
     </header>
 
+
     <!-- SD Card Notification Banner -->
     <div id="sdCardNotification" class="sd-card-notification" style="display: none;" role="alert" aria-live="polite">
       <div class="sd-card-notification-content">
@@ -75,6 +76,18 @@
         <div class="file-list-header">
           <h2>Selected Videos</h2>
           <span id="fileCount" class="file-count" aria-live="polite">0 files</span>
+          <div class="undo-redo-controls">
+            <button id="undoBtn" class="btn btn-icon" aria-label="Undo last action" disabled title="Nothing to undo">
+              <span class="btn-icon" aria-hidden="true">↶</span>
+              Undo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘Z</span>
+            </button>
+            <button id="redoBtn" class="btn btn-icon" aria-label="Redo last action" disabled title="Nothing to redo">
+              <span class="btn-icon" aria-hidden="true">↷</span>
+              Redo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘⇧Z</span>
+            </button>
+          </div>
         </div>
         <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">
@@ -121,6 +134,13 @@
               <option value="low">Low Quality (CRF 28, Smaller File)</option>
             </select>
             <small class="quality-hint">Higher quality = larger file size, longer processing time</small>
+          </div>
+          <div class="audio-controls">
+            <label class="audio-option">
+              <input type="checkbox" id="normalizeAudioCheckbox">
+              <span>Normalize Audio Levels (EBU R128)</span>
+            </label>
+            <small class="audio-hint">Normalizes audio to consistent levels across all videos</small>
           </div>
         </div>
         
