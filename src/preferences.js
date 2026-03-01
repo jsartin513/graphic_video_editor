@@ -26,7 +26,8 @@ const DEFAULT_PREFERENCES = {
     { name: 'US (MM-DD-YYYY)', format: 'MM-DD-YYYY' },
     { name: 'European (DD-MM-YYYY)', format: 'DD-MM-YYYY' },
     { name: 'Compact (YYYYMMDD)', format: 'YYYYMMDD' }
-  ]
+  ],
+  failedOperations: [] // Track failed merge operations for recovery
 };
 
 /**
@@ -184,6 +185,100 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD') 
     .replace(/{day}/gi, day);
 }
 
+/**
+ * Add a failed operation to the preferences for later recovery
+ * @param {Object} preferences - Current preferences
+ * @param {Object} operation - Failed operation details (sessionId, files, outputPath, error, timestamp)
+ * @returns {Object} Updated preferences
+ */
+const MAX_FAILED_OPERATIONS = 50;
+
+function addFailedOperation(preferences, operation) {
+  if (
+    !operation ||
+    !operation.sessionId ||
+    typeof operation.outputPath !== 'string' ||
+    operation.outputPath.trim() === ''
+  ) {
+    return preferences;
+  }
+
+  const existingFailedOps = Array.isArray(preferences.failedOperations)
+    ? preferences.failedOperations
+    : [];
+  const failedOps = [...existingFailedOps];
+  
+  // Check if this operation already exists (by sessionId and outputPath)
+  const existingIndex = failedOps.findIndex(
+    op => op.sessionId === operation.sessionId && op.outputPath === operation.outputPath
+  );
+  
+  if (existingIndex >= 0) {
+    // Update existing operation
+    failedOps[existingIndex] = {
+      ...operation,
+      timestamp: Date.now(), // Update timestamp
+      retryCount: (failedOps[existingIndex].retryCount || 0) + 1
+    };
+  } else {
+    // Add new failed operation
+    failedOps.push({
+      ...operation,
+      timestamp: operation.timestamp || Date.now(),
+      retryCount: 0
+    });
+  }
+  
+  // Keep only the most recent MAX_FAILED_OPERATIONS entries
+  const trimmed = failedOps
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_FAILED_OPERATIONS);
+  
+  return {
+    ...preferences,
+    failedOperations: trimmed
+  };
+}
+
+/**
+ * Remove a failed operation from preferences
+ * @param {Object} preferences - Current preferences
+ * @param {string} sessionId - Session ID of the operation to remove
+ * @param {string} outputPath - Output path of the operation to remove
+ * @returns {Object} Updated preferences
+ */
+function removeFailedOperation(preferences, sessionId, outputPath) {
+  const failedOps = Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
+  
+  return {
+    ...preferences,
+    failedOperations: failedOps.filter(
+      op => !(op.sessionId === sessionId && op.outputPath === outputPath)
+    )
+  };
+}
+
+/**
+ * Get all failed operations
+ * @param {Object} preferences - Current preferences
+ * @returns {Array} Array of failed operations
+ */
+function getFailedOperations(preferences) {
+  return Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
+}
+
+/**
+ * Clear all failed operations
+ * @param {Object} preferences - Current preferences
+ * @returns {Object} Updated preferences
+ */
+function clearFailedOperations(preferences) {
+  return {
+    ...preferences,
+    failedOperations: []
+  };
+}
+
 module.exports = {
   loadPreferences,
   savePreferences,
@@ -193,5 +288,9 @@ module.exports = {
   setLastOutputDestination,
   formatDate,
   applyDateTokens,
+  addFailedOperation,
+  removeFailedOperation,
+  getFailedOperations,
+  clearFailedOperations,
   DEFAULT_PREFERENCES
 };

@@ -38,6 +38,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
   setPreferredQuality: (quality) => ipcRenderer.invoke('set-preferred-quality', quality),
   setLastOutputDestination: (destination) => ipcRenderer.invoke('set-last-output-destination', destination),
-  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
+  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  // Error recovery API
+  addFailedOperation: (operation) => ipcRenderer.invoke('add-failed-operation', operation),
+  removeFailedOperation: (sessionId, outputPath) => ipcRenderer.invoke('remove-failed-operation', sessionId, outputPath),
+  getFailedOperations: () => ipcRenderer.invoke('get-failed-operations'),
+  clearFailedOperations: () => ipcRenderer.invoke('clear-failed-operations')
 });
 
