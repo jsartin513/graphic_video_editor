@@ -5,6 +5,9 @@ const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
 const { formatFileSize } = require('./src/main-utils');
 
+// Import logger
+const { logger } = require('./src/logger');
+
 let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
@@ -21,7 +24,7 @@ function setupAppIcon() {
       app.dock.setIcon(icon); // macOS Dock icon
       // Note: BrowserWindow icon is set in createWindow
     } catch (error) {
-      console.warn('Could not set app icon:', error.message);
+      logger.warn('Could not set app icon', { error: error.message });
     }
   }
 }
@@ -34,7 +37,7 @@ function createWindow() {
     try {
       windowIcon = nativeImage.createFromPath(iconPath);
     } catch (error) {
-      console.warn('Could not load window icon:', error.message);
+      logger.warn('Could not load window icon', { error: error.message });
     }
   }
 
@@ -61,7 +64,22 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Initialize logger
+  await logger.initialize();
+  
+  // Load preferences and set debug mode
+  try {
+    const prefs = await loadPreferences();
+    if (prefs.debugMode) {
+      logger.setDebugMode(true);
+    }
+  } catch (error) {
+    logger.error('Failed to load preferences for logger', { error: error.message });
+  }
+  
+  logger.info('Application started');
+  
   // Set up app icon (for development - production uses electron-builder config)
   setupAppIcon();
   
@@ -90,7 +108,7 @@ async function checkPrerequisites() {
       mainWindow.webContents.send('prerequisites-missing', result);
     }
   } catch (error) {
-    console.error('Error checking prerequisites:', error);
+    logger.error('Error checking prerequisites', { error: error.message });
   }
 }
 
@@ -150,7 +168,7 @@ ipcMain.handle('select-folder', async () => {
         }
       }
     } catch (error) {
-      console.error(`Error scanning directory ${dirPath}:`, error);
+      logger.error('Error scanning directory', { dirPath, error: error.message });
     }
   }
 
@@ -165,7 +183,7 @@ ipcMain.handle('select-folder', async () => {
 ipcMain.handle('get-file-metadata', async (event, filePath) => {
   // Validate filePath before processing
   if (!filePath || typeof filePath !== 'string') {
-    console.error(`Error getting file metadata: invalid filePath (received: ${typeof filePath})`);
+    logger.error('Error getting file metadata: invalid filePath', { type: typeof filePath });
     return null;
   }
   
@@ -177,7 +195,7 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
       modified: stats.mtime
     };
   } catch (error) {
-    console.error(`Error getting file metadata for ${filePath}:`, error);
+    logger.error('Error getting file metadata', { filePath, error: error.message });
     return null;
   }
 });
@@ -204,7 +222,7 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
         }
       }
     } catch (error) {
-      console.error(`Error scanning directory ${dirPath}:`, error);
+      logger.error('Error scanning directory for dropped paths', { dirPath, error: error.message });
     }
   }
 
@@ -220,7 +238,7 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
         }
       }
     } catch (error) {
-      console.error(`Error processing ${droppedPath}:`, error);
+      logger.error('Error processing dropped path', { droppedPath, error: error.message });
     }
   }
 
@@ -278,7 +296,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
     ffprobe.on('error', (error) => {
       // Handle case where ffprobe is not found
       if (error.code === 'ENOENT') {
-        console.error('ffprobe not found. Please install ffmpeg.');
+        logger.error('ffprobe not found. Please install ffmpeg.');
         resolve(0); // Return 0 duration instead of failing
       } else {
         reject(error);
@@ -291,7 +309,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
         resolve(isNaN(duration) ? 0 : duration);
       } else {
         // Don't fail completely, just return 0 duration
-        console.error(`ffprobe failed for ${filePath}: ${errorOutput}`);
+        logger.error('ffprobe failed', { filePath, errorOutput });
         resolve(0);
       }
     });
@@ -541,7 +559,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
     fs.writeFile(tempFileList, fileListContent, 'utf8')
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
-        console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        logger.debug('merge-videos: Using ffmpeg', { ffmpegCmd });
         
         // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
         const env = { ...process.env };
@@ -553,10 +571,12 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
         }
         
-        console.log(`[merge-videos] File list content (first 500 chars):\n${fileListContent.substring(0, 500)}`);
-        console.log(`[merge-videos] Output path: ${outputPath}`);
-        console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
-        console.log(`[merge-videos] Quality option: ${qualityOption}`);
+        logger.debug('merge-videos: File list preview', { 
+          preview: fileListContent.substring(0, 500),
+          fileCount: validFilePaths.length
+        });
+        logger.debug('merge-videos: Output path', { outputPath });
+        logger.debug('merge-videos: Quality option', { qualityOption });
         
         // Build ffmpeg command based on quality option
         const ffmpegArgs = [
@@ -602,7 +622,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         const timeout = setTimeout(() => {
           hasTimedOut = true;
           ffmpeg.kill('SIGTERM');
-          console.error(`[merge-videos] ⚠️  FFmpeg operation timed out after 5 minutes`);
+          logger.error('merge-videos: FFmpeg operation timed out after 5 minutes');
           reject(new Error('FFmpeg operation timed out. The merge may have failed or is taking too long.'));
         }, 5 * 60 * 1000);
         
@@ -660,8 +680,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         ffmpeg.stderr.on('data', (data) => {
           const output = data.toString();
           errorOutput += output;
-          // Log stderr in real-time for debugging
-          console.log(`[merge-videos] FFmpeg stderr: ${output.trim()}`);
+          logger.debug('merge-videos: FFmpeg stderr', { output: output.trim() });
           
           // Parse time from FFmpeg output: time=00:00:05.00
           const timeMatch = output.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d+)/);
@@ -671,25 +690,22 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
             const seconds = parseFloat(timeMatch[3]);
             const currentTime = hours * 3600 + minutes * 60 + seconds;
             
-            // Calculate progress percentage if we have total duration
             let percent = null;
             if (totalDuration !== null && totalDuration > 0) {
               percent = Math.min((currentTime / totalDuration) * 100, 100);
             }
             
-            // Format time string for display (HH:MM:SS)
             const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${Math.floor(seconds).toString().padStart(2, '0')}`;
             
-            // Calculate ETA if we have progress
             let eta = null;
             let etaStr = null;
             if (percent !== null && percent > 0 && percent < 100 && totalDuration > 0) {
-              const elapsed = (Date.now() - ffmpeg.startTime) / 1000; // seconds
+              const elapsed = (Date.now() - ffmpeg.startTime) / 1000;
               if (elapsed > 0 && currentTime > 0) {
-                const rate = currentTime / elapsed; // seconds per second (should be ~1.0 for real-time)
+                const rate = currentTime / elapsed;
                 if (rate > 0) {
                   const remaining = totalDuration - currentTime;
-                  eta = Math.round(remaining / rate); // seconds remaining
+                  eta = Math.round(remaining / rate);
                   const etaHours = Math.floor(eta / 3600);
                   const etaMinutes = Math.floor((eta % 3600) / 60);
                   const etaSeconds = eta % 60;
@@ -702,7 +718,6 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
               }
             }
             
-            // Emit progress event to renderer
             mainWindow.webContents.send('merge-progress', {
               currentTime,
               totalDuration: totalDuration || 0,
@@ -717,7 +732,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         ffmpeg.on('error', (error) => {
           clearTimeout(timeout);
           fs.unlink(tempFileList).catch(() => {});
-          console.error(`[merge-videos] ⚠️  FFmpeg spawn error:`, error);
+          logger.error('merge-videos: FFmpeg spawn error', { error: error.message });
           // Handle case where ffmpeg is not found
           if (error.code === 'ENOENT') {
             reject(new Error('ffmpeg not found. Please install ffmpeg using the prerequisites installer or run: brew install ffmpeg'));
@@ -735,14 +750,13 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
             return; // Already rejected in timeout handler
           }
           
-          console.log(`[merge-videos] FFmpeg exited with code: ${code}`);
+          logger.debug('merge-videos: FFmpeg exited', { code });
           
           if (code === 0) {
-            console.log(`[merge-videos] ✅ Merge completed successfully: ${outputPath}`);
+            logger.info('merge-videos: Merge completed successfully', { outputPath });
             resolve({ success: true, outputPath });
           } else {
-            console.error(`[merge-videos] ❌ FFmpeg failed with code ${code}`);
-            console.error(`[merge-videos] Error output:\n${errorOutput}`);
+            logger.error('merge-videos: FFmpeg failed', { code, errorOutput });
             reject(new Error(`ffmpeg failed: ${errorOutput}`));
           }
         });
@@ -832,7 +846,7 @@ ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
           });
         } catch (error) {
           // Continue with next split even if one fails
-          console.error(`Error splitting segment ${i + 1}:`, error);
+          logger.error('Error splitting segment', { segmentIndex: i + 1, error: error.message });
           if (!results.find(r => r.filename === split.filename)) {
             results.push({ success: false, filename: split.filename, error: error.message });
           }
@@ -989,7 +1003,10 @@ function getBundledBinaryPath(binaryName) {
             const exePath = app.getPath('exe');
             resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
           } catch (exeError) {
-            console.error('[getBundledBinaryPath] Error getting resources path:', e, exeError);
+            logger.error('getBundledBinaryPath: Error getting resources path', { 
+              resourcesPathError: e.message, 
+              exePathError: exeError.message 
+            });
             resourcesPath = path.join(__dirname, '..');
           }
         }
@@ -997,9 +1014,12 @@ function getBundledBinaryPath(binaryName) {
       
       const binaryPath = path.join(resourcesPath, 'resources', binaryName);
       
-      console.log(`[getBundledBinaryPath] Looking for ${binaryName} at: ${binaryPath}`);
-      console.log(`[getBundledBinaryPath] resourcesPath: ${resourcesPath}`);
-      console.log(`[getBundledBinaryPath] process.resourcesPath: ${process.resourcesPath || 'undefined'}`);
+      logger.debug('getBundledBinaryPath: Looking for binary', { 
+        binaryName, 
+        binaryPath, 
+        resourcesPath,
+        processResourcesPath: process.resourcesPath || 'undefined'
+      });
       
       // Check if the binary exists
       if (fsSync.existsSync(binaryPath)) {
@@ -1007,25 +1027,32 @@ function getBundledBinaryPath(binaryName) {
         try {
           fsSync.chmodSync(binaryPath, 0o755);
           const stats = fsSync.statSync(binaryPath);
-          console.log(`[getBundledBinaryPath] ✅ Found ${binaryName}: ${binaryPath} (${stats.size} bytes)`);
+          logger.info('getBundledBinaryPath: Found binary', { binaryName, binaryPath, size: stats.size });
           return binaryPath;
         } catch (e) {
-          console.warn(`[getBundledBinaryPath] Failed to set executable permissions on "${binaryPath}":`, e);
+          logger.warn('getBundledBinaryPath: Failed to set executable permissions', { binaryPath, error: e.message });
           // Still return the path even if chmod fails
           return binaryPath;
         }
       } else {
-        console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found at ${binaryPath}`);
-        console.log(`[getBundledBinaryPath] Checking if resources directory exists: ${fsSync.existsSync(resourcesPath)}`);
+        logger.debug('getBundledBinaryPath: Binary not found at expected path', { 
+          binaryName, 
+          binaryPath,
+          resourcesDirExists: fsSync.existsSync(resourcesPath)
+        });
+        
         if (fsSync.existsSync(resourcesPath)) {
           const contents = fsSync.readdirSync(resourcesPath);
-          console.log(`[getBundledBinaryPath] Contents of resourcesPath:`, contents);
+          logger.debug('getBundledBinaryPath: Resources directory contents', { contents });
+          
           // Check if 'resources' subdirectory exists
           const resourcesSubdir = path.join(resourcesPath, 'resources');
           if (fsSync.existsSync(resourcesSubdir)) {
-            console.log(`[getBundledBinaryPath] Found 'resources' subdirectory, contents:`, fsSync.readdirSync(resourcesSubdir));
+            const subdirContents = fsSync.readdirSync(resourcesSubdir);
+            logger.debug('getBundledBinaryPath: Resources subdirectory contents', { subdirContents });
           }
         }
+        
         // Try alternative locations for debugging
         const altPaths = [
           path.join(resourcesPath, binaryName), // Direct in Resources
@@ -1041,16 +1068,16 @@ function getBundledBinaryPath(binaryName) {
         
         for (const altPath of validAltPaths) {
           if (fsSync.existsSync(altPath)) {
-            console.log(`[getBundledBinaryPath] ✅ Found ${binaryName} at alternative location: ${altPath}`);
+            logger.info('getBundledBinaryPath: Found binary at alternative location', { binaryName, altPath });
             try {
               fsSync.chmodSync(altPath, 0o755);
             } catch (e) {
-              console.warn(`[getBundledBinaryPath] Failed to chmod ${altPath}:`, e);
+              logger.warn('getBundledBinaryPath: Failed to chmod alternative path', { altPath, error: e.message });
             }
             return altPath;
           }
         }
-        console.log(`[getBundledBinaryPath] ❌ ${binaryName} not found in any location`);
+        logger.warn('getBundledBinaryPath: Binary not found in any location', { binaryName });
         return null;
       }
     } else {
@@ -1071,7 +1098,7 @@ function getBundledBinaryPath(binaryName) {
     
     return null;
   } catch (error) {
-    console.error(`Error getting bundled binary for ${binaryName}:`, error);
+    logger.error('Error getting bundled binary', { binaryName, error: error.message });
     return null;
   }
 }
@@ -1157,15 +1184,13 @@ async function checkFFmpeg() {
     const bundledFFmpeg = getBundledBinaryPath('ffmpeg');
     const bundledFFprobe = getBundledBinaryPath('ffprobe');
     
-    console.log('[checkFFmpeg] Bundled ffmpeg:', bundledFFmpeg);
-    console.log('[checkFFmpeg] Bundled ffprobe:', bundledFFprobe);
+    logger.debug('checkFFmpeg: Bundled binaries', { bundledFFmpeg, bundledFFprobe });
     
     // Then check system binaries
     const foundFFmpegPath = bundledFFmpeg || findSystemExecutablePath('ffmpeg');
     const foundFFprobePath = bundledFFprobe || findSystemExecutablePath('ffprobe');
     
-    console.log('[checkFFmpeg] Found ffmpeg path:', foundFFmpegPath);
-    console.log('[checkFFmpeg] Found ffprobe path:', foundFFprobePath);
+    logger.debug('checkFFmpeg: Found binaries', { foundFFmpegPath, foundFFprobePath });
     
     ffmpegPath = foundFFmpegPath;
     ffprobePath = foundFFprobePath;
@@ -1180,7 +1205,7 @@ async function checkFFmpeg() {
     function checkComplete() {
       checksDone++;
       if (checksDone === 3 && versionCheckDone) {
-        console.log('[checkFFmpeg] Final result - ffmpegFound:', ffmpegFound, 'ffprobeFound:', ffprobeFound, 'installed:', ffmpegFound && ffprobeFound);
+        logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
         resolve({
           installed: ffmpegFound && ffprobeFound,
           ffmpegFound,
@@ -1193,7 +1218,7 @@ async function checkFFmpeg() {
     
     // If we have bundled binaries, test them directly instead of using 'which'
     if (bundledFFmpeg && bundledFFprobe) {
-      console.log('[checkFFmpeg] Testing bundled binaries directly...');
+      logger.debug('checkFFmpeg: Testing bundled binaries directly');
       // Test bundled ffmpeg
       try {
         const testFFmpeg = spawn(bundledFFmpeg, ['-version'], { timeout: 5000 });
@@ -1209,7 +1234,7 @@ async function checkFFmpeg() {
               ffmpegVersion = match[1];
             }
           } else {
-            console.log('[checkFFmpeg] Bundled ffmpeg test failed with code:', code);
+            logger.debug('checkFFmpeg: Bundled ffmpeg test failed', { code });
           }
           
           // Test bundled ffprobe
@@ -1218,7 +1243,7 @@ async function checkFFmpeg() {
             testFFprobe.on('close', (code) => {
               ffprobeFound = code === 0;
               if (!ffprobeFound) {
-                console.log('[checkFFmpeg] Bundled ffprobe test failed with code:', code);
+                logger.debug('checkFFmpeg: Bundled ffprobe test failed', { code });
               }
               
               // Check for brew (still needed for install message)
@@ -1237,26 +1262,26 @@ async function checkFFmpeg() {
               });
             });
             testFFprobe.on('error', (err) => {
-              console.error('[checkFFmpeg] Error testing bundled ffprobe:', err);
+              logger.error('checkFFmpeg: Error testing bundled ffprobe', { error: err.message });
               ffprobeFound = false;
               versionCheckDone = true;
               checkComplete();
             });
           } catch (err) {
-            console.error('[checkFFmpeg] Error spawning bundled ffprobe test:', err);
+            logger.error('checkFFmpeg: Error spawning bundled ffprobe test', { error: err.message });
             ffprobeFound = false;
             versionCheckDone = true;
             checkComplete();
           }
         });
         testFFmpeg.on('error', (err) => {
-          console.error('[checkFFmpeg] Error testing bundled ffmpeg:', err);
+          logger.error('checkFFmpeg: Error testing bundled ffmpeg', { error: err.message });
           ffmpegFound = false;
           versionCheckDone = true;
           checkComplete();
         });
       } catch (err) {
-        console.error('[checkFFmpeg] Error spawning bundled ffmpeg test:', err);
+        logger.error('checkFFmpeg: Error spawning bundled ffmpeg test', { error: err.message });
         ffmpegFound = false;
         versionCheckDone = true;
         checkComplete();
@@ -1420,7 +1445,7 @@ ipcMain.handle('load-preferences', async () => {
     }
     return prefs;
   } catch (error) {
-    console.error('Error loading preferences:', error);
+    logger.error('Error loading preferences', { error: error.message });
     throw error;
   }
 });
@@ -1431,7 +1456,7 @@ ipcMain.handle('save-preferences', async (event, preferences) => {
     await savePreferences(preferences);
     return { success: true };
   } catch (error) {
-    console.error('Error saving preferences:', error);
+    logger.error('Error saving preferences', { error: error.message });
     throw error;
   }
 });
@@ -1444,7 +1469,7 @@ ipcMain.handle('save-filename-pattern', async (event, pattern) => {
     await savePreferences(updated);
     return { success: true, preferences: updated };
   } catch (error) {
-    console.error('Error saving filename pattern:', error);
+    logger.error('Error saving filename pattern', { error: error.message });
     throw error;
   }
 });
@@ -1457,7 +1482,7 @@ ipcMain.handle('set-date-format', async (event, format) => {
     await savePreferences(updated);
     return { success: true, preferences: updated };
   } catch (error) {
-    console.error('Error setting date format:', error);
+    logger.error('Error setting date format', { error: error.message });
     throw error;
   }
 });
@@ -1508,8 +1533,72 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
     const result = applyDateTokens(pattern, date, dateFormat);
     return { result };
   } catch (error) {
-    console.error('Error applying date tokens:', error);
+    logger.error('Error applying date tokens', { error: error.message });
     throw error;
+  }
+});
+
+// Logger IPC handlers
+ipcMain.handle('get-logs', async (event, filename = null, maxLines = 1000) => {
+  try {
+    const logs = await logger.readLogs(filename, maxLines);
+    return { success: true, logs };
+  } catch (error) {
+    logger.error('Error getting logs', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-log-files', async () => {
+  try {
+    const files = await logger.getLogFiles();
+    return { success: true, files };
+  } catch (error) {
+    logger.error('Error getting log files', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('clear-logs', async () => {
+  try {
+    await logger.clearLogs();
+    return { success: true };
+  } catch (error) {
+    logger.error('Error clearing logs', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('export-logs', async (event, destinationPath) => {
+  try {
+    const result = await logger.exportLogs(destinationPath);
+    return result;
+  } catch (error) {
+    logger.error('Error exporting logs', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-debug-mode', async () => {
+  try {
+    const debugMode = logger.getDebugMode();
+    return { success: true, debugMode };
+  } catch (error) {
+    logger.error('Error getting debug mode', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('set-debug-mode', async (event, enabled) => {
+  try {
+    logger.setDebugMode(enabled);
+    const prefs = await loadPreferences();
+    prefs.debugMode = enabled;
+    await savePreferences(prefs);
+    return { success: true, debugMode: enabled };
+  } catch (error) {
+    logger.error('Error setting debug mode', { error: error.message });
+    return { success: false, error: error.message };
   }
 });
 
@@ -1576,7 +1665,7 @@ ipcMain.handle('add-failed-operation', async (event, operation) => {
     await savePreferences(updated);
     return { success: true };
   } catch (error) {
-    console.error('Error adding failed operation:', error);
+    logger.error('Error adding failed operation', { error: error.message });
     throw error;
   }
 });
@@ -1589,7 +1678,7 @@ ipcMain.handle('remove-failed-operation', async (event, sessionId, outputPath) =
     await savePreferences(updated);
     return { success: true };
   } catch (error) {
-    console.error('Error removing failed operation:', error);
+    logger.error('Error removing failed operation', { error: error.message });
     throw error;
   }
 });
@@ -1600,7 +1689,7 @@ ipcMain.handle('get-failed-operations', async () => {
     const prefs = await loadPreferences();
     return getFailedOperations(prefs);
   } catch (error) {
-    console.error('Error getting failed operations:', error);
+    logger.error('Error getting failed operations', { error: error.message });
     throw error;
   }
 });
@@ -1613,7 +1702,7 @@ ipcMain.handle('clear-failed-operations', async () => {
     await savePreferences(updated);
     return { success: true };
   } catch (error) {
-    console.error('Error clearing failed operations:', error);
+    logger.error('Error clearing failed operations', { error: error.message });
     throw error;
   }
 });

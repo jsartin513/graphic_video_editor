@@ -39,6 +39,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setPreferredQuality: (quality) => ipcRenderer.invoke('set-preferred-quality', quality),
   setLastOutputDestination: (destination) => ipcRenderer.invoke('set-last-output-destination', destination),
   applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  // Logger API
+  getLogs: (filename, maxLines) => ipcRenderer.invoke('get-logs', filename, maxLines),
+  getLogFiles: () => ipcRenderer.invoke('get-log-files'),
+  clearLogs: () => ipcRenderer.invoke('clear-logs'),
+  exportLogs: (destinationPath) => ipcRenderer.invoke('export-logs', destinationPath),
+  getDebugMode: () => ipcRenderer.invoke('get-debug-mode'),
+  setDebugMode: (enabled) => ipcRenderer.invoke('set-debug-mode', enabled),
   // Error recovery API
   addFailedOperation: (operation) => ipcRenderer.invoke('add-failed-operation', operation),
   removeFailedOperation: (sessionId, outputPath) => ipcRenderer.invoke('remove-failed-operation', sessionId, outputPath),
