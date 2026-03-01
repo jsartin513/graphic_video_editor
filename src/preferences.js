@@ -6,6 +6,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { app } = require('electron');
+const { logger } = require('./logger');
 
 // Get preferences file path (in user data directory)
 function getPreferencesPath() {
@@ -19,6 +20,7 @@ const DEFAULT_PREFERENCES = {
   maxRecentPatterns: 10,
   preferredDateFormat: 'YYYY-MM-DD', // ISO format by default
   lastUsedPattern: null,
+  debugMode: false, // Debug logging mode
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
     { name: 'US (MM-DD-YYYY)', format: 'MM-DD-YYYY' },
@@ -49,7 +51,7 @@ async function loadPreferences() {
       // File doesn't exist yet, return defaults
       return { ...DEFAULT_PREFERENCES };
     }
-    console.error('Error loading preferences:', error);
+    logger.error('Error loading preferences', { error: error.message });
     return { ...DEFAULT_PREFERENCES };
   }
 }
@@ -66,7 +68,7 @@ async function savePreferences(preferences) {
     await fs.mkdir(path.dirname(prefsPath), { recursive: true });
     await fs.writeFile(prefsPath, JSON.stringify(preferences, null, 2), 'utf8');
   } catch (error) {
-    console.error('Error saving preferences:', error);
+    logger.error('Error saving preferences', { error: error.message });
     throw error;
   }
 }

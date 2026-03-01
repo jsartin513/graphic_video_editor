@@ -26,6 +26,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
-  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
+  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  // Logger API
+  getLogs: (filename, maxLines) => ipcRenderer.invoke('get-logs', filename, maxLines),
+  getLogFiles: () => ipcRenderer.invoke('get-log-files'),
+  clearLogs: () => ipcRenderer.invoke('clear-logs'),
+  exportLogs: (destinationPath) => ipcRenderer.invoke('export-logs', destinationPath),
+  getDebugMode: () => ipcRenderer.invoke('get-debug-mode'),
+  setDebugMode: (enabled) => ipcRenderer.invoke('set-debug-mode', enabled)
 });
 
