@@ -91,7 +91,7 @@ const domElements = {
 const trimVideo = initializeTrimVideo(domElements, state);
 const fileHandling = initializeFileHandling(state, domElements, trimVideo);
 const splitVideo = initializeSplitVideo(domElements, state);
-const failedOperations = initializeFailedOperations(domElements, state);
+const failedOperations = initializeFailedOperations(domElements);
 const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo, trimVideo, failedOperations);
 const prerequisites = initializePrerequisites(domElements);
 
