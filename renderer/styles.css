@@ -1614,6 +1614,127 @@ body {
   }
 }
 
+
+/* SD Card Notification Styles */
+.sd-card-notification {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px 24px;
+  margin: 0 24px 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sd-card-notification-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sd-card-notification-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.sd-card-notification-text {
+  flex: 1;
+}
+
+.sd-card-notification-text strong {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.sd-card-notification-text p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+.sd-card-notification-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sd-card-notification .btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sd-card-notification .btn-primary {
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
+  border: none;
+}
+
+.sd-card-notification .btn-primary:hover {
+  background: white;
+  transform: translateY(-1px);
+}
+
+.sd-card-notification .btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.sd-card-notification .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.sd-card-notification .btn-text {
+  background: transparent;
+  color: white;
+  border: none;
+  padding: 6px 8px;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.sd-card-notification .btn-text:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .sd-card-notification {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  }
+  
+  .sd-card-notification .btn-primary {
+    background: rgba(255, 255, 255, 0.9);
+    color: #2d3748;
+  }
+}
+
+@media (max-width: 768px) {
+  .sd-card-notification-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .sd-card-notification-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 /* Trim Video Modal Styles */
 .trim-modal-content {
   max-width: 700px;
@@ -1820,4 +1941,3 @@ body {
   margin-right: 8px;
   margin-top: 12px;
 }
-

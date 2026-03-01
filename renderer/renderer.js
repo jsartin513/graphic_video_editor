@@ -30,6 +30,13 @@ const domElements = {
   fileCount: document.getElementById('fileCount'),
   prepareMergeBtn: document.getElementById('prepareMergeBtn'),
   
+  // SD Card notification
+  sdCardNotification: document.getElementById('sdCardNotification'),
+  sdCardName: document.getElementById('sdCardName'),
+  openSDCardBtn: document.getElementById('openSDCardBtn'),
+  loadSDCardBtn: document.getElementById('loadSDCardBtn'),
+  dismissSDCardBtn: document.getElementById('dismissSDCardBtn'),
+  
   // Preview screen
   previewScreen: document.getElementById('previewScreen'),
   previewList: document.getElementById('previewList'),
@@ -150,3 +157,67 @@ updateShortcutHints();
 
 // Make state accessible for debugging
 window.appState = state;
+
+// SD Card Detection
+let currentSDCard = null;
+
+// Listen for SD card detection events
+window.electronAPI.onSDCardDetected((sdCard) => {
+  console.log('SD card detected:', sdCard);
+  currentSDCard = sdCard;
+  showSDCardNotification(sdCard);
+});
+
+window.electronAPI.onSDCardRemoved((sdCard) => {
+  console.log('SD card removed:', sdCard);
+  if (currentSDCard && currentSDCard.name === sdCard.name) {
+    hideSDCardNotification();
+    currentSDCard = null;
+  }
+});
+
+function showSDCardNotification(sdCard) {
+  domElements.sdCardName.textContent = sdCard.name;
+  domElements.sdCardNotification.style.display = 'block';
+}
+
+function hideSDCardNotification() {
+  domElements.sdCardNotification.style.display = 'none';
+}
+
+// SD Card notification actions
+domElements.openSDCardBtn.addEventListener('click', async () => {
+  if (currentSDCard) {
+    try {
+      await window.electronAPI.openSDCardDirectory(currentSDCard.path);
+    } catch (error) {
+      console.error('Error opening SD card directory:', error);
+    }
+  }
+});
+
+domElements.loadSDCardBtn.addEventListener('click', async () => {
+  if (currentSDCard) {
+    try {
+      const result = await window.electronAPI.loadSDCardFiles(currentSDCard.path);
+      if (result.success && result.files.length > 0) {
+        // Add files to the file list using the fileHandling module
+        for (const file of result.files) {
+          if (!state.selectedFiles.includes(file)) {
+            state.selectedFiles.push(file);
+          }
+        }
+        fileHandling.updateFileList();
+        hideSDCardNotification();
+      } else {
+        console.log('No video files found on SD card');
+      }
+    } catch (error) {
+      console.error('Error loading SD card files:', error);
+    }
+  }
+});
+
+domElements.dismissSDCardBtn.addEventListener('click', () => {
+  hideSDCardNotification();
+});

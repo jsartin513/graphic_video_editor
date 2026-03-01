@@ -29,6 +29,11 @@ const DEFAULT_PREFERENCES = {
     { name: 'European (DD-MM-YYYY)', format: 'DD-MM-YYYY' },
     { name: 'Compact (YYYYMMDD)', format: 'YYYYMMDD' }
   ],
+  // SD Card detection settings
+  autoDetectSDCards: true,
+  knownSDCardPaths: [],
+  lastSDCardPath: null,
+  showSDCardNotifications: true,
   failedOperations: [] // Track failed merge operations for recovery
 };
 
@@ -188,6 +193,33 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD') 
 }
 
 /**
+ * Add an SD card path to known SD card paths
+ * @param {Object} preferences - Current preferences
+ * @param {string} sdCardPath - The SD card path to remember
+ * @returns {Object} Updated preferences
+ */
+function addSDCardPath(preferences, sdCardPath) {
+  if (!sdCardPath || typeof sdCardPath !== 'string') {
+    return preferences;
+  }
+  
+  // Remove if already exists
+  const filtered = (preferences.knownSDCardPaths || []).filter(p => p !== sdCardPath);
+  
+  // Add to front of array
+  const updated = [sdCardPath, ...filtered];
+  
+  // Keep only the most recent 10 paths
+  const trimmed = updated.slice(0, 10);
+  
+  return {
+    ...preferences,
+    knownSDCardPaths: trimmed,
+    lastSDCardPath: sdCardPath
+  };
+}
+
+/**
  * Add a failed operation to the preferences for later recovery
  * @param {Object} preferences - Current preferences
  * @param {Object} operation - Failed operation details (sessionId, files, outputPath, error, timestamp)
@@ -243,6 +275,19 @@ function addFailedOperation(preferences, operation) {
 }
 
 /**
+ * Set auto-detect SD cards preference
+ * @param {Object} preferences - Current preferences
+ * @param {boolean} enabled - Whether to enable auto-detection
+ * @returns {Object} Updated preferences
+ */
+function setAutoDetectSDCards(preferences, enabled) {
+  return {
+    ...preferences,
+    autoDetectSDCards: enabled
+  };
+}
+
+/**
  * Remove a failed operation from preferences
  * @param {Object} preferences - Current preferences
  * @param {string} sessionId - Session ID of the operation to remove
@@ -257,6 +302,19 @@ function removeFailedOperation(preferences, sessionId, outputPath) {
     failedOperations: failedOps.filter(
       op => !(op.sessionId === sessionId && op.outputPath === outputPath)
     )
+  };
+}
+
+/**
+ * Set SD card notifications preference
+ * @param {Object} preferences - Current preferences
+ * @param {boolean} enabled - Whether to show notifications
+ * @returns {Object} Updated preferences
+ */
+function setShowSDCardNotifications(preferences, enabled) {
+  return {
+    ...preferences,
+    showSDCardNotifications: enabled
   };
 }
 
@@ -290,6 +348,9 @@ module.exports = {
   setLastOutputDestination,
   formatDate,
   applyDateTokens,
+  addSDCardPath,
+  setAutoDetectSDCards,
+  setShowSDCardNotifications,
   addFailedOperation,
   removeFailedOperation,
   getFailedOperations,
