@@ -79,6 +79,12 @@ describe('derivePatternFromFilename', () => {
     expect(derivePatternFromFilename('test.MP4')).toBeNull();
     expect(derivePatternFromFilename('GX123.MP4')).toBeNull();
   });
+  test('handles prefix whose digits overlap with sessionId', () => {
+    // GX100000: sessionId=0000, prefix must be GX10, not GX1
+    expect(derivePatternFromFilename('GX100000.MP4')).toBe('GX10{sessionId}');
+    // GX000001: sessionId=0001, prefix must be GX00, not GX0
+    expect(derivePatternFromFilename('GX000001.MP4')).toBe('GX00{sessionId}');
+  });
 });
 
 describe('analyzeAndGroupVideos', () => {
