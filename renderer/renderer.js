@@ -3,13 +3,19 @@
 
 import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
+import { initializeTrimVideo } from './trimVideo.js';
+import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
+import { getFileName, getDirectoryPath } from './utils.js';
+import { initializeFailedOperations } from './failedOperations.js';
 
 // Shared application state
 const state = {
   selectedFiles: [],
   videoGroups: [],
   currentScreen: 'fileList', // 'fileList', 'preview', 'progress'
-  selectedOutputDestination: null // null means use default
+  selectedOutputDestination: null, // null means use default
+  selectedGroups: new Set(), // Track which groups are selected for batch merge
+  stopOnError: true // Stop batch processing on error by default
 };
 
 // DOM element references
@@ -17,6 +23,7 @@ const domElements = {
   // File selection
   selectFilesBtn: document.getElementById('selectFilesBtn'),
   selectFolderBtn: document.getElementById('selectFolderBtn'),
+  splitVideoBtn: document.getElementById('splitVideoBtn'),
   dropZone: document.getElementById('dropZone'),
   fileListContainer: document.getElementById('fileListContainer'),
   fileList: document.getElementById('fileList'),
@@ -65,14 +72,23 @@ const domElements = {
   splitProgress: document.getElementById('splitProgress'),
   splitProgressBar: document.getElementById('splitProgressBar'),
   splitProgressText: document.getElementById('splitProgressText'),
-  splitResult: document.getElementById('splitResult')
+  splitResult: document.getElementById('splitResult'),
+
+  // Failed Operations Modal
+  viewFailedBtn: document.getElementById('viewFailedBtn'),
+  failedOpsModal: document.getElementById('failedOpsModal'),
+  closeFailedOpsModalBtn: document.getElementById('closeFailedOpsModalBtn'),
+  closeFailedOpsBtn: document.getElementById('closeFailedOpsBtn'),
+  failedOpsList: document.getElementById('failedOpsList'),
+  noFailedOps: document.getElementById('noFailedOps'),
+  clearAllFailedBtn: document.getElementById('clearAllFailedBtn'),
+  failedBadge: document.getElementById('failedBadge')
 };
 
-// Lazy-loaded modules
+// Lazy-loaded modules (code splitting)
 let splitVideoModule = null;
 let prerequisitesModule = null;
 
-// Lazy load split video module
 async function loadSplitVideoModule() {
   if (!splitVideoModule) {
     const module = await import('./splitVideo.js');
@@ -81,7 +97,6 @@ async function loadSplitVideoModule() {
   return splitVideoModule;
 }
 
-// Lazy load prerequisites module
 async function loadPrerequisitesModule() {
   if (!prerequisitesModule) {
     const module = await import('./prerequisites.js');
@@ -91,14 +106,47 @@ async function loadPrerequisitesModule() {
 }
 
 // Initialize core modules (always loaded)
-const fileHandling = initializeFileHandling(state, domElements);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule);
+const trimVideo = initializeTrimVideo(domElements, state);
+const fileHandling = initializeFileHandling(state, domElements, trimVideo);
+const failedOperations = initializeFailedOperations(domElements);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations);
 
 // Set up lazy loading for prerequisites
 window.electronAPI.onPrerequisitesMissing(async (event, status) => {
   const prerequisites = await loadPrerequisitesModule();
   prerequisites.showPrerequisitesModal(status);
 });
+
+// Split Video button (start screen) - lazy loads splitVideo on first click
+const splitVideoBtn = document.getElementById('splitVideoBtn');
+if (splitVideoBtn) {
+  splitVideoBtn.addEventListener('click', async () => {
+    try {
+      const result = await window.electronAPI.selectFiles();
+      if (result.canceled || !result.files?.length) return;
+      const videoPath = result.files[0];
+      const videoName = getFileName(videoPath);
+      const outputDir = getDirectoryPath(videoPath);
+      const splitVideo = await loadSplitVideoModule();
+      splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
+    } catch (error) {
+      console.error('Error opening split video:', error);
+    }
+  });
+}
+
+// Initialize keyboard shortcuts
+const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
+  cancelMerge: mergeWorkflow?.cancelMerge || (() => {
+    // Fallback: try to cancel via IPC if available
+    if (window.electronAPI?.cancelMerge) {
+      window.electronAPI.cancelMerge();
+    }
+  })
+});
+
+// Update keyboard shortcut hints to show platform-specific shortcuts
+updateShortcutHints();
 
 // Make state accessible for debugging
 window.appState = state;
