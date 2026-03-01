@@ -2,6 +2,12 @@
 
 import { getFileName, escapeHtml, formatDate } from './utils.js';
 
+// Thumbnail cache and queue management
+const thumbnailCache = new Map();
+const thumbnailQueue = [];
+let activeThumbnailRequests = 0;
+const MAX_CONCURRENT_THUMBNAILS = 4;
+
 // State will be managed in the main renderer.js
 export function initializeFileHandling(state, domElements) {
   const {
@@ -92,6 +98,9 @@ export function initializeFileHandling(state, domElements) {
       const item = await createFileItem(filePath);
       fileList.appendChild(item);
     }
+    
+    // Start loading thumbnails after items are added to DOM
+    loadThumbnailsForVisibleItems();
   }
 
   async function createFileItem(filePath) {
@@ -101,6 +110,11 @@ export function initializeFileHandling(state, domElements) {
     try {
       const metadata = await window.electronAPI.getFileMetadata(filePath);
       item.innerHTML = `
+        <div class="file-thumbnail-container">
+          <div class="file-thumbnail loading" data-filepath="${escapeHtml(filePath)}">
+            <div class="thumbnail-spinner"></div>
+          </div>
+        </div>
         <div class="file-info">
           <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
           <div class="file-meta">
@@ -114,6 +128,11 @@ export function initializeFileHandling(state, domElements) {
       `;
     } catch (error) {
       item.innerHTML = `
+        <div class="file-thumbnail-container">
+          <div class="file-thumbnail loading" data-filepath="${escapeHtml(filePath)}">
+            <div class="thumbnail-spinner"></div>
+          </div>
+        </div>
         <div class="file-info">
           <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
         </div>
@@ -128,6 +147,75 @@ export function initializeFileHandling(state, domElements) {
     removeBtn.addEventListener('click', () => removeFile(filePath));
 
     return item;
+  }
+
+  // Load thumbnails for visible items with concurrent request limiting
+  async function loadThumbnailsForVisibleItems() {
+    const thumbnailElements = fileList.querySelectorAll('.file-thumbnail.loading');
+    
+    for (const thumbnailEl of thumbnailElements) {
+      const filePath = thumbnailEl.getAttribute('data-filepath');
+      if (filePath) {
+        queueThumbnailLoad(filePath, thumbnailEl);
+      }
+    }
+  }
+
+  // Queue thumbnail load with concurrent request limiting
+  function queueThumbnailLoad(filePath, thumbnailEl) {
+    thumbnailQueue.push({ filePath, thumbnailEl });
+    processThumbnailQueue();
+  }
+
+  // Process thumbnail queue with concurrent request limiting
+  async function processThumbnailQueue() {
+    while (thumbnailQueue.length > 0 && activeThumbnailRequests < MAX_CONCURRENT_THUMBNAILS) {
+      const item = thumbnailQueue.shift();
+      if (item) {
+        loadThumbnail(item.filePath, item.thumbnailEl);
+      }
+    }
+  }
+
+  // Load thumbnail for a specific file
+  async function loadThumbnail(filePath, thumbnailEl) {
+    // Check cache first before incrementing counter
+    if (thumbnailCache.has(filePath)) {
+      const cachedDataUrl = thumbnailCache.get(filePath);
+      updateThumbnailElement(thumbnailEl, cachedDataUrl);
+      // Process next item in queue since we didn't actually start a request
+      processThumbnailQueue();
+      return;
+    }
+    
+    activeThumbnailRequests++;
+    
+    try {
+      // Generate thumbnail
+      const dataUrl = await window.electronAPI.generateThumbnail(filePath, 1);
+      
+      // Cache the result
+      thumbnailCache.set(filePath, dataUrl);
+      
+      // Update UI
+      updateThumbnailElement(thumbnailEl, dataUrl);
+    } catch (error) {
+      console.error(`Failed to generate thumbnail for ${filePath}:`, error);
+      // Show error state
+      thumbnailEl.classList.remove('loading');
+      thumbnailEl.classList.add('error');
+      thumbnailEl.innerHTML = '<div class="thumbnail-error">📹</div>';
+    } finally {
+      activeThumbnailRequests--;
+      // Process next item in queue
+      processThumbnailQueue();
+    }
+  }
+
+  // Update thumbnail element with image data
+  function updateThumbnailElement(thumbnailEl, dataUrl) {
+    thumbnailEl.classList.remove('loading');
+    thumbnailEl.innerHTML = `<img src="${dataUrl}" alt="Video thumbnail" />`;
   }
 
   // Attach event listeners
