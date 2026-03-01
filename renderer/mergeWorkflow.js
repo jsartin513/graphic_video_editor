@@ -43,6 +43,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Initialize preferences
   loadUserPreferences();
   
+  // Helper function to remove file extension from filename
+  const removeExtension = (filename) => filename.replace(/\.[^.]+$/i, '');
+  
   // Helper function to get file extension based on format
   function getFileExtension(format = selectedFormat) {
     return `.${format}`;
@@ -67,7 +70,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     state.videoGroups.forEach((group, index) => {
       const currentName = group.outputFilename || `PROCESSED${group.sessionId}`;
       // Remove old extension
-      const nameWithoutExt = currentName.replace(/\.[^.]+$/, '');
+      const nameWithoutExt = removeExtension(currentName);
       // Add new extension
       group.outputFilename = nameWithoutExt + getFileExtension();
       
@@ -189,7 +192,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     if (userPreferences && userPreferences.recentFilenamePatterns && userPreferences.recentFilenamePatterns.length > 0) {
       const datalistId = `patterns-${index}`;
       const options = userPreferences.recentFilenamePatterns.map(pattern => 
-        `<option value="${escapeHtml(pattern.replace(/\.[^.]+$/i, ''))}">`
+        `<option value="${escapeHtml(removeExtension(pattern))}">`
       ).join('');
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
@@ -231,7 +234,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       const value = e.target.value.trim();
       if (value) {
         // Remove extension if user added it
-        const cleanValue = value.replace(/\.[^.]+$/i, '');
+        const cleanValue = removeExtension(value);
         state.videoGroups[index].outputFilename = cleanValue + getFileExtension();
       }
     });
@@ -243,7 +246,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         value = `PROCESSED${group.sessionId}`;
       }
       // Remove extension if present
-      value = value.replace(/\.[^.]+$/i, '');
+      value = removeExtension(value);
       
       // Store the original pattern before token replacement for preferences
       const originalPattern = value;

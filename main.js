@@ -355,7 +355,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, format = 'mp
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         
-        // Build ffmpeg arguments based on format
+        // Build ffmpeg arguments - using codec copy for all formats
         const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
