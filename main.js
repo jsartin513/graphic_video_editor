@@ -257,7 +257,7 @@ ipcMain.handle('process-dropped-paths', async (event, paths) => {
 });
 
 // Import video grouping functions
-const { analyzeAndGroupVideos } = require('./src/video-grouping');
+const { analyzeAndGroupVideos, derivePatternFromFilename } = require('./src/video-grouping');
 
 // Import preferences module
 const {
@@ -1487,6 +1487,31 @@ ipcMain.handle('save-filename-pattern', async (event, pattern) => {
     return { success: true, preferences: updated };
   } catch (error) {
     logger.error('Error saving filename pattern', { error: error.message });
+    throw error;
+  }
+});
+
+// Derive patterns from selected filenames and save to recent patterns
+// e.g. GXAA0123.MP4 -> GXAA{sessionId}; GOPR0001.MP4 -> GOPR{sessionId}
+ipcMain.handle('save-patterns-from-selected-files', async (event, filePaths) => {
+  try {
+    if (!Array.isArray(filePaths) || filePaths.length === 0) return { success: true, saved: 0 };
+    const seen = new Set();
+    let prefs = await loadPreferences();
+    for (const filePath of filePaths) {
+      const filename = path.basename(filePath);
+      const pattern = derivePatternFromFilename(filename);
+      if (pattern && !seen.has(pattern)) {
+        seen.add(pattern);
+        prefs = addRecentPattern(prefs, pattern);
+      }
+    }
+    if (seen.size > 0) {
+      await savePreferences(prefs);
+    }
+    return { success: true, saved: seen.size };
+  } catch (error) {
+    logger.error('Error saving patterns from selected files', { error: error.message });
     throw error;
   }
 });
