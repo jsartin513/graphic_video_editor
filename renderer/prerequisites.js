@@ -113,7 +113,12 @@ export function initializePrerequisites(domElements) {
     } catch (error) {
       clearInterval(progressInterval);
       installProgressText.textContent = 'Installation error';
-      installResult.innerHTML = `<div class="result-item error">✗ Error: ${error.message}</div>`;
+      
+      // Map error and show user-friendly dialog
+      const mappedError = await window.electronAPI.mapError(error.message || String(error));
+      showErrorDialog(mappedError);
+      
+      installResult.innerHTML = `<div class="result-item error">✗ Error: ${mappedError.userMessage}</div>`;
       installResult.style.display = 'block';
       installBtn.disabled = false;
     }
@@ -126,10 +131,8 @@ export function initializePrerequisites(domElements) {
     prerequisitesModal.style.display = 'none';
   });
 
-  // Listen for prerequisites missing event
-  window.electronAPI.onPrerequisitesMissing((event, status) => {
-    showPrerequisitesModal(status);
-  });
+  // Note: The prerequisites-missing event listener is now in renderer.js
+  // to support lazy loading of this module
 
   return { showPrerequisitesModal };
 }
