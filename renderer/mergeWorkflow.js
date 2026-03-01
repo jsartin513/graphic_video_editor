@@ -45,7 +45,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   
   // Helper function to get file extension based on format
   function getFileExtension(format = selectedFormat) {
-    return `.${format.toUpperCase()}`;
+    return `.${format}`;
   }
   
   // Handle format selection change

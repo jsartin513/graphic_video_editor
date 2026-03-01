@@ -359,27 +359,10 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, format = 'mp
         const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
-          '-i', tempFileList
+          '-i', tempFileList,
+          '-c', 'copy', // Use codec copy for all formats
+          outputPath
         ];
-        
-        // Add format-specific codec settings
-        // For most formats, we can use codec copy for speed
-        // But some formats may need specific codecs
-        if (format === 'mp4' || format === 'mov' || format === 'm4v') {
-          // MP4/MOV/M4V: Use copy, works well with H.264
-          ffmpegArgs.push('-c', 'copy');
-        } else if (format === 'mkv') {
-          // MKV: Use copy, supports most codecs
-          ffmpegArgs.push('-c', 'copy');
-        } else if (format === 'avi') {
-          // AVI: Use copy, but may need re-encoding for some codecs
-          ffmpegArgs.push('-c', 'copy');
-        } else {
-          // Default: use copy
-          ffmpegArgs.push('-c', 'copy');
-        }
-        
-        ffmpegArgs.push(outputPath);
         
         const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
