@@ -75,10 +75,8 @@ let prerequisitesModule = null;
 // Lazy load split video module
 async function loadSplitVideoModule() {
   if (!splitVideoModule) {
-    console.log('Loading splitVideo module...');
     const module = await import('./splitVideo.js');
     splitVideoModule = module.initializeSplitVideo(domElements, state);
-    console.log('splitVideo module loaded');
   }
   return splitVideoModule;
 }
@@ -86,10 +84,8 @@ async function loadSplitVideoModule() {
 // Lazy load prerequisites module
 async function loadPrerequisitesModule() {
   if (!prerequisitesModule) {
-    console.log('Loading prerequisites module...');
     const module = await import('./prerequisites.js');
     prerequisitesModule = module.initializePrerequisites(domElements);
-    console.log('prerequisites module loaded');
   }
   return prerequisitesModule;
 }
