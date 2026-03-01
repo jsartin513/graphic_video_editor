@@ -597,8 +597,8 @@ function getBundledBinaryPath(binaryName) {
             resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
           } catch (exeError) {
             logger.error('getBundledBinaryPath: Error getting resources path', { 
-              firstError: e.message, 
-              exeError: exeError.message 
+              resourcesPathError: e.message, 
+              exePathError: exeError.message 
             });
             resourcesPath = path.join(__dirname, '..');
           }

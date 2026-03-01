@@ -267,6 +267,12 @@ class Logger {
         : this.currentLogFile;
 
       const content = await fs.readFile(logFile, 'utf8');
+      
+      // Handle empty file
+      if (!content) {
+        return '';
+      }
+      
       const lines = content.split('\n');
 
       // Return last N lines
