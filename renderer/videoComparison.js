@@ -76,13 +76,20 @@ export function initializeVideoComparison(state, domElements) {
 
   // Open comparison modal with two video files
   async function openComparison(pathA, pathB) {
+    // Validate paths
+    if (!pathA || !pathB || typeof pathA !== 'string' || typeof pathB !== 'string') {
+      console.error('Invalid video paths provided to comparison modal');
+      return;
+    }
+    
     videoPaths = [pathA, pathB];
     
-    // Set video names
+    // Set video names (getFileName already sanitizes output)
     videoAName.textContent = getFileName(pathA);
     videoBName.textContent = getFileName(pathB);
     
-    // Load videos
+    // Load videos - paths come from trusted electron file picker
+    // and are validated by the main process
     videoA.src = `file://${pathA}`;
     videoB.src = `file://${pathB}`;
     
