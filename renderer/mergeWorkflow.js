@@ -17,6 +17,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     progressBar,
     progressText,
     progressDetails,
+    cancelMergeBtn,
     outputDestinationPath,
     selectOutputDestinationBtn,
     useDefaultDestinationBtn,
@@ -589,8 +590,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     
     const results = [];
     let completed = 0;
+    let wasCancelled = false;
     let failed = 0;
-    
+
     for (let i = 0; i < indicesToMerge.length; i++) {
       const index = indicesToMerge[i];
       const group = state.videoGroups[index];
@@ -613,6 +615,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
+
+        // Check if error is due to cancellation
+        if (error.message && error.message.includes('cancelled')) {
+          wasCancelled = true;
+          results.push({ success: false, sessionId: group.sessionId, error: 'Cancelled', cancelled: true });
+          updateProgress(i + 1, state.videoGroups.length, 'Operation cancelled');
+          break; // Stop processing remaining groups
+        }
+
         const enhanced = enhanceError(error, {
           operation: 'Merge Videos',
           sessionId: group.sessionId,
@@ -627,7 +638,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           outputPath
         };
         results.push(failedResult);
-        
+
         // Save failed operation for recovery
         try {
           await window.electronAPI.addFailedOperation({
@@ -642,7 +653,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
         failed++;
         updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
-        
+
         // Stop on error if configured
         if (state.stopOnError) {
           updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`);
@@ -650,14 +661,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
       }
     }
-    
+
+    // Hide cancel button when merge is complete or cancelled
+    if (cancelMergeBtn) {
+      cancelMergeBtn.style.display = 'none';
+    }
+
     // Clean up progress listener
     currentGroup = null;
     window.electronAPI.removeMergeProgressListener();
-    
-    const statusText = failed > 0 
-      ? `Batch complete: ${completed} succeeded, ${failed} failed`
-      : `All ${completed} videos processed successfully`;
+
+    const statusText = wasCancelled
+      ? 'Operation cancelled'
+      : failed > 0
+        ? `Batch complete: ${completed} succeeded, ${failed} failed`
+        : `All ${completed} videos processed successfully`;
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
 
     // Update failed operations button visibility
@@ -668,35 +686,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     // Show results
     await showMergeResults(results, outputDir);
   }
-  
-  // Update batch controls based on selection
-  function updateBatchControls() {
-    const selectedCount = state.selectedGroups.size;
-    const totalCount = state.videoGroups.length;
-    
-    // Update merge button text
-    const mergeBtn = document.getElementById('mergeBtn');
-    if (mergeBtn) {
-      if (selectedCount === totalCount) {
-        mergeBtn.textContent = 'Merge All Videos';
-      } else if (selectedCount > 0) {
-        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
-      } else {
-        mergeBtn.textContent = 'Merge Videos';
-      }
-    }
-    
-    // Show/hide merge selected button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      if (selectedCount > 0 && selectedCount < totalCount) {
-        mergeSelectedBtn.style.display = 'inline-flex';
-      } else {
-        mergeSelectedBtn.style.display = 'none';
-      }
-    }
-  }
-  
+
   // Update batch controls based on selection
   function updateBatchControls() {
     const selectedCount = state.selectedGroups.size;
@@ -731,6 +721,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     previewScreen.style.display = 'none';
     progressScreen.style.display = 'block';
     progressBar.style.width = '0%';
+    
+    // Show and enable cancel button
+    if (cancelMergeBtn) {
+      cancelMergeBtn.style.display = 'inline-block';
+      cancelMergeBtn.disabled = false;
+    }
   }
 
   // Update progress (group-level)
@@ -1083,6 +1079,56 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     });
   }
 
+  // Handle cancel merge
+  async function handleCancelMerge() {
+    // Show confirmation dialog
+    const confirmed = confirm('Are you sure you want to cancel the merge operation?\n\nAny progress will be lost.');
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    // Disable cancel button to prevent multiple clicks
+    if (cancelMergeBtn) {
+      cancelMergeBtn.disabled = true;
+      cancelMergeBtn.textContent = 'Cancelling...';
+    }
+    
+    try {
+      const result = await window.electronAPI.cancelMerge();
+      
+      if (result.success) {
+        progressText.textContent = 'Merge cancelled by user';
+        
+        // Hide cancel button after cancellation
+        if (cancelMergeBtn) {
+          cancelMergeBtn.style.display = 'none';
+        }
+        
+        // Show a message and allow user to go back
+        setTimeout(() => {
+          alert('Merge operation was cancelled. You can go back and start over.');
+          handleBack();
+        }, 1000);
+      } else {
+        // Re-enable button if cancellation failed
+        if (cancelMergeBtn) {
+          cancelMergeBtn.disabled = false;
+          cancelMergeBtn.textContent = 'Cancel';
+        }
+        alert(result.message || 'Could not cancel operation');
+      }
+    } catch (error) {
+      console.error('Error cancelling merge:', error);
+      // Re-enable button if error occurred
+      if (cancelMergeBtn) {
+        cancelMergeBtn.disabled = false;
+        cancelMergeBtn.textContent = 'Cancel';
+      }
+      alert('Error cancelling merge: ' + error.message);
+    }
+  }
+
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
@@ -1103,16 +1149,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
-  
-  // Add quality selector event listener
-  if (qualitySelect) {
-    qualitySelect.addEventListener('change', handleQualityChange);
+
+  if (cancelMergeBtn) {
+    cancelMergeBtn.addEventListener('click', handleCancelMerge);
   }
-  
-  // Add format selector event listener
-  if (formatSelect) {
-    formatSelect.addEventListener('change', handleFormatChange);
-  }
+  // qualitySelect and formatSelect already have listeners attached above (getElementById blocks)
 
   return { updateOutputDestinationDisplay };
 }
