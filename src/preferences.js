@@ -19,6 +19,7 @@ const DEFAULT_PREFERENCES = {
   maxRecentPatterns: 10,
   preferredDateFormat: 'YYYY-MM-DD', // ISO format by default
   lastUsedPattern: null,
+  debugMode: false, // Debug logging mode
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
     { name: 'US (MM-DD-YYYY)', format: 'MM-DD-YYYY' },

@@ -4,6 +4,9 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
 
+// Import logger
+const { logger } = require('./src/logger');
+
 let mainWindow;
 let ffmpegPath = null;
 let ffprobePath = null;
@@ -60,7 +63,22 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Initialize logger
+  await logger.initialize();
+  
+  // Load preferences and set debug mode
+  try {
+    const prefs = await loadPreferences();
+    if (prefs.debugMode) {
+      logger.setDebugMode(true);
+    }
+  } catch (error) {
+    console.error('Failed to load preferences for logger:', error);
+  }
+  
+  logger.info('Application started');
+  
   // Set up app icon (for development - production uses electron-builder config)
   setupAppIcon();
   
@@ -1047,6 +1065,80 @@ ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) 
   } catch (error) {
     console.error('Error applying date tokens:', error);
     throw error;
+  }
+});
+
+// Logger IPC handlers
+
+// Get logs
+ipcMain.handle('get-logs', async (event, filename = null, maxLines = 1000) => {
+  try {
+    const logs = await logger.readLogs(filename, maxLines);
+    return { success: true, logs };
+  } catch (error) {
+    logger.error('Error getting logs', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Get all log files
+ipcMain.handle('get-log-files', async () => {
+  try {
+    const files = await logger.getLogFiles();
+    return { success: true, files };
+  } catch (error) {
+    logger.error('Error getting log files', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear logs
+ipcMain.handle('clear-logs', async () => {
+  try {
+    await logger.clearLogs();
+    return { success: true };
+  } catch (error) {
+    logger.error('Error clearing logs', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Export logs
+ipcMain.handle('export-logs', async (event, destinationPath) => {
+  try {
+    const result = await logger.exportLogs(destinationPath);
+    return result;
+  } catch (error) {
+    logger.error('Error exporting logs', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Get debug mode status
+ipcMain.handle('get-debug-mode', async () => {
+  try {
+    const debugMode = logger.getDebugMode();
+    return { success: true, debugMode };
+  } catch (error) {
+    logger.error('Error getting debug mode', { error: error.message });
+    return { success: false, error: error.message };
+  }
+});
+
+// Set debug mode
+ipcMain.handle('set-debug-mode', async (event, enabled) => {
+  try {
+    logger.setDebugMode(enabled);
+    
+    // Save to preferences
+    const prefs = await loadPreferences();
+    prefs.debugMode = enabled;
+    await savePreferences(prefs);
+    
+    return { success: true, debugMode: enabled };
+  } catch (error) {
+    logger.error('Error setting debug mode', { error: error.message });
+    return { success: false, error: error.message };
   }
 });
 
