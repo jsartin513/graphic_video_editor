@@ -20,12 +20,12 @@ export function initializeVideoComparison(state, domElements) {
   const videoBName = document.getElementById('videoBName');
   
   // Control elements
-  const playPauseBtn = document.getElementById('playPauseBtn');
-  const playPauseText = document.getElementById('playPauseText');
-  const timelineSlider = document.getElementById('timelineSlider');
-  const currentTimeDisplay = document.getElementById('currentTime');
-  const totalDurationDisplay = document.getElementById('totalDuration');
-  const playbackSpeedSelect = document.getElementById('playbackSpeed');
+  const playPauseBtn = document.getElementById('comparisonPlayPauseBtn');
+  const playPauseText = document.getElementById('comparisonPlayPauseText');
+  const timelineSlider = document.getElementById('comparisonTimelineSlider');
+  const currentTimeDisplay = document.getElementById('comparisonCurrentTime');
+  const totalDurationDisplay = document.getElementById('comparisonTotalDuration');
+  const playbackSpeedSelect = document.getElementById('comparisonPlaybackSpeed');
   const layoutSideBySideBtn = document.getElementById('layoutSideBySide');
   const layoutOverUnderBtn = document.getElementById('layoutOverUnder');
   
@@ -78,7 +78,7 @@ export function initializeVideoComparison(state, domElements) {
   async function openComparison(pathA, pathB) {
     // Validate paths
     if (!pathA || !pathB || typeof pathA !== 'string' || typeof pathB !== 'string') {
-      console.error('Invalid video paths provided to comparison modal');
+      alert('Unable to open video comparison: Invalid video files selected. Please try selecting the videos again.');
       return;
     }
     

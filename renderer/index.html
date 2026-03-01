@@ -269,19 +269,19 @@
         </div>
         
         <div class="playback-controls">
-          <button id="playPauseBtn" class="btn btn-primary" aria-label="Play/Pause videos">
+          <button id="comparisonPlayPauseBtn" class="btn btn-primary" aria-label="Play/Pause videos">
             <span class="btn-icon" aria-hidden="true">▶</span>
-            <span id="playPauseText">Play</span>
+            <span id="comparisonPlayPauseText">Play</span>
           </button>
           <div class="timeline-container">
-            <input type="range" id="timelineSlider" class="timeline-slider" min="0" max="100" value="0" step="0.1" aria-label="Video timeline">
+            <input type="range" id="comparisonTimelineSlider" class="timeline-slider" min="0" max="100" value="0" step="0.1" aria-label="Video timeline">
             <div class="time-display" role="timer" aria-label="Video playback time">
-              <span id="currentTime" aria-label="Current time">0:00</span> / <span id="totalDuration" aria-label="Total duration">0:00</span>
+              <span id="comparisonCurrentTime" aria-label="Current time">0:00</span> / <span id="comparisonTotalDuration" aria-label="Total duration">0:00</span>
             </div>
           </div>
           <div class="playback-speed">
-            <label for="playbackSpeed">Speed:</label>
-            <select id="playbackSpeed" class="speed-selector" aria-label="Playback speed">
+            <label for="comparisonPlaybackSpeed">Speed:</label>
+            <select id="comparisonPlaybackSpeed" class="speed-selector" aria-label="Playback speed">
               <option value="0.25">0.25x</option>
               <option value="0.5">0.5x</option>
               <option value="1" selected>1x</option>
