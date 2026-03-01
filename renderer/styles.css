@@ -1413,6 +1413,12 @@ body {
   font-size: 14px;
 }
 
+.failed-op-details .output-path {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
 .error-message {
   color: var(--accent-danger);
   font-family: monospace;

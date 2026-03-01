@@ -456,12 +456,13 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
+        const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${group.outputFilename}`;
         const failedResult = { 
           success: false, 
           sessionId: group.sessionId, 
           error: error.message,
           files: group.files,
-          outputPath: path.join(outputDir, group.outputFilename)
+          outputPath
         };
         results.push(failedResult);
         
@@ -470,7 +471,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
           await window.electronAPI.addFailedOperation({
             sessionId: group.sessionId,
             files: group.files,
-            outputPath: path.join(outputDir, group.outputFilename),
+            outputPath,
             error: error.message,
             timestamp: Date.now()
           });

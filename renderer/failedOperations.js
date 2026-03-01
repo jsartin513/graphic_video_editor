@@ -1,7 +1,7 @@
 // Failed Operations Management
 // Handles viewing and retrying failed merge operations
 
-import { getFileName, escapeHtml } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, getDirectoryPath } from './utils.js';
 
 export function initializeFailedOperations(domElements, state) {
   const {
@@ -96,6 +96,7 @@ export function initializeFailedOperations(domElements, state) {
     
     const timestamp = new Date(op.timestamp).toLocaleString();
     const outputFilename = getFileName(op.outputPath);
+    const outputDir = getDirectoryPath(op.outputPath);
     const fileCount = op.files ? op.files.length : 0;
     const retryCount = op.retryCount || 0;
     
@@ -110,18 +111,18 @@ export function initializeFailedOperations(domElements, state) {
         </div>
         <div class="failed-op-actions">
           <button class="btn btn-small btn-primary retry-btn" 
-                  aria-label="Retry merge for session ${escapeHtml(op.sessionId)}">
+                  aria-label="Retry merge for session ${escapeAttr(op.sessionId)}">
             <span class="btn-icon" aria-hidden="true">🔄</span>
             Retry
           </button>
           <button class="btn btn-small btn-text remove-btn" 
-                  aria-label="Remove failed operation for session ${escapeHtml(op.sessionId)}">
+                  aria-label="Remove failed operation for session ${escapeAttr(op.sessionId)}">
             ✕
           </button>
         </div>
       </div>
       <div class="failed-op-details">
-        <p><strong>Output:</strong> ${escapeHtml(outputFilename)}</p>
+        <p><strong>Output:</strong> ${escapeHtml(outputFilename)} <span class="output-path">(${escapeHtml(outputDir)})</span></p>
         <p><strong>Error:</strong> <span class="error-message">${escapeHtml(op.error || 'Unknown error')}</span></p>
         <details class="failed-op-files">
           <summary>View input files (${fileCount})</summary>
@@ -165,10 +166,7 @@ export function initializeFailedOperations(domElements, state) {
         return;
       }
 
-      // Close the modal
-      closeModal();
-      
-      // Show confirmation
+      // Show confirmation first (before closing modal)
       const filesCount = op.files.length;
       const confirmed = confirm(
         `Retry merging Session ${op.sessionId}?\n\n` +
@@ -176,8 +174,10 @@ export function initializeFailedOperations(domElements, state) {
       );
       
       if (!confirmed) {
-        return;
+        return; // Modal stays open so user can continue reviewing
       }
+
+      closeModal();
       
       // Get the quality preference
       let selectedQuality = 'copy';

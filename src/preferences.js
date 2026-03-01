@@ -248,7 +248,7 @@ function addFailedOperation(preferences, operation) {
  * @returns {Object} Updated preferences
  */
 function removeFailedOperation(preferences, sessionId, outputPath) {
-  const failedOps = preferences.failedOperations || [];
+  const failedOps = Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
   
   return {
     ...preferences,
@@ -264,7 +264,7 @@ function removeFailedOperation(preferences, sessionId, outputPath) {
  * @returns {Array} Array of failed operations
  */
 function getFailedOperations(preferences) {
-  return preferences.failedOperations || [];
+  return Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
 }
 
 /**
