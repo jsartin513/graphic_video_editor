@@ -1,9 +1,9 @@
 // File selection and handling functionality
 
-import { getFileName, escapeHtml, formatDate, formatDuration, formatBitrate, formatResolution, formatFrameRate } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDate, formatDuration, formatBitrate, formatResolution, formatFrameRate, getDirectoryPath } from './utils.js';
 
 // State will be managed in the main renderer.js
-export function initializeFileHandling(state, domElements) {
+export function initializeFileHandling(state, domElements, trimVideo = null) {
   const {
     selectFilesBtn,
     selectFolderBtn,
@@ -62,12 +62,64 @@ export function initializeFileHandling(state, domElements) {
   }
 
   function addFiles(newFiles) {
+    const duplicates = [];
+    const added = [];
+    const fileNameMap = new Map(); // filename -> full path
+    
+    // Build map of existing filenames
+    for (const existingFile of state.selectedFiles) {
+      const fileName = getFileName(existingFile);
+      if (!fileNameMap.has(fileName)) {
+        fileNameMap.set(fileName, []);
+      }
+      fileNameMap.get(fileName).push(existingFile);
+    }
+    
+    // Check for duplicates and add new files
     for (const file of newFiles) {
-      if (!state.selectedFiles.includes(file)) {
+      // Skip if exact path already exists
+      if (state.selectedFiles.includes(file)) {
+        continue;
+      }
+      
+      const fileName = getFileName(file);
+      const existingPaths = fileNameMap.get(fileName) || [];
+      
+      if (existingPaths.length > 0) {
+        // Duplicate filename detected
+        duplicates.push({
+          newFile: file,
+          fileName: fileName,
+          existingFiles: existingPaths
+        });
+      } else {
+        // No duplicate, add file
         state.selectedFiles.push(file);
+        if (!fileNameMap.has(fileName)) {
+          fileNameMap.set(fileName, []);
+        }
+        fileNameMap.get(fileName).push(file);
+        added.push(file);
       }
     }
-    updateFileList();
+    
+    // Show error if duplicates found
+    if (duplicates.length > 0) {
+      const duplicateNames = duplicates.map(d => d.fileName).join(', ');
+      const message = duplicates.length === 1
+        ? `File "${duplicateNames}" is already in the list. Each file must have a unique name.`
+        : `Files with duplicate names detected: ${duplicateNames}. Each file must have a unique name.`;
+      
+      alert(message);
+      
+      // Optionally still add files with a suffix to make them unique
+      // For now, we'll just show the error and not add duplicates
+    }
+    
+    // Update UI only if files were added
+    if (added.length > 0 || duplicates.length === 0) {
+      updateFileList();
+    }
   }
 
   function removeFile(filePath) {
@@ -209,34 +261,68 @@ export function initializeFileHandling(state, domElements) {
   async function createFileItem(filePath) {
     const item = document.createElement('div');
     item.className = 'file-item';
-    
+    const fileName = getFileName(filePath);
+
     try {
       const basicMetadata = await window.electronAPI.getFileMetadata(filePath);
-      const videoMetadata = await window.electronAPI.getVideoMetadataDetailed(filePath);
-      
-      // Build the basic file info
-      let html = `
-        <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
-          <div class="file-meta">
-            <span>Size: ${basicMetadata.sizeFormatted}</span>
-            <span>Modified: ${formatDate(basicMetadata.modified)}</span>
-      `;
-      
-      // Add video metadata if available
-      if (videoMetadata) {
-        html += `
-            <span>Duration: ${formatDuration(videoMetadata.duration)}</span>
-            <span>Resolution: ${formatResolution(videoMetadata.width, videoMetadata.height)}</span>
-        `;
+      let videoMetadata = null;
+      let flatMetadata = null; // For compatibility checking: { width, height, fps, videoCodec }
+
+      try {
+        videoMetadata = await window.electronAPI.getVideoMetadata(filePath);
+        if (videoMetadata && videoMetadata.video) {
+          const v = videoMetadata.video;
+          flatMetadata = {
+            width: v.width || null,
+            height: v.height || null,
+            fps: v.fps || null,
+            videoCodec: v.codec || null
+          };
+        }
+      } catch (error) {
+        console.error(`Error getting video metadata for ${filePath}:`, error);
       }
-      
-      html += `
+
+      // Generate thumbnail (lazy load - don't await)
+      let thumbnailHtml = '<div class="file-thumbnail-placeholder">🎬</div>';
+      window.electronAPI.generateThumbnail(filePath, 1)
+        .then(thumbnailDataUrl => {
+          const thumbnailImg = item.querySelector('.file-thumbnail');
+          if (thumbnailImg) {
+            thumbnailImg.src = thumbnailDataUrl;
+            thumbnailImg.style.display = 'block';
+            const placeholder = item.querySelector('.file-thumbnail-placeholder');
+            if (placeholder) {
+              placeholder.style.display = 'none';
+            }
+          }
+        })
+        .catch(error => {
+          console.error(`Error generating thumbnail for ${filePath}:`, error);
+        });
+
+      const v = videoMetadata?.video;
+      const duration = videoMetadata?.duration ?? null;
+      const bitrate = videoMetadata?.bitrate ?? (v?.bitrate ?? null);
+
+      let html = `
+        <div class="file-thumbnail-container">
+          <img class="file-thumbnail" src="" alt="Video thumbnail" style="display: none;">
+          ${thumbnailHtml}
+        </div>
+        <div class="file-info">
+          <div class="file-name">${escapeHtml(fileName)}</div>
+          <div class="file-meta">
+            <span>Size: ${basicMetadata?.sizeFormatted ?? 'Unknown'}</span>
+            <span>Modified: ${basicMetadata ? formatDate(basicMetadata.modified) : ''}</span>
+            ${flatMetadata ? `
+            <span>Duration: ${formatDuration(duration)}</span>
+            <span>Resolution: ${formatResolution(v?.width, v?.height)}</span>
+            ` : ''}
           </div>
       `;
-      
-      // Add expandable detailed metadata section if video metadata is available
-      if (videoMetadata) {
+
+      if (flatMetadata) {
         html += `
           <button class="metadata-toggle" aria-expanded="false">
             <span class="toggle-icon">▶</span> Show Details
@@ -245,56 +331,53 @@ export function initializeFileHandling(state, domElements) {
             <div class="metadata-grid">
               <div class="metadata-item">
                 <span class="metadata-label">Resolution:</span>
-                <span class="metadata-value">${formatResolution(videoMetadata.width, videoMetadata.height)}</span>
+                <span class="metadata-value">${formatResolution(v?.width, v?.height)}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Frame Rate:</span>
-                <span class="metadata-value">${formatFrameRate(videoMetadata.fps)}</span>
+                <span class="metadata-value">${formatFrameRate(v?.fps)}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Video Codec:</span>
-                <span class="metadata-value">${videoMetadata.videoCodec ? escapeHtml(videoMetadata.videoCodec) : 'Unknown'}</span>
+                <span class="metadata-value">${v?.codec ? escapeHtml(v.codec) : 'Unknown'}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Bitrate:</span>
-                <span class="metadata-value">${formatBitrate(videoMetadata.bitrate)}</span>
+                <span class="metadata-value">${formatBitrate(bitrate)}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Duration:</span>
-                <span class="metadata-value">${formatDuration(videoMetadata.duration)}</span>
+                <span class="metadata-value">${formatDuration(duration)}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">File Size:</span>
-                <span class="metadata-value">${basicMetadata.sizeFormatted}</span>
+                <span class="metadata-value">${basicMetadata?.sizeFormatted ?? 'Unknown'}</span>
               </div>
             </div>
           </div>
         `;
       }
-      
+
       html += `
         </div>
         <div class="file-actions">
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}" aria-label="Remove ${escapeHtml(getFileName(filePath))}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}" aria-label="Remove ${escapeHtml(fileName)}">Remove</button>
         </div>
       `;
-      
+
       item.innerHTML = html;
-      
-      // Add toggle handler for metadata details if available
-      if (videoMetadata) {
+
+      if (flatMetadata) {
         const toggleBtn = item.querySelector('.metadata-toggle');
         const detailsSection = item.querySelector('.metadata-details');
-        
         const TOGGLE_TEXT = {
           collapsed: { icon: '▶', text: 'Show Details' },
           expanded: { icon: '▼', text: 'Hide Details' }
         };
-        
         toggleBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
-          
           if (isExpanded) {
             detailsSection.style.display = 'none';
             toggleBtn.setAttribute('aria-expanded', 'false');
@@ -308,24 +391,115 @@ export function initializeFileHandling(state, domElements) {
           }
         });
       }
-      
-      // Store metadata for compatibility checking
-      item.dataset.videoMetadata = JSON.stringify(videoMetadata);
+
+      item.dataset.videoMetadata = JSON.stringify(flatMetadata);
       
     } catch (error) {
+      const fileName = getFileName(filePath);
+      
       item.innerHTML = `
+        <div class="file-thumbnail-container">
+          <div class="file-thumbnail-placeholder">🎬</div>
+        </div>
         <div class="file-info">
-          <div class="file-name">${escapeHtml(getFileName(filePath))}</div>
+          <div class="file-name">${escapeHtml(fileName)}</div>
         </div>
         <div class="file-actions">
-          <button class="btn-remove" data-file="${escapeHtml(filePath)}" aria-label="Remove ${escapeHtml(getFileName(filePath))}">Remove</button>
+          ${trimVideo ? `<button class="btn-trim" data-file="${escapeAttr(filePath)}" data-name="${escapeAttr(fileName)}">✂️ Trim</button>` : ''}
+          <button class="btn-remove" data-file="${escapeAttr(filePath)}" aria-label="Remove ${escapeHtml(fileName)}">Remove</button>
         </div>
       `;
+    }
+
+    // Add trim button handler if trimVideo module is available
+    if (trimVideo) {
+      const trimBtn = item.querySelector('.btn-trim');
+      if (trimBtn) {
+        trimBtn.addEventListener('click', () => {
+          const file = trimBtn.getAttribute('data-file');
+          const name = trimBtn.getAttribute('data-name');
+          // Get directory from file path
+          const directory = getDirectoryPath(filePath);
+          trimVideo.showTrimVideoModal(file, name, directory);
+        });
+      }
     }
 
     // Add remove button handler
     const removeBtn = item.querySelector('.btn-remove');
     removeBtn.addEventListener('click', () => removeFile(filePath));
+
+    // Make item draggable for reordering
+    item.draggable = true;
+    item.setAttribute('data-file-index', state.selectedFiles.indexOf(filePath));
+    item.classList.add('draggable-item');
+    
+    // Drag event handlers
+    item.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', filePath);
+      item.classList.add('dragging');
+      
+      // Store the dragged item reference
+      state.draggedItem = item;
+      state.draggedIndex = state.selectedFiles.indexOf(filePath);
+    });
+    
+    item.addEventListener('dragend', (e) => {
+      item.classList.remove('dragging');
+      
+      // Clear drop indicators
+      document.querySelectorAll('.drag-over-item').forEach(el => {
+        el.classList.remove('drag-over-item');
+      });
+      
+      delete state.draggedItem;
+      delete state.draggedIndex;
+    });
+    
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      // Only show drop indicator if dragging over a different item
+      if (state.draggedItem && item !== state.draggedItem) {
+        item.classList.add('drag-over-item');
+      }
+    });
+    
+    item.addEventListener('dragleave', (e) => {
+      // Only remove indicator if not dragging over a child element
+      if (!item.contains(e.relatedTarget)) {
+        item.classList.remove('drag-over-item');
+      }
+    });
+    
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over-item');
+      
+      if (state.draggedItem && state.draggedIndex !== undefined) {
+        const draggedFilePath = state.selectedFiles[state.draggedIndex];
+        const dropIndex = state.selectedFiles.indexOf(filePath);
+        
+        if (draggedFilePath && dropIndex !== -1 && state.draggedIndex !== dropIndex) {
+          // Reorder files in state
+          const originalIndex = state.draggedIndex;
+          state.selectedFiles.splice(originalIndex, 1);
+          const targetIndex = originalIndex < dropIndex ? dropIndex - 1 : dropIndex;
+          state.selectedFiles.splice(targetIndex, 0, draggedFilePath);
+          
+          // Save state for undo/redo if available (will be integrated when undo/redo feature is merged)
+          if (typeof undoRedo !== 'undefined' && undoRedo) {
+            undoRedo.saveState(`Reordered files`);
+          }
+          
+          // Update UI
+          updateFileList();
+        }
+      }
+    });
 
     return item;
   }

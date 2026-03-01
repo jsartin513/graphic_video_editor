@@ -11,6 +11,9 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - **Expandable metadata details** - Toggle detailed properties for each video
 - **Compatibility checking** - Automatic detection of mismatched video properties
 - **Visual warnings** - Highlights videos with incompatible properties before merging
+- **Auto-detect GoPro SD cards** - Automatically detects when GoPro SD cards are inserted
+- **SD card notifications** - Get notified when a GoPro SD card is detected with quick actions
+- View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
 - **Smart filename preferences** - Remember and suggest filename patterns
 - **Date token support** - Use {date}, {year}, {month}, {day} in filenames
@@ -70,6 +73,7 @@ npm start
 - `src/` - Core modules
   - `video-grouping.js` - Groups GoPro videos by session ID
   - `preferences.js` - User preferences storage and management
+  - `sd-card-detector.js` - SD card detection and monitoring
 - `renderer/` - UI files
   - `index.html` - Main HTML structure
   - `styles.css` - Application styling
@@ -111,6 +115,43 @@ The app remembers your filename patterns and preferences to make renaming files 
 - Using recent pattern suggestions
 - Date token support ({date}, {year}, {month}, {day})
 - Customizing date formats
+
+## SD Card Auto-Detection
+
+The application automatically detects when a GoPro SD card is inserted into your Mac. When detected:
+- A notification banner appears at the top of the app
+- You can quickly open the SD card folder in Finder
+- You can instantly load all videos from the SD card into the app
+- The app remembers recently used SD cards for future reference
+
+**Features:**
+- Automatically monitors the `/Volumes/` directory for new SD cards
+- Detects GoPro directory structure (DCIM folder with GoPro video files)
+- Provides quick actions: "Open Folder" and "Load Videos"
+- Stores SD card paths in preferences for easy access
+
+**Settings:**
+- Auto-detection can be enabled/disabled in preferences
+- Notifications can be customized through preferences
+
+## Testing
+
+The project includes comprehensive unit and integration tests:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+**Test Coverage**: High coverage across multiple unit and integration test suites (see coverage reports for current metrics).
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
 
 ## Development
 
