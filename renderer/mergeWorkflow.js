@@ -19,16 +19,26 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     progressDetails,
     outputDestinationPath,
     selectOutputDestinationBtn,
-    useDefaultDestinationBtn
+    useDefaultDestinationBtn,
+    qualitySelect,
+    formatSelect
   } = domElements;
 
   // Load preferences on initialization
   let userPreferences = null;
+  let selectedQuality = 'copy'; // Default to copy (fastest)
+  let selectedFormat = 'mp4'; // Default format
+  
   async function loadUserPreferences() {
     try {
       userPreferences = await window.electronAPI.loadPreferences();
       if (userPreferences && userPreferences.preferredQuality) {
         selectedQuality = userPreferences.preferredQuality;
+        if (qualitySelect) qualitySelect.value = selectedQuality;
+      }
+      if (userPreferences && userPreferences.preferredFormat) {
+        selectedFormat = userPreferences.preferredFormat;
+        if (formatSelect) formatSelect.value = selectedFormat;
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -37,9 +47,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   
   // Initialize preferences
   loadUserPreferences();
-  
-  // Quality selection state
-  let selectedQuality = 'copy'; // Default to copy (fastest)
+
   let normalizeAudio = false; // Audio normalization option
 
   // Handle Prepare Merge button
@@ -140,6 +148,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         if (qualitySelect) {
           qualitySelect.value = userPreferences.preferredQuality;
           selectedQuality = userPreferences.preferredQuality;
+        }
+      }
+      
+      // Load and set format preference
+      if (userPreferences && userPreferences.preferredFormat) {
+        const formatSelect = document.getElementById('formatSelect');
+        if (formatSelect) {
+          formatSelect.value = userPreferences.preferredFormat;
+          selectedFormat = userPreferences.preferredFormat;
         }
       }
     } catch (error) {
@@ -251,7 +268,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     if (userPreferences && userPreferences.recentFilenamePatterns && userPreferences.recentFilenamePatterns.length > 0) {
       const datalistId = `patterns-${index}`;
       const options = userPreferences.recentFilenamePatterns.map(pattern => 
-        `<option value="${escapeHtml(pattern.replace(/\.MP4$/i, ''))}">`
+        `<option value="${escapeHtml(removeExtension(pattern))}">`
       ).join('');
       patternsDatalist = `<datalist id="${datalistId}">${options}</datalist>`;
     }
@@ -287,9 +304,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
                    data-index="${index}"
                    list="patterns-${index}"
                    value="${escapeHtml(group.outputFilename)}"
-                   placeholder="PROCESSED${group.sessionId}.MP4">
+                   placeholder="PROCESSED${group.sessionId}.${selectedFormat}">
             ${patternsDatalist}
-            <span class="filename-hint">.MP4</span>
+            <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
           <div class="filename-help">
             <small>💡 Use date tokens: {date}, {year}, {month}, {day}</small>
@@ -307,9 +324,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     input.addEventListener('input', (e) => {
       const value = e.target.value.trim();
       if (value) {
-        // Remove .MP4 extension if user added it
-        const cleanValue = value.replace(/\.MP4$/i, '');
-        state.videoGroups[index].outputFilename = cleanValue + '.MP4';
+        // Remove any video extension if user added it
+        const cleanValue = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+        state.videoGroups[index].outputFilename = cleanValue + '.' + selectedFormat.toLowerCase();
+        // Update hint
+        const hint = item.querySelector(`#filename-hint-${index}`);
+        if (hint) hint.textContent = '.' + selectedFormat.toUpperCase();
       }
     });
     
@@ -330,8 +350,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       if (!value) {
         value = `PROCESSED${group.sessionId}`;
       }
-      // Remove .MP4 if present
-      value = value.replace(/\.MP4$/i, '');
+      // Remove any video extension if present
+      value = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
       
       // Store the original pattern before token replacement for preferences
       const originalPattern = value;
@@ -352,9 +372,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Remove invalid characters but preserve hyphens and underscores
       // This happens after date token replacement to preserve date formatting
       value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
-      state.videoGroups[index].outputFilename = value + '.MP4';
+      const extension = '.' + selectedFormat.toLowerCase();
+      state.videoGroups[index].outputFilename = value + extension;
       e.target.value = value;
-      
+
+      // Update hint to show current format
+      const hint = item.querySelector(`#filename-hint-${index}`);
+      if (hint) hint.textContent = extension.toUpperCase();
+
       // Save state for undo/redo on filename change
       if (undoRedo && originalPattern) {
         undoRedo.saveState(`Changed filename to ${value}`);
@@ -569,14 +594,20 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     for (let i = 0; i < indicesToMerge.length; i++) {
       const index = indicesToMerge[i];
       const group = state.videoGroups[index];
-      const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${group.outputFilename}`;
+      
+      // Ensure output filename has the correct extension for selected format
+      let outputFilename = group.outputFilename;
+      const baseName = outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+      outputFilename = baseName + '.' + selectedFormat.toLowerCase();
+      
+      const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${outputFilename}`;
       currentGroupIndex = i;
       currentGroup = group;
       
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, normalizeAudio);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
@@ -1012,6 +1043,38 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     });
   }
 
+  // Format selector change handler
+  const formatSelect = document.getElementById('formatSelect');
+  if (formatSelect) {
+    formatSelect.addEventListener('change', async (e) => {
+      selectedFormat = e.target.value;
+
+      // Update all filename hints to reflect new format
+      document.querySelectorAll('[id^="filename-hint-"]').forEach(hint => {
+        hint.textContent = '.' + selectedFormat.toUpperCase();
+      });
+
+      // Update all output filenames to use new extension
+      state.videoGroups.forEach((group, index) => {
+        const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+        group.outputFilename = baseName + '.' + selectedFormat.toLowerCase();
+
+        // Update input field value if it exists
+        const input = document.querySelector(`.filename-input[data-index="${index}"]`);
+        if (input) {
+          input.value = baseName;
+        }
+      });
+
+      // Save preference
+      try {
+        await window.electronAPI.setPreferredFormat(selectedFormat);
+      } catch (error) {
+        console.error('Error saving format preference:', error);
+      }
+    });
+  }
+
   // Audio normalization checkbox handler
   const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
   if (normalizeAudioCheckbox) {
@@ -1040,6 +1103,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  
+  // Add quality selector event listener
+  if (qualitySelect) {
+    qualitySelect.addEventListener('change', handleQualityChange);
+  }
+  
+  // Add format selector event listener
+  if (formatSelect) {
+    formatSelect.addEventListener('change', handleFormatChange);
+  }
 
   return { updateOutputDestinationDisplay };
 }

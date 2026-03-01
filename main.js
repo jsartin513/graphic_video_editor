@@ -297,6 +297,7 @@ const {
   setAutoDetectSDCards,
   setShowSDCardNotifications,
   setPreferredQuality,
+  setPreferredFormat,
   setLastOutputDestination,
   addFailedOperation,
   removeFailedOperation,
@@ -369,6 +370,7 @@ ipcMain.handle('get-video-metadata', async (event, videoPath) => {
   if (!videoPath || typeof videoPath !== 'string') {
     throw new Error('Invalid video path');
   }
+
 
   return new Promise((resolve, reject) => {
     const ffprobeCmd = getFFprobePath();
@@ -586,7 +588,7 @@ ipcMain.handle('get-total-file-size', async (event, filePaths) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', normalizeAudio = false) => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false) => {
   return new Promise((resolve, reject) => {
     // Validate quality option
     try {
@@ -633,12 +635,36 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
         logger.debug('merge-videos: Output path', { outputPath });
         logger.debug('merge-videos: Quality option', { qualityOption });
 
-        // Build ffmpeg command based on quality option
+        // Normalize format to lowercase for consistent comparisons
+        const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
+
+        // Build ffmpeg command based on quality option and format
         const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
           '-i', tempFileList
         ];
+
+        // Map format to ffmpeg muxer (if needed, otherwise auto-detect from extension)
+        const formatMuxers = {
+          'mp4': 'mp4',
+          'mov': 'mov',
+          'mkv': 'matroska',
+          'avi': 'avi',
+          'm4v': 'mp4' // M4V uses same muxer as MP4
+        };
+
+        // Ensure output path has correct extension
+        const outputExt = path.extname(outputPath).toLowerCase().slice(1);
+        if (outputExt !== normalizedFormat) {
+          const basePath = outputPath.replace(/\.[^/.]+$/, '');
+          outputPath = basePath + '.' + normalizedFormat;
+        }
+
+        // Add format muxer if not MP4 (MP4 is default)
+        if (normalizedFormat !== 'mp4' && formatMuxers[normalizedFormat]) {
+          ffmpegArgs.push('-f', formatMuxers[normalizedFormat]);
+        }
 
         if (qualityOption === QUALITY_COPY) {
           // Fast copy mode (no re-encoding)
@@ -656,6 +682,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
           // Re-encode with quality settings
           const settings = QUALITY_SETTINGS[qualityOption];
 
+          // Video codec settings (H.264 for maximum compatibility)
           ffmpegArgs.push(
             '-c:v', 'libx264',
             '-crf', settings.crf,
@@ -668,10 +695,12 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOptio
               '-b:a', '192k'
             );
           } else {
-            ffmpegArgs.push(
-              '-c:a', 'aac',
-              '-b:a', '192k'
-            );
+            // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
+            if (['mp4', 'mov', 'm4v'].includes(normalizedFormat)) {
+              ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
+            } else {
+              ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
+            }
           }
         }
 
@@ -1613,12 +1642,27 @@ ipcMain.handle('set-preferred-quality', async (event, quality) => {
     if (typeof quality !== 'string' || !ALLOWED_QUALITIES.has(quality)) {
       throw new Error(`Invalid quality value: ${String(quality)}`);
     }
+
     const prefs = await loadPreferences();
     const updated = setPreferredQuality(prefs, quality);
     await savePreferences(updated);
     return { success: true, preferences: updated };
   } catch (error) {
     console.error('Error setting preferred quality:', error);
+    throw error;
+  }
+});
+
+// Set preferred format
+ipcMain.handle('set-preferred-format', async (event, format) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredFormat(prefs, format);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting preferred format:', error);
+
     throw error;
   }
 });
@@ -1637,35 +1681,6 @@ ipcMain.handle('set-last-output-destination', async (event, destination) => {
     }
     const prefs = await loadPreferences();
     const updated = setLastOutputDestination(prefs, safeDestination);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error setting last output destination:', error);
-    throw error;
-  }
-});
-
-// Set preferred quality
-ipcMain.handle('set-preferred-quality', async (event, quality) => {
-  try {
-    // Validate quality parameter
-    validateQualityOption(quality);
-    
-    const prefs = await loadPreferences();
-    const updated = setPreferredQuality(prefs, quality);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error setting preferred quality:', error);
-    throw error;
-  }
-});
-
-// Set last output destination
-ipcMain.handle('set-last-output-destination', async (event, destination) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = setLastOutputDestination(prefs, destination);
     await savePreferences(updated);
     return { success: true, preferences: updated };
   } catch (error) {
