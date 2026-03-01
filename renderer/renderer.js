@@ -42,6 +42,9 @@ const domElements = {
   selectOutputDestinationBtn: document.getElementById('selectOutputDestinationBtn'),
   useDefaultDestinationBtn: document.getElementById('useDefaultDestinationBtn'),
   
+  // Quality selector
+  qualitySelect: document.getElementById('qualitySelect'),
+  
   // Format selector
   formatSelect: document.getElementById('formatSelect'),
   

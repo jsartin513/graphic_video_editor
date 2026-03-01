@@ -18,16 +18,25 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
     outputDestinationPath,
     selectOutputDestinationBtn,
     useDefaultDestinationBtn,
+    qualitySelect,
     formatSelect
   } = domElements;
 
   // Load preferences on initialization
   let userPreferences = null;
+  let selectedQuality = 'copy'; // Default to copy (fastest)
   let selectedFormat = 'mp4'; // Default format
   
   async function loadUserPreferences() {
     try {
       userPreferences = await window.electronAPI.loadPreferences();
+      // Set quality from preferences
+      if (userPreferences && userPreferences.preferredQuality) {
+        selectedQuality = userPreferences.preferredQuality;
+        if (qualitySelect) {
+          qualitySelect.value = selectedQuality;
+        }
+      }
       // Set format from preferences
       if (userPreferences && userPreferences.preferredOutputFormat) {
         selectedFormat = userPreferences.preferredOutputFormat;
@@ -49,6 +58,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Helper function to get file extension based on format
   function getFileExtension(format = selectedFormat) {
     return `.${format}`;
+  }
+  
+  // Handle quality selection change
+  function handleQualityChange() {
+    selectedQuality = qualitySelect.value;
+    
+    // Save quality preference
+    window.electronAPI.setPreferredQuality(selectedQuality).catch(error => {
+      console.error('Error saving quality preference:', error);
+    });
   }
   
   // Handle format selection change
@@ -364,7 +383,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedFormat);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
@@ -580,6 +599,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   mergeBtn.addEventListener('click', handleMerge);
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+  
+  // Add quality selector event listener
+  if (qualitySelect) {
+    qualitySelect.addEventListener('change', handleQualityChange);
+  }
   
   // Add format selector event listener
   if (formatSelect) {

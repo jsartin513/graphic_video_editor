@@ -19,6 +19,7 @@ const DEFAULT_PREFERENCES = {
   maxRecentPatterns: 10,
   preferredDateFormat: 'YYYY-MM-DD', // ISO format by default
   lastUsedPattern: null,
+  preferredQuality: 'copy', // Default to copy (fastest, no re-encoding)
   preferredOutputFormat: 'mp4', // Default to MP4 for best compatibility
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
@@ -114,6 +115,19 @@ function setPreferredDateFormat(preferences, format) {
 }
 
 /**
+ * Set the preferred quality option
+ * @param {Object} preferences - Current preferences
+ * @param {string} quality - The quality option ('copy', 'high', 'medium', 'low')
+ * @returns {Object} Updated preferences
+ */
+function setPreferredQuality(preferences, quality) {
+  return {
+    ...preferences,
+    preferredQuality: quality
+  };
+}
+
+/**
  * Set the preferred output format
  * @param {Object} preferences - Current preferences
  * @param {string} format - The output format (e.g., 'mp4', 'mov', 'mkv')
@@ -175,6 +189,7 @@ module.exports = {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredQuality,
   setPreferredOutputFormat,
   formatDate,
   applyDateTokens,

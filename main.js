@@ -260,6 +260,7 @@ const {
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredQuality,
   setPreferredOutputFormat,
   applyDateTokens
 } = require('./src/preferences');
@@ -318,7 +319,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath, format = 'mp4') => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4') => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
@@ -339,6 +340,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, format = 'mp
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
         console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        console.log(`[merge-videos] Quality option: ${qualityOption}`);
         console.log(`[merge-videos] Output format: ${format}`);
         
         // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
@@ -355,14 +357,42 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath, format = 'mp
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         
-        // Build ffmpeg arguments - using codec copy for all formats
+        // Build ffmpeg command based on quality option and format
         const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
-          '-i', tempFileList,
-          '-c', 'copy', // Use codec copy for all formats
-          outputPath
+          '-i', tempFileList
         ];
+        
+        if (qualityOption === 'copy') {
+          // Fast copy mode (no re-encoding)
+          ffmpegArgs.push('-c', 'copy');
+        } else {
+          // Re-encode with quality settings
+          const qualitySettings = {
+            'high': { crf: '18', preset: 'slow' },
+            'medium': { crf: '23', preset: 'medium' },
+            'low': { crf: '28', preset: 'fast' }
+          };
+          
+          const settings = qualitySettings[qualityOption] || qualitySettings['medium'];
+          
+          // Video codec settings (H.264 for maximum compatibility)
+          ffmpegArgs.push(
+            '-c:v', 'libx264',
+            '-crf', settings.crf,
+            '-preset', settings.preset
+          );
+          
+          // Audio codec - AAC for MP4/MOV/M4V, MP3 for others
+          if (['mp4', 'mov', 'm4v'].includes(format.toLowerCase())) {
+            ffmpegArgs.push('-c:a', 'aac', '-b:a', '192k');
+          } else {
+            ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', '192k');
+          }
+        }
+        
+        ffmpegArgs.push(outputPath);
         
         const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
@@ -1039,6 +1069,19 @@ ipcMain.handle('set-date-format', async (event, format) => {
     return { success: true, preferences: updated };
   } catch (error) {
     console.error('Error setting date format:', error);
+    throw error;
+  }
+});
+
+// Set preferred quality
+ipcMain.handle('set-preferred-quality', async (event, quality) => {
+  try {
+    const prefs = await loadPreferences();
+    const updated = setPreferredQuality(prefs, quality);
+    await savePreferences(updated);
+    return { success: true, preferences: updated };
+  } catch (error) {
+    console.error('Error setting preferred quality:', error);
     throw error;
   }
 });
