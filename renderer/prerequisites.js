@@ -126,10 +126,8 @@ export function initializePrerequisites(domElements) {
     prerequisitesModal.style.display = 'none';
   });
 
-  // Listen for prerequisites missing event
-  window.electronAPI.onPrerequisitesMissing((event, status) => {
-    showPrerequisitesModal(status);
-  });
+  // Note: The prerequisites-missing event listener is now in renderer.js
+  // to support lazy loading of this module
 
   return { showPrerequisitesModal };
 }
