@@ -317,7 +317,7 @@ ipcMain.handle('get-video-duration', async (event, filePath) => {
 });
 
 // Merge videos using ffmpeg
-ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
+ipcMain.handle('merge-videos', async (event, filePaths, outputPath, normalizeAudio = false) => {
   return new Promise((resolve, reject) => {
     // Filter out macOS metadata files (starting with ._)
     const validFilePaths = filePaths.filter(filePath => {
@@ -338,6 +338,7 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
       .then(() => {
         const ffmpegCmd = getFFmpegPath();
         console.log(`[merge-videos] Using ffmpeg at: ${ffmpegCmd}`);
+        console.log(`[merge-videos] Audio normalization: ${normalizeAudio ? 'enabled' : 'disabled'}`);
         
         // When using bundled binary, we should not need PATH, but limit it to avoid finding system binaries
         const env = { ...process.env };
@@ -353,13 +354,32 @@ ipcMain.handle('merge-videos', async (event, filePaths, outputPath) => {
         console.log(`[merge-videos] Output path: ${outputPath}`);
         console.log(`[merge-videos] Number of files to merge: ${validFilePaths.length}`);
         
-        const ffmpeg = spawn(ffmpegCmd, [
+        // Build FFmpeg arguments
+        const ffmpegArgs = [
           '-f', 'concat',
           '-safe', '0',
-          '-i', tempFileList,
-          '-c', 'copy',
-          outputPath
-        ], { 
+          '-i', tempFileList
+        ];
+        
+        // Apply audio normalization if requested
+        if (normalizeAudio) {
+          // Use loudnorm filter (EBU R128 standard) with recommended settings
+          // -c:v copy keeps video fast (no re-encoding)
+          // -c:a aac -af loudnorm re-encodes audio with normalization
+          ffmpegArgs.push(
+            '-c:v', 'copy',
+            '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+            '-c:a', 'aac',
+            '-b:a', '192k'
+          );
+        } else {
+          // Fast copy mode (no re-encoding)
+          ffmpegArgs.push('-c', 'copy');
+        }
+        
+        ffmpegArgs.push(outputPath);
+        
+        const ffmpeg = spawn(ffmpegCmd, ffmpegArgs, { 
           env
         });
         

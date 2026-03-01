@@ -33,6 +33,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   // Initialize preferences
   loadUserPreferences();
 
+  // Audio normalization state
+  let normalizeAudio = false;
+
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
     if (state.selectedFiles.length === 0) return;
@@ -315,7 +318,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
       updateProgress(i, state.videoGroups.length, `Merging Session ${group.sessionId}...`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath);
+        await window.electronAPI.mergeVideos(group.files, outputPath, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, state.videoGroups.length, `Completed Session ${group.sessionId}`);
@@ -531,6 +534,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
   mergeBtn.addEventListener('click', handleMerge);
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
+
+  // Audio normalization checkbox handler
+  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+  if (normalizeAudioCheckbox) {
+    normalizeAudioCheckbox.addEventListener('change', (e) => {
+      normalizeAudio = e.target.checked;
+      console.log('Audio normalization:', normalizeAudio ? 'enabled' : 'disabled');
+    });
+  }
 
   return { updateOutputDestinationDisplay };
 }
