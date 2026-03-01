@@ -3,8 +3,6 @@
 
 import { initializeFileHandling } from './fileHandling.js';
 import { initializeMergeWorkflow } from './mergeWorkflow.js';
-import { initializeSplitVideo } from './splitVideo.js';
-import { initializePrerequisites } from './prerequisites.js';
 
 // Shared application state
 const state = {
@@ -70,11 +68,41 @@ const domElements = {
   splitResult: document.getElementById('splitResult')
 };
 
-// Initialize all modules
+// Lazy-loaded modules
+let splitVideoModule = null;
+let prerequisitesModule = null;
+
+// Lazy load split video module
+async function loadSplitVideoModule() {
+  if (!splitVideoModule) {
+    console.log('Loading splitVideo module...');
+    const module = await import('./splitVideo.js');
+    splitVideoModule = module.initializeSplitVideo(domElements, state);
+    console.log('splitVideo module loaded');
+  }
+  return splitVideoModule;
+}
+
+// Lazy load prerequisites module
+async function loadPrerequisitesModule() {
+  if (!prerequisitesModule) {
+    console.log('Loading prerequisites module...');
+    const module = await import('./prerequisites.js');
+    prerequisitesModule = module.initializePrerequisites(domElements);
+    console.log('prerequisites module loaded');
+  }
+  return prerequisitesModule;
+}
+
+// Initialize core modules (always loaded)
 const fileHandling = initializeFileHandling(state, domElements);
-const splitVideo = initializeSplitVideo(domElements, state);
-const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, splitVideo);
-const prerequisites = initializePrerequisites(domElements);
+const mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule);
+
+// Set up lazy loading for prerequisites
+window.electronAPI.onPrerequisitesMissing(async (event, status) => {
+  const prerequisites = await loadPrerequisitesModule();
+  prerequisites.showPrerequisitesModal(status);
+});
 
 // Make state accessible for debugging
 window.appState = state;

@@ -2,7 +2,7 @@
 
 import { getFileName, escapeHtml, formatDuration, getDirectoryName } from './utils.js';
 
-export function initializeMergeWorkflow(state, domElements, fileHandling, splitVideo) {
+export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule) {
   const {
     prepareMergeBtn,
     previewScreen,
@@ -517,9 +517,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, splitV
 
     // Add event listeners for split video buttons
     document.querySelectorAll('.btn-split-video').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         const videoPath = e.target.getAttribute('data-video-path');
         const videoName = e.target.getAttribute('data-video-name');
+        // Lazy load split video module when user clicks split button
+        const splitVideo = await loadSplitVideoModule();
         splitVideo.showSplitVideoModal(videoPath, videoName, outputDir);
       });
     });
