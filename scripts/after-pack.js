@@ -1,0 +1,111 @@
+// Electron Builder afterPack hook to copy ffmpeg binaries
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+exports.default = async function(context) {
+  // Context object structure: { projectDir, appOutDir, electronPlatformName, arch, ... }
+  const projectDir = context.projectDir || process.cwd();
+  const appOutDir = context.appOutDir;
+  
+  if (!appOutDir) {
+    console.error('[afterPack] Error: appOutDir is undefined in context');
+    return;
+  }
+  
+  const resourcesSrc = path.join(projectDir, 'resources');
+  // appOutDir is the directory containing the .app bundle (e.g., dist/mac)
+  // Find the .app bundle in appOutDir
+  const entries = fs.readdirSync(appOutDir);
+  const appBundle = entries.find(e => e.endsWith('.app'));
+  if (!appBundle) {
+    console.error(`[afterPack] Error: No .app bundle found in ${appOutDir}`);
+    return;
+  }
+  const resourcesDest = path.join(appOutDir, appBundle, 'Contents', 'Resources', 'resources');
+  
+  console.log(`[afterPack] Copying resources from ${resourcesSrc} to ${resourcesDest}`);
+  console.log(`[afterPack] projectDir: ${projectDir}`);
+  console.log(`[afterPack] appOutDir: ${appOutDir}`);
+  
+  // Check if source exists
+  if (!fs.existsSync(resourcesSrc)) {
+    console.error(`[afterPack] ❌ ERROR: resources directory not found at ${resourcesSrc}`);
+    console.error(`[afterPack] Current working directory: ${process.cwd()}`);
+    console.error(`[afterPack] Listing projectDir contents:`, fs.existsSync(projectDir) ? fs.readdirSync(projectDir) : 'projectDir does not exist');
+    throw new Error(`Resources directory not found at ${resourcesSrc}. Make sure prebuild script ran successfully.`);
+  }
+  
+  // Verify binaries exist before copying
+  const ffmpegSrc = path.join(resourcesSrc, 'ffmpeg');
+  const ffprobeSrc = path.join(resourcesSrc, 'ffprobe');
+  if (!fs.existsSync(ffmpegSrc)) {
+    throw new Error(`FFmpeg binary not found at ${ffmpegSrc}`);
+  }
+  if (!fs.existsSync(ffprobeSrc)) {
+    throw new Error(`FFprobe binary not found at ${ffprobeSrc}`);
+  }
+  console.log(`[afterPack] ✅ Source binaries verified`);
+  
+  // Create destination directory
+  if (!fs.existsSync(resourcesDest)) {
+    fs.mkdirSync(resourcesDest, { recursive: true });
+    console.log(`[afterPack] Created directory: ${resourcesDest}`);
+  }
+  
+  // Copy ffmpeg and ffprobe
+  const binaries = ['ffmpeg', 'ffprobe'];
+  for (const binary of binaries) {
+    const src = path.join(resourcesSrc, binary);
+    const dest = path.join(resourcesDest, binary);
+    
+    if (fs.existsSync(src)) {
+      try {
+        fs.copyFileSync(src, dest);
+        // Make executable
+        if (process.platform !== 'win32') {
+          execSync(`chmod +x "${dest}"`, { stdio: 'ignore' });
+        }
+        const size = fs.statSync(src).size;
+        console.log(`[afterPack] ✓ Copied ${binary} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+      } catch (error) {
+        console.error(`[afterPack] Error copying ${binary}:`, error.message);
+      }
+    } else {
+      console.warn(`[afterPack] Warning: ${binary} not found at ${src}`);
+    }
+  }
+  
+  console.log('[afterPack] Resources copy completed');
+  
+  // Also copy test videos if they exist
+  const testVideosSrc = path.join(projectDir, 'test-videos');
+  const testVideosDest = path.join(appOutDir, appBundle, 'Contents', 'Resources', 'test-videos');
+  
+  if (fs.existsSync(testVideosSrc)) {
+    console.log(`[afterPack] Copying test videos from ${testVideosSrc} to ${testVideosDest}`);
+    
+    // Create destination directory
+    if (!fs.existsSync(testVideosDest)) {
+      fs.mkdirSync(testVideosDest, { recursive: true });
+    }
+    
+    // Copy all .mp4 files from test-videos
+    const testFiles = fs.readdirSync(testVideosSrc).filter(f => f.endsWith('.mp4'));
+    for (const file of testFiles) {
+      const src = path.join(testVideosSrc, file);
+      const dest = path.join(testVideosDest, file);
+      try {
+        fs.copyFileSync(src, dest);
+        const size = fs.statSync(src).size;
+        console.log(`[afterPack] ✓ Copied test video ${file} (${(size / 1024).toFixed(1)} KB)`);
+      } catch (error) {
+        console.error(`[afterPack] Error copying test video ${file}:`, error.message);
+      }
+    }
+    console.log('[afterPack] Test videos copy completed');
+  } else {
+    console.log('[afterPack] No test-videos directory found, skipping');
+  }
+};
+
