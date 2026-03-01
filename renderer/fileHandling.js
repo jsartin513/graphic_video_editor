@@ -88,11 +88,11 @@ export function initializeFileHandling(state, domElements) {
     prepareMergeBtn.style.display = 'inline-flex';
     fileCount.textContent = `${state.selectedFiles.length} file${state.selectedFiles.length !== 1 ? 's' : ''}`;
     
-    // Create all file items
-    const items = [];
-    for (const filePath of state.selectedFiles) {
-      const item = await createFileItem(filePath);
-      items.push(item);
+    // Create all file items in parallel
+    const items = await Promise.all(
+      state.selectedFiles.map(filePath => createFileItem(filePath))
+    );
+    for (const item of items) {
       fileList.appendChild(item);
     }
     
@@ -135,22 +135,27 @@ export function initializeFileHandling(state, domElements) {
         if (!metadataStr) return;
         
         const metadata = JSON.parse(metadataStr);
+        if (!metadata) return;
         const mismatches = [];
         
         warnings.forEach(warning => {
-          // Find the most common value
+          // Find the most common value using a Map to preserve original types
           const allValues = metadataList.map(m => m[warning.property]);
-          const valueCounts = {};
+          const valueCounts = new Map();
           allValues.forEach(v => {
-            valueCounts[v] = (valueCounts[v] || 0) + 1;
+            valueCounts.set(v, (valueCounts.get(v) || 0) + 1);
           });
           
-          const keys = Object.keys(valueCounts);
-          if (keys.length === 0) return;
+          if (valueCounts.size === 0) return;
           
-          const mostCommon = keys.reduce((a, b) => 
-            valueCounts[a] > valueCounts[b] ? a : b
-          );
+          let mostCommon = null;
+          let maxCount = 0;
+          for (const [v, count] of valueCounts) {
+            if (count > maxCount) {
+              maxCount = count;
+              mostCommon = v;
+            }
+          }
           
           // Check if this item's value differs from most common
           if (metadata[warning.property] !== mostCommon) {
@@ -191,7 +196,7 @@ export function initializeFileHandling(state, domElements) {
               const propName = w.property === 'fps' ? 'frame rate' : 
                                w.property === 'videoCodec' ? 'video codec' :
                                w.property;
-              return `<li><strong>${propName}:</strong> ${w.values.join(', ')}</li>`;
+              return `<li><strong>${escapeHtml(propName)}:</strong> ${w.values.map(v => escapeHtml(String(v))).join(', ')}</li>`;
             }).join('')}
           </ul>
         </div>
@@ -233,7 +238,7 @@ export function initializeFileHandling(state, domElements) {
       // Add expandable detailed metadata section if video metadata is available
       if (videoMetadata) {
         html += `
-          <button class="metadata-toggle" aria-expanded="false" aria-label="Show detailed metadata">
+          <button class="metadata-toggle" aria-expanded="false">
             <span class="toggle-icon">▶</span> Show Details
           </button>
           <div class="metadata-details" style="display: none;">
@@ -248,7 +253,7 @@ export function initializeFileHandling(state, domElements) {
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Video Codec:</span>
-                <span class="metadata-value">${videoMetadata.videoCodec || 'Unknown'}</span>
+                <span class="metadata-value">${videoMetadata.videoCodec ? escapeHtml(videoMetadata.videoCodec) : 'Unknown'}</span>
               </div>
               <div class="metadata-item">
                 <span class="metadata-label">Bitrate:</span>
