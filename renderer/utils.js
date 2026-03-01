@@ -46,3 +46,16 @@ export function getDirectoryName(filePath) {
   return parts[parts.length - 2];
 }
 
+// Performance optimization: Debounce function to limit frequency of expensive operations
+export function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
