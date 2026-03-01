@@ -19,6 +19,8 @@ const DEFAULT_PREFERENCES = {
   maxRecentPatterns: 10,
   preferredDateFormat: 'YYYY-MM-DD', // ISO format by default
   lastUsedPattern: null,
+  preferredQuality: 'copy', // Default to copy (fastest, no re-encoding)
+  lastOutputDestination: null, // Last selected output directory (null = use default)
   dateFormats: [
     { name: 'ISO (YYYY-MM-DD)', format: 'YYYY-MM-DD' },
     { name: 'US (MM-DD-YYYY)', format: 'MM-DD-YYYY' },
@@ -29,7 +31,8 @@ const DEFAULT_PREFERENCES = {
   autoDetectSDCards: true,
   knownSDCardPaths: [],
   lastSDCardPath: null,
-  showSDCardNotifications: true
+  showSDCardNotifications: true,
+  failedOperations: [] // Track failed merge operations for recovery
 };
 
 /**
@@ -118,6 +121,32 @@ function setPreferredDateFormat(preferences, format) {
 }
 
 /**
+ * Set the preferred video quality
+ * @param {Object} preferences - Current preferences
+ * @param {string} quality - The quality option ('copy', 'high', 'medium', 'low')
+ * @returns {Object} Updated preferences
+ */
+function setPreferredQuality(preferences, quality) {
+  return {
+    ...preferences,
+    preferredQuality: quality
+  };
+}
+
+/**
+ * Set the last used output destination
+ * @param {Object} preferences - Current preferences
+ * @param {string|null} destination - The output destination path (null = use default)
+ * @returns {Object} Updated preferences
+ */
+function setLastOutputDestination(preferences, destination) {
+  return {
+    ...preferences,
+    lastOutputDestination: destination
+  };
+}
+
+/**
  * Format a date using the specified format string
  * @param {Date} date - The date to format
  * @param {string} format - Format string (supports YYYY, MM, DD, YY, M, D)
@@ -189,6 +218,61 @@ function addSDCardPath(preferences, sdCardPath) {
 }
 
 /**
+ * Add a failed operation to the preferences for later recovery
+ * @param {Object} preferences - Current preferences
+ * @param {Object} operation - Failed operation details (sessionId, files, outputPath, error, timestamp)
+ * @returns {Object} Updated preferences
+ */
+const MAX_FAILED_OPERATIONS = 50;
+
+function addFailedOperation(preferences, operation) {
+  if (
+    !operation ||
+    !operation.sessionId ||
+    typeof operation.outputPath !== 'string' ||
+    operation.outputPath.trim() === ''
+  ) {
+    return preferences;
+  }
+
+  const existingFailedOps = Array.isArray(preferences.failedOperations)
+    ? preferences.failedOperations
+    : [];
+  const failedOps = [...existingFailedOps];
+  
+  // Check if this operation already exists (by sessionId and outputPath)
+  const existingIndex = failedOps.findIndex(
+    op => op.sessionId === operation.sessionId && op.outputPath === operation.outputPath
+  );
+  
+  if (existingIndex >= 0) {
+    // Update existing operation
+    failedOps[existingIndex] = {
+      ...operation,
+      timestamp: Date.now(), // Update timestamp
+      retryCount: (failedOps[existingIndex].retryCount || 0) + 1
+    };
+  } else {
+    // Add new failed operation
+    failedOps.push({
+      ...operation,
+      timestamp: operation.timestamp || Date.now(),
+      retryCount: 0
+    });
+  }
+  
+  // Keep only the most recent MAX_FAILED_OPERATIONS entries
+  const trimmed = failedOps
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_FAILED_OPERATIONS);
+  
+  return {
+    ...preferences,
+    failedOperations: trimmed
+  };
+}
+
+/**
  * Set auto-detect SD cards preference
  * @param {Object} preferences - Current preferences
  * @param {boolean} enabled - Whether to enable auto-detection
@@ -198,6 +282,24 @@ function setAutoDetectSDCards(preferences, enabled) {
   return {
     ...preferences,
     autoDetectSDCards: enabled
+  };
+}
+
+/**
+ * Remove a failed operation from preferences
+ * @param {Object} preferences - Current preferences
+ * @param {string} sessionId - Session ID of the operation to remove
+ * @param {string} outputPath - Output path of the operation to remove
+ * @returns {Object} Updated preferences
+ */
+function removeFailedOperation(preferences, sessionId, outputPath) {
+  const failedOps = Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
+  
+  return {
+    ...preferences,
+    failedOperations: failedOps.filter(
+      op => !(op.sessionId === sessionId && op.outputPath === outputPath)
+    )
   };
 }
 
@@ -214,15 +316,42 @@ function setShowSDCardNotifications(preferences, enabled) {
   };
 }
 
+/**
+ * Get all failed operations
+ * @param {Object} preferences - Current preferences
+ * @returns {Array} Array of failed operations
+ */
+function getFailedOperations(preferences) {
+  return Array.isArray(preferences.failedOperations) ? preferences.failedOperations : [];
+}
+
+/**
+ * Clear all failed operations
+ * @param {Object} preferences - Current preferences
+ * @returns {Object} Updated preferences
+ */
+function clearFailedOperations(preferences) {
+  return {
+    ...preferences,
+    failedOperations: []
+  };
+}
+
 module.exports = {
   loadPreferences,
   savePreferences,
   addRecentPattern,
   setPreferredDateFormat,
+  setPreferredQuality,
+  setLastOutputDestination,
   formatDate,
   applyDateTokens,
   addSDCardPath,
   setAutoDetectSDCards,
   setShowSDCardNotifications,
+  addFailedOperation,
+  removeFailedOperation,
+  getFailedOperations,
+  clearFailedOperations,
   DEFAULT_PREFERENCES
 };

@@ -101,6 +101,25 @@ The application automatically detects when a GoPro SD card is inserted into your
 - Auto-detection can be enabled/disabled in preferences
 - Notifications can be customized through preferences
 
+## Testing
+
+The project includes comprehensive unit and integration tests:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+**Test Coverage**: High coverage across multiple unit and integration test suites (see coverage reports for current metrics).
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
+
 ## Development
 
 The application uses Electron with context isolation for security. File operations are handled in the main process, and the renderer communicates with it via IPC.
