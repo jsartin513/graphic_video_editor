@@ -5,7 +5,7 @@
  * @returns {string} 'mac' or 'other'
  */
 function getPlatform() {
-  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') || 
+  const isMac = (typeof process !== 'undefined' && process.platform === 'darwin') ||
                 navigator.platform.toUpperCase().indexOf('MAC') >= 0 ||
                 navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
   return isMac ? 'mac' : 'other';
@@ -28,7 +28,6 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
   } = domElements;
 
   // Detect platform (macOS uses Meta, others use Ctrl)
-  // Check for macOS more reliably
   const isMac = getPlatform() === 'mac';
   const modifierKey = isMac ? 'metaKey' : 'ctrlKey';
   const modifierDisplay = isMac ? '⌘' : 'Ctrl';
@@ -158,8 +157,6 @@ export function formatShortcut(key, useModifier = true, useShift = false) {
 /**
  * Update keyboard shortcut hints in the UI
  * Call this on page load to set platform-specific shortcuts
- * Note: Only updates shortcuts with platform-specific modifiers (Cmd/Ctrl).
- * Shortcuts like Enter and Esc are the same across all platforms and don't need updating.
  */
 export function updateShortcutHints() {
   // Update button shortcuts with platform-specific modifiers

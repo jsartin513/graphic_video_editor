@@ -40,6 +40,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   
   // Quality selection state
   let selectedQuality = 'copy'; // Default to copy (fastest)
+  let normalizeAudio = false; // Audio normalization option
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -481,7 +482,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     // Merge all groups
     await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
   }
-  
+
   // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
   async function syncAndApplyTokensFromInputs(indicesToMerge) {
     for (const index of indicesToMerge) {
@@ -575,7 +576,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality);
+        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
@@ -586,9 +587,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           sessionId: group.sessionId,
           outputPath: outputPath
         });
-        const failedResult = { 
-          success: false, 
-          sessionId: group.sessionId, 
+        const failedResult = {
+          success: false,
+          sessionId: group.sessionId,
           error: enhanced.userMessage,
           errorDetails: enhanced,
           files: group.files,
@@ -627,14 +628,42 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       ? `Batch complete: ${completed} succeeded, ${failed} failed`
       : `All ${completed} videos processed successfully`;
     updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
-    
+
     // Update failed operations button visibility
     if (failedOperations && failedOperations.updateFailedOperationsButton) {
       failedOperations.updateFailedOperationsButton();
     }
-    
+
     // Show results
     await showMergeResults(results, outputDir);
+  }
+  
+  // Update batch controls based on selection
+  function updateBatchControls() {
+    const selectedCount = state.selectedGroups.size;
+    const totalCount = state.videoGroups.length;
+    
+    // Update merge button text
+    const mergeBtn = document.getElementById('mergeBtn');
+    if (mergeBtn) {
+      if (selectedCount === totalCount) {
+        mergeBtn.textContent = 'Merge All Videos';
+      } else if (selectedCount > 0) {
+        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
+      } else {
+        mergeBtn.textContent = 'Merge Videos';
+      }
+    }
+    
+    // Show/hide merge selected button
+    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
+    if (mergeSelectedBtn) {
+      if (selectedCount > 0 && selectedCount < totalCount) {
+        mergeSelectedBtn.style.display = 'inline-flex';
+      } else {
+        mergeSelectedBtn.style.display = 'none';
+      }
+    }
   }
   
   // Update batch controls based on selection
@@ -982,7 +1011,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     });
   }
-  
+
+  // Audio normalization checkbox handler
+  const normalizeAudioCheckbox = document.getElementById('normalizeAudioCheckbox');
+  if (normalizeAudioCheckbox) {
+    normalizeAudioCheckbox.addEventListener('change', (e) => {
+      normalizeAudio = e.target.checked;
+    });
+  }
+
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
