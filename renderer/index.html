@@ -16,6 +16,30 @@
       <p class="subtitle">Select GoPro video files to merge</p>
     </header>
 
+    <!-- SD Card Notification Banner -->
+    <div id="sdCardNotification" class="sd-card-notification" style="display: none;" role="alert" aria-live="polite">
+      <div class="sd-card-notification-content">
+        <div class="sd-card-notification-icon" aria-hidden="true">💾</div>
+        <div class="sd-card-notification-text">
+          <strong>GoPro SD Card Detected</strong>
+          <p id="sdCardName">SD Card Name</p>
+        </div>
+        <div class="sd-card-notification-actions">
+          <button id="openSDCardBtn" class="btn btn-primary btn-small" aria-label="Open SD card folder">
+            <span class="btn-icon" aria-hidden="true">📂</span>
+            Open Folder
+          </button>
+          <button id="loadSDCardBtn" class="btn btn-secondary btn-small" aria-label="Load videos from SD card">
+            <span class="btn-icon" aria-hidden="true">📥</span>
+            Load Videos
+          </button>
+          <button id="dismissSDCardBtn" class="btn btn-text btn-small" aria-label="Dismiss notification">
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+
     <main id="main-content" class="main-content" role="main">
       <div class="selection-controls">
         <button id="selectFilesBtn" class="btn btn-primary" aria-label="Select video files">

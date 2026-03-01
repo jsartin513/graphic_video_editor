@@ -26,6 +26,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
-  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat)
+  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  // SD Card Detection API
+  getGoProSDCards: () => ipcRenderer.invoke('get-gopro-sd-cards'),
+  openSDCardDirectory: (sdCardPath) => ipcRenderer.invoke('open-sd-card-directory', sdCardPath),
+  loadSDCardFiles: (sdCardPath) => ipcRenderer.invoke('load-sd-card-files', sdCardPath),
+  setAutoDetectSDCards: (enabled) => ipcRenderer.invoke('set-auto-detect-sd-cards', enabled),
+  setShowSDCardNotifications: (enabled) => ipcRenderer.invoke('set-show-sd-card-notifications', enabled),
+  onSDCardDetected: (callback) => {
+    ipcRenderer.on('sd-card-detected', (event, data) => callback(data));
+  },
+  onSDCardRemoved: (callback) => {
+    ipcRenderer.on('sd-card-removed', (event, data) => callback(data));
+  },
+  removeSDCardListeners: () => {
+    ipcRenderer.removeAllListeners('sd-card-detected');
+    ipcRenderer.removeAllListeners('sd-card-removed');
+  }
 });
 
