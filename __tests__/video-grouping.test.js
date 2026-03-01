@@ -1,18 +1,36 @@
-const { extractSessionId, analyzeAndGroupVideos } = require('../src/video-grouping');
+const { extractSessionId, derivePatternFromFilename, analyzeAndGroupVideos } = require('../src/video-grouping');
 const path = require('path');
 
 describe('extractSessionId', () => {
-  test('extracts session ID from GX pattern', () => {
-    // GX pattern: GX + 2 digits (sequence) + 4 digits (session ID)
+  test('extracts session ID from GX pattern (original digit format)', () => {
+    // Original format: GX + 2 digits (sequence) + 4 digits (session ID)
     expect(extractSessionId('GX010001.MP4')).toBe('0001');
     expect(extractSessionId('GX121234.MP4')).toBe('1234');
     expect(extractSessionId('GX999999.MP4')).toBe('9999');
+    expect(extractSessionId('GX000000.MP4')).toBe('0000');
   });
 
-  test('extracts session ID from GP pattern', () => {
-    // GP pattern: GP + 2 digits (sequence) + 4 digits (session ID)
+  test('extracts session ID from GXAA format (letter sequence)', () => {
+    // GXAA format: GX + 2 letters + 4 digits (session ID)
+    expect(extractSessionId('GXAA0123.MP4')).toBe('0123');
+    expect(extractSessionId('GXAA0223.MP4')).toBe('0223');
+    expect(extractSessionId('GXAB1234.MP4')).toBe('1234');
+    expect(extractSessionId('GXZZ9999.MP4')).toBe('9999');
+  });
+
+  test('extracts session ID from GX mixed alphanumeric format', () => {
+    // GX + 2 alphanumeric + 4 digits (mixed letters/digits)
+    expect(extractSessionId('GX0A0123.MP4')).toBe('0123');
+    expect(extractSessionId('GXA10001.MP4')).toBe('0001');
+    expect(extractSessionId('GX1B1234.MP4')).toBe('1234');
+  });
+
+  test('extracts session ID from GP pattern (original and letter formats)', () => {
+    // Original: GP + 2 digits
     expect(extractSessionId('GP010001.MP4')).toBe('0001');
     expect(extractSessionId('GP121234.MP4')).toBe('1234');
+    // GP + 2 letters (same extension as GX)
+    expect(extractSessionId('GPAA0123.MP4')).toBe('0123');
   });
 
   test('extracts session ID from GOPR pattern', () => {
@@ -20,8 +38,18 @@ describe('extractSessionId', () => {
     expect(extractSessionId('GOPR1234.MP4')).toBe('1234');
   });
 
+  test('is backward compatible with all original formats', () => {
+    // Ensure no regression: original GX01, GP01, GOPR formats unchanged
+    expect(extractSessionId('GX010001.MP4')).toBe('0001');
+    expect(extractSessionId('GX020001.MP4')).toBe('0001');
+    expect(extractSessionId('GX030001.MP4')).toBe('0001');
+    expect(extractSessionId('GP010001.MP4')).toBe('0001');
+    expect(extractSessionId('GOPR0001.MP4')).toBe('0001');
+  });
+
   test('is case insensitive', () => {
     expect(extractSessionId('gx010001.mp4')).toBe('0001');
+    expect(extractSessionId('gxaa0123.mp4')).toBe('0123');
     expect(extractSessionId('GOPR0001.mp4')).toBe('0001');
     expect(extractSessionId('gopr0001.MP4')).toBe('0001');
   });
@@ -30,6 +58,32 @@ describe('extractSessionId', () => {
     expect(extractSessionId('video.mp4')).toBeNull();
     expect(extractSessionId('test.MP4')).toBeNull();
     expect(extractSessionId('GX123.MP4')).toBeNull(); // Too short
+    expect(extractSessionId('GX1.MP4')).toBeNull(); // No session ID
+  });
+});
+
+describe('derivePatternFromFilename', () => {
+  test('derives pattern with {sessionId} from GX filenames', () => {
+    expect(derivePatternFromFilename('GX010001.MP4')).toBe('GX01{sessionId}');
+    expect(derivePatternFromFilename('GXAA0123.MP4')).toBe('GXAA{sessionId}');
+    expect(derivePatternFromFilename('GXAB1234.MP4')).toBe('GXAB{sessionId}');
+    expect(derivePatternFromFilename('GX0A0001.MP4')).toBe('GX0A{sessionId}');
+  });
+  test('derives pattern with {sessionId} from GP and GOPR filenames', () => {
+    expect(derivePatternFromFilename('GP010001.MP4')).toBe('GP01{sessionId}');
+    expect(derivePatternFromFilename('GPAA0123.MP4')).toBe('GPAA{sessionId}');
+    expect(derivePatternFromFilename('GOPR0001.MP4')).toBe('GOPR{sessionId}');
+  });
+  test('returns null for non-GoPro files', () => {
+    expect(derivePatternFromFilename('video.mp4')).toBeNull();
+    expect(derivePatternFromFilename('test.MP4')).toBeNull();
+    expect(derivePatternFromFilename('GX123.MP4')).toBeNull();
+  });
+  test('handles prefix whose digits overlap with sessionId', () => {
+    // GX100000: sessionId=0000, prefix must be GX10, not GX1
+    expect(derivePatternFromFilename('GX100000.MP4')).toBe('GX10{sessionId}');
+    // GX000001: sessionId=0001, prefix must be GX00, not GX0
+    expect(derivePatternFromFilename('GX000001.MP4')).toBe('GX00{sessionId}');
   });
 });
 
@@ -202,6 +256,74 @@ describe('analyzeAndGroupVideos', () => {
 
     const result = analyzeAndGroupVideos(filePaths);
     expect(result).toHaveLength(0);
+  });
+
+  test('groups GX format files by session ID (session 0123)', () => {
+    // GX + 2 alphanumeric + 4 digits (session). Clips 01, 02, 03 same session.
+    const filePaths = [
+      '/videos/folder1/GX010123.MP4',
+      '/videos/folder1/GX020123.MP4',
+      '/videos/folder1/GX030123.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0123');
+    expect(result[0].directory).toBe('/videos/folder1');
+    expect(result[0].files).toHaveLength(3);
+    expect(result[0].outputFilename).toBe('PROCESSED0123.MP4');
+  });
+
+  test('groups GXAA format files (user format GXAA0123, GXAA0223)', () => {
+    // GXAA: GX + 2 letters + 4 digits. Each file is a separate session.
+    const filePaths = [
+      '/videos/folder1/GXAA0123.MP4',
+      '/videos/folder1/GXAA0223.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].sessionId).toBe('0123');
+    expect(result[0].files).toHaveLength(1);
+    expect(result[1].sessionId).toBe('0223');
+    expect(result[1].files).toHaveLength(1);
+  });
+
+  test('groups GXAA and GX01 format together when same session', () => {
+    // Both GXAA0001 and GX010001 extract session 0001
+    const filePaths = [
+      '/videos/folder1/GXAA0001.MP4',
+      '/videos/folder1/GX010001.MP4',
+      '/videos/folder1/GX020001.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0001');
+    expect(result[0].files).toHaveLength(3);
+  });
+
+  test('separates sessions by session ID (GX format multi-clip)', () => {
+    // GX010123/GX020123 = session 0123; GX010223/GX020223 = session 0223
+    const filePaths = [
+      '/videos/folder1/GX010123.MP4',
+      '/videos/folder1/GX020123.MP4',
+      '/videos/folder1/GX010223.MP4',
+      '/videos/folder1/GX020223.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(2);
+    const session123 = result.find(g => g.sessionId === '0123');
+    const session223 = result.find(g => g.sessionId === '0223');
+    expect(session123).toBeDefined();
+    expect(session123.files).toHaveLength(2);
+    expect(session223).toBeDefined();
+    expect(session223.files).toHaveLength(2);
   });
 });
 
