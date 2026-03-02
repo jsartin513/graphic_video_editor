@@ -7,6 +7,20 @@ jest.mock('../src/logger', () => ({
   logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
+// Prevent tests from accidentally using real system binaries
+// via findSystemExecutablePath()'s direct path probing.
+jest.mock('fs', () => {
+  const actualFs = jest.requireActual('fs');
+  return {
+    ...actualFs,
+    accessSync: jest.fn(() => {
+      const err = new Error('ENOENT');
+      err.code = 'ENOENT';
+      throw err;
+    })
+  };
+});
+
 const { EventEmitter } = require('events');
 
 const mockSpawn = jest.fn();
