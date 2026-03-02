@@ -116,7 +116,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error setting preferred quality:', error);
+      logger.error('Error setting preferred quality', { error: error.message });
       throw error;
     }
   });
@@ -128,7 +128,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error setting preferred format:', error);
+      logger.error('Error setting preferred format', { error: error.message });
       throw error;
     }
   });
@@ -148,7 +148,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error setting last output destination:', error);
+      logger.error('Error setting last output destination', { error: error.message });
       throw error;
     }
   });
@@ -157,7 +157,7 @@ function registerPreferenceIpcHandlers() {
     try {
       return mapError(errorMessage);
     } catch (error) {
-      console.error('Error mapping error:', error);
+      logger.error('Error mapping error', { error: error?.message });
       return {
         userMessage: 'An Error Occurred',
         suggestion: 'Something went wrong.',
@@ -183,7 +183,7 @@ function registerPreferenceIpcHandlers() {
       });
       return { success: true };
     } catch (error) {
-      console.error('Error installing update:', error);
+      logger.error('Error installing update', { error: error?.message });
       return {
         success: false,
         error: 'Failed to install update. The app will install the update on the next quit.'
@@ -209,7 +209,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error adding recent directory:', error);
+      logger.error('Error adding recent directory', { error: error.message });
       throw error;
     }
   });
@@ -221,7 +221,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error pinning directory:', error);
+      logger.error('Error pinning directory', { error: error.message });
       throw error;
     }
   });
@@ -233,7 +233,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error unpinning directory:', error);
+      logger.error('Error unpinning directory', { error: error.message });
       throw error;
     }
   });
@@ -245,7 +245,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error clearing recent directories:', error);
+      logger.error('Error clearing recent directories', { error: error.message });
       throw error;
     }
   });
@@ -265,7 +265,7 @@ function registerPreferenceIpcHandlers() {
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
-      console.error('Error cleaning up directories:', error);
+      logger.error('Error cleaning up directories', { error: error.message });
       throw error;
     }
   });

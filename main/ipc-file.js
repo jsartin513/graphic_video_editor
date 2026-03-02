@@ -35,7 +35,7 @@ function registerFileIpcHandlers(getMainWindow) {
         const updated = addRecentDirectory(prefs, dirPath);
         await savePreferences(updated);
       } catch (error) {
-        console.error('Error tracking recent directory:', error);
+        logger.warn('Error tracking recent directory', { error: error.message });
       }
     }
 
@@ -60,7 +60,7 @@ function registerFileIpcHandlers(getMainWindow) {
         const updated = addRecentDirectory(prefs, result.filePaths[0]);
         await savePreferences(updated);
       } catch (error) {
-        console.error('Error tracking recent directory:', error);
+        logger.warn('Error tracking recent directory', { error: error.message });
       }
     }
 
@@ -107,7 +107,7 @@ function registerFileIpcHandlers(getMainWindow) {
             const updated = addRecentDirectory(prefs, droppedPath);
             await savePreferences(updated);
           } catch (error) {
-            console.error('Error tracking recent directory:', error);
+            logger.warn('Error tracking recent directory', { error: error.message });
           }
         } else if (stats.isFile()) {
           const ext = path.extname(droppedPath).toLowerCase();
@@ -119,7 +119,7 @@ function registerFileIpcHandlers(getMainWindow) {
               const updated = addRecentDirectory(prefs, dirPath);
               await savePreferences(updated);
             } catch (error) {
-              console.error('Error tracking recent directory:', error);
+              logger.warn('Error tracking recent directory', { error: error.message });
             }
           }
         }
@@ -159,7 +159,7 @@ function registerFileIpcHandlers(getMainWindow) {
             }
           }
         } catch (error) {
-          console.error(`Error scanning directory ${scanDirPath}:`, error);
+          logger.warn('Error scanning directory', { scanDirPath, error: error.message });
         }
       }
 
@@ -167,7 +167,7 @@ function registerFileIpcHandlers(getMainWindow) {
 
       return { success: true, files: videoFiles };
     } catch (error) {
-      console.error('Error opening recent directory:', error);
+      logger.error('Error opening recent directory', { dirPath, error: error.message });
       throw error;
     }
   });
