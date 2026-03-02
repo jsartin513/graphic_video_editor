@@ -1,12 +1,37 @@
+jest.mock('../src/logger', () => ({ logger: { error: jest.fn() } }));
+
+const fs = require('fs').promises;
+const path = require('path');
+
+jest.mock('fs', () => {
+  const actualFs = jest.requireActual('fs');
+  return {
+    ...actualFs,
+    promises: {
+      readFile: jest.fn(),
+      writeFile: jest.fn(),
+      mkdir: jest.fn()
+    }
+  };
+});
+
 const {
   addRecentPattern,
   setPreferredDateFormat,
   formatDate,
   applyDateTokens,
+  sanitizeFailedOperation,
   addFailedOperation,
   removeFailedOperation,
   getFailedOperations,
   clearFailedOperations,
+  loadPreferences,
+  savePreferences,
+  setPreferredQuality,
+  setPreferredFormat,
+  setLastOutputDestination,
+  setAutoDetectSDCards,
+  setShowSDCardNotifications,
   DEFAULT_PREFERENCES
 } = require('../src/preferences');
 
@@ -62,6 +87,112 @@ describe('addRecentPattern', () => {
     
     const result2 = addRecentPattern(prefs, null);
     expect(result2.recentFilenamePatterns).toEqual(['Pattern1']);
+  });
+});
+
+describe('loadPreferences', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('returns merged preferences when file exists', async () => {
+    const stored = { preferredDateFormat: 'MM-DD-YYYY', recentFilenamePatterns: ['P1'] };
+    fs.readFile.mockResolvedValue(JSON.stringify(stored));
+
+    const result = await loadPreferences();
+
+    expect(result.preferredDateFormat).toBe('MM-DD-YYYY');
+    expect(result.recentFilenamePatterns).toEqual(['P1']);
+    expect(result.preferredQuality).toBe('copy'); // from defaults
+  });
+
+  test('returns defaults when file does not exist (ENOENT)', async () => {
+    const err = new Error('not found');
+    err.code = 'ENOENT';
+    fs.readFile.mockRejectedValue(err);
+
+    const result = await loadPreferences();
+
+    expect(result).toEqual({ ...DEFAULT_PREFERENCES });
+  });
+
+  test('returns defaults on parse error', async () => {
+    fs.readFile.mockResolvedValue('invalid json {{{');
+
+    const result = await loadPreferences();
+
+    expect(result).toEqual({ ...DEFAULT_PREFERENCES });
+  });
+});
+
+describe('savePreferences', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fs.mkdir.mockResolvedValue(undefined);
+    fs.writeFile.mockResolvedValue(undefined);
+  });
+
+  test('creates directory and writes preferences', async () => {
+    const prefs = { ...DEFAULT_PREFERENCES, preferredDateFormat: 'YYYY-MM-DD' };
+
+    await savePreferences(prefs);
+
+    expect(fs.mkdir).toHaveBeenCalled();
+    expect(fs.writeFile).toHaveBeenCalled();
+    const [filePath, content] = fs.writeFile.mock.calls[0];
+    expect(JSON.parse(content).preferredDateFormat).toBe('YYYY-MM-DD');
+  });
+
+  test('throws on write error', async () => {
+    fs.writeFile.mockRejectedValue(new Error('write failed'));
+
+    await expect(savePreferences(DEFAULT_PREFERENCES)).rejects.toThrow('write failed');
+  });
+});
+
+describe('setPreferredQuality', () => {
+  test('sets preferred quality', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = setPreferredQuality(prefs, 'high');
+    expect(result.preferredQuality).toBe('high');
+  });
+});
+
+describe('setPreferredFormat', () => {
+  test('sets preferred format', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = setPreferredFormat(prefs, 'mov');
+    expect(result.preferredFormat).toBe('mov');
+  });
+});
+
+describe('setLastOutputDestination', () => {
+  test('sets last output destination', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = setLastOutputDestination(prefs, '/tmp/output');
+    expect(result.lastOutputDestination).toBe('/tmp/output');
+  });
+
+  test('sets null for default destination', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = setLastOutputDestination(prefs, null);
+    expect(result.lastOutputDestination).toBeNull();
+  });
+});
+
+describe('setAutoDetectSDCards', () => {
+  test('sets auto-detect preference', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = setAutoDetectSDCards(prefs, false);
+    expect(result.autoDetectSDCards).toBe(false);
+  });
+});
+
+describe('setShowSDCardNotifications', () => {
+  test('sets show SD card notifications', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const result = setShowSDCardNotifications(prefs, false);
+    expect(result.showSDCardNotifications).toBe(false);
   });
 });
 
@@ -191,6 +322,75 @@ describe('applyDateTokens', () => {
   test('handles null pattern', () => {
     const result = applyDateTokens(null);
     expect(result).toBeNull();
+  });
+});
+
+describe('sanitizeFailedOperation', () => {
+  const validOp = {
+    sessionId: 'session-1',
+    outputPath: '/tmp/out.mp4',
+    files: ['/tmp/a.mp4'],
+    error: 'Merge failed',
+    timestamp: 1000
+  };
+
+  test('returns sanitized operation for valid input', () => {
+    const result = sanitizeFailedOperation(validOp);
+    expect(result.sessionId).toBe('session-1');
+    expect(result.outputPath).toBe('/tmp/out.mp4');
+    expect(result.files).toEqual(['/tmp/a.mp4']);
+    expect(result.error).toBe('Merge failed');
+    expect(result.timestamp).toBe(1000);
+  });
+
+  test('throws for null or non-object', () => {
+    expect(() => sanitizeFailedOperation(null)).toThrow('Invalid failed operation: expected an object.');
+    expect(() => sanitizeFailedOperation(undefined)).toThrow('Invalid failed operation: expected an object.');
+    expect(() => sanitizeFailedOperation('string')).toThrow('Invalid failed operation: expected an object.');
+  });
+
+  test('throws for missing sessionId', () => {
+    expect(() => sanitizeFailedOperation({ outputPath: '/tmp/out.mp4' })).toThrow('Invalid failed operation: missing sessionId.');
+    expect(() => sanitizeFailedOperation({ sessionId: '', outputPath: '/tmp/out.mp4' })).toThrow('Invalid failed operation: missing sessionId.');
+  });
+
+  test('throws for missing outputPath', () => {
+    expect(() => sanitizeFailedOperation({ sessionId: 's1' })).toThrow('Invalid failed operation: missing outputPath.');
+  });
+
+  test('trims and truncates long strings', () => {
+    const long = 'a'.repeat(2000);
+    const result = sanitizeFailedOperation({
+      sessionId: '  s1  ',
+      outputPath: '/path',
+      error: long
+    });
+    expect(result.sessionId).toBe('s1');
+    expect(result.error).toHaveLength(1024);
+  });
+
+  test('filters non-string files and limits count', () => {
+    const files = Array(150).fill('/tmp/a.mp4');
+    const result = sanitizeFailedOperation({ sessionId: 's1', outputPath: '/out', files });
+    expect(result.files).toHaveLength(100);
+  });
+
+  test('uses default timestamp when not provided or invalid', () => {
+    const before = Date.now();
+    const result = sanitizeFailedOperation({ sessionId: 's1', outputPath: '/out' });
+    const after = Date.now();
+    expect(result.timestamp).toBeGreaterThanOrEqual(before);
+    expect(result.timestamp).toBeLessThanOrEqual(after);
+  });
+
+  test('handles empty files array', () => {
+    const result = sanitizeFailedOperation({ sessionId: 's1', outputPath: '/out', files: [] });
+    expect(result.files).toEqual([]);
+  });
+
+  test('handles missing files (defaults to empty array)', () => {
+    const result = sanitizeFailedOperation({ sessionId: 's1', outputPath: '/out' });
+    expect(result.files).toEqual([]);
   });
 });
 

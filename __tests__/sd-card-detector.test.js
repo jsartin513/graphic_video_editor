@@ -204,4 +204,133 @@ describe('SDCardDetector', () => {
       expect(detector.checkInterval).toBeNull();
     });
   });
+
+  describe('scanVolumes', () => {
+    it('should return early when volumes directory does not exist', async () => {
+      fsSync.existsSync.mockReturnValue(false);
+
+      await detector.scanVolumes();
+
+      expect(fs.readdir).not.toHaveBeenCalled();
+    });
+
+    it('should detect new GoPro volume and emit sd-card-detected', async () => {
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockResolvedValueOnce(['GOPRO_SD']); // scanVolumes: list volumes
+      fs.stat.mockResolvedValueOnce({ isDirectory: () => true }); // isGoProSDCard: DCIM exists
+      fs.readdir.mockResolvedValueOnce(['100GOPRO']); // isGoProSDCard: DCIM contents
+
+      const emitted = [];
+      detector.on('sd-card-detected', (ev) => emitted.push(ev));
+
+      await detector.scanVolumes();
+
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].name).toBe('GOPRO_SD');
+      expect(emitted[0].path).toBe(path.join('/Volumes', 'GOPRO_SD'));
+      expect(emitted[0].dcimPath).toBe(path.join('/Volumes', 'GOPRO_SD', 'DCIM'));
+    });
+
+    it('should remove unmounted volume and emit sd-card-removed', async () => {
+      detector.knownVolumes.add('OLD_VOL');
+      detector.knownGoProVolumes.add('OLD_VOL');
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockResolvedValue([]); // no volumes mounted
+
+      const emitted = [];
+      detector.on('sd-card-removed', (ev) => emitted.push(ev));
+
+      await detector.scanVolumes();
+
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].name).toBe('OLD_VOL');
+      expect(detector.knownVolumes.has('OLD_VOL')).toBe(false);
+      expect(detector.knownGoProVolumes.has('OLD_VOL')).toBe(false);
+    });
+
+    it('should skip excluded volumes', async () => {
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockResolvedValueOnce(['Macintosh HD', 'GOPRO_SD']); // scanVolumes
+      fs.stat.mockResolvedValueOnce({ isDirectory: () => true }); // GOPRO_SD DCIM exists
+      fs.readdir.mockResolvedValueOnce(['100GOPRO']); // GOPRO_SD DCIM contents
+
+      const emitted = [];
+      detector.on('sd-card-detected', (ev) => emitted.push(ev));
+
+      await detector.scanVolumes();
+
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].name).toBe('GOPRO_SD');
+    });
+
+    it('should return early when already scanning', async () => {
+      detector.isScanning = true;
+      fsSync.existsSync.mockReturnValue(true);
+
+      await detector.scanVolumes();
+
+      expect(fs.readdir).not.toHaveBeenCalled();
+    });
+
+    it('should handle scan errors gracefully', async () => {
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockRejectedValue(new Error('permission denied'));
+
+      await expect(detector.scanVolumes()).resolves.not.toThrow();
+      expect(detector.isScanning).toBe(false);
+    });
+  });
+
+  describe('getGoProSDCards', () => {
+    it('should return empty array when volumes path does not exist', async () => {
+      fsSync.existsSync.mockReturnValue(false);
+
+      const result = await detector.getGoProSDCards();
+
+      expect(result).toEqual([]);
+      expect(fs.readdir).not.toHaveBeenCalled();
+    });
+
+    it('should return GoPro SD cards', async () => {
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockResolvedValueOnce(['GOPRO_SD', 'Macintosh HD']); // getGoProSDCards
+      fs.stat.mockResolvedValueOnce({ isDirectory: () => true }); // GOPRO_SD DCIM exists
+      fs.readdir.mockResolvedValueOnce(['100GOPRO']); // GOPRO_SD DCIM contents
+
+      const result = await detector.getGoProSDCards();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('GOPRO_SD');
+      expect(result[0].path).toBe(path.join('/Volumes', 'GOPRO_SD'));
+      expect(result[0].dcimPath).toBe(path.join('/Volumes', 'GOPRO_SD', 'DCIM'));
+    });
+
+    it('should skip excluded volumes', async () => {
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockResolvedValue(['Macintosh HD']);
+
+      const result = await detector.getGoProSDCards();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      fsSync.existsSync.mockReturnValue(true);
+      fs.readdir.mockRejectedValue(new Error('read failed'));
+
+      const result = await detector.getGoProSDCards();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('isGoProSDCard error handling', () => {
+    it('should return false on error', async () => {
+      fs.stat.mockRejectedValue(new Error('unexpected'));
+
+      const result = await detector.isGoProSDCard('/Volumes/TEST');
+
+      expect(result).toBe(false);
+    });
+  });
 });

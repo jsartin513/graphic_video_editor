@@ -2,20 +2,20 @@ const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron')
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { formatFileSize } = require('./src/main-utils');
 
 // Import logger
 const { logger } = require('./src/logger');
 
+// Import video scanner
+const { scanDirectoryForVideos, VIDEO_EXTENSIONS } = require('./src/video-scanner');
+
 let mainWindow;
-let ffmpegPath = null;
-let ffprobePath = null;
 let sdCardDetector = null;
 
-// Supported video extensions
-const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.MP4', '.MOV', '.AVI', '.MKV', '.M4V'];
+const { getFFmpegPath, getFFprobePath, checkFFmpeg } = require('./src/ffmpeg-resolver');
 
 // Process tracking for cancellation
 let currentMergeProcess = null;
@@ -27,32 +27,14 @@ let isCancelled = false;
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
 
-// Quality option constants
-const QUALITY_COPY = 'copy';
-const QUALITY_HIGH = 'high';
-const QUALITY_MEDIUM = 'medium';
-const QUALITY_LOW = 'low';
-
-// Video quality settings for encoding
-const QUALITY_SETTINGS = {
-  [QUALITY_HIGH]: { crf: '18', preset: 'slow' },
-  [QUALITY_MEDIUM]: { crf: '23', preset: 'medium' },
-  [QUALITY_LOW]: { crf: '28', preset: 'fast' }
-};
-
-// Valid quality options (including 'copy' which doesn't use QUALITY_SETTINGS)
-const VALID_QUALITY_OPTIONS = [QUALITY_COPY, QUALITY_HIGH, QUALITY_MEDIUM, QUALITY_LOW];
-
-/**
- * Validates that the quality option is one of the allowed values
- * @param {string} qualityOption - The quality option to validate
- * @throws {Error} If the quality option is not valid
- */
-function validateQualityOption(qualityOption) {
-  if (!VALID_QUALITY_OPTIONS.includes(qualityOption)) {
-    throw new Error(`Invalid quality option: ${qualityOption}. Must be one of: ${VALID_QUALITY_OPTIONS.join(', ')}`);
-  }
-}
+const {
+  QUALITY_COPY,
+  QUALITY_HIGH,
+  QUALITY_MEDIUM,
+  QUALITY_LOW,
+  QUALITY_SETTINGS,
+  validateQualityOption
+} = require('./src/quality-utils');
 
 // Set app icon for development (will be overridden by electron-builder in production)
 function setupAppIcon() {
@@ -246,33 +228,9 @@ ipcMain.handle('select-folder', async () => {
     }
   }
 
-  // Recursively find all video files in the folder
-  const videoFiles = [];
-
-  async function scanDirectory(dirPath) {
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        
-        if (entry.isDirectory()) {
-          await scanDirectory(fullPath);
-        } else if (entry.isFile()) {
-          const ext = path.extname(entry.name);
-          if (VIDEO_EXTENSIONS.includes(ext)) {
-            videoFiles.push(fullPath);
-          }
-        }
-      }
-    } catch (error) {
-      logger.error('Error scanning directory', { dirPath, error: error.message });
-    }
-  }
-
-  if (result.filePaths.length > 0) {
-    await scanDirectory(result.filePaths[0]);
-  }
+  const videoFiles = result.filePaths.length > 0
+    ? await scanDirectoryForVideos(result.filePaths[0])
+    : [];
 
   return { canceled: false, files: videoFiles };
 });
@@ -302,32 +260,12 @@ ipcMain.handle('get-file-metadata', async (event, filePath) => {
 ipcMain.handle('process-dropped-paths', async (event, paths) => {
   const videoFiles = [];
 
-  async function scanDirectory(dirPath) {
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        
-        if (entry.isDirectory()) {
-          await scanDirectory(fullPath);
-        } else if (entry.isFile()) {
-          const ext = path.extname(entry.name);
-          if (VIDEO_EXTENSIONS.includes(ext)) {
-            videoFiles.push(fullPath);
-          }
-        }
-      }
-    } catch (error) {
-      logger.error('Error scanning directory for dropped paths', { dirPath, error: error.message });
-    }
-  }
-
   for (const droppedPath of paths) {
     try {
       const stats = await fs.stat(droppedPath);
       if (stats.isDirectory()) {
-        await scanDirectory(droppedPath);
+        const files = await scanDirectoryForVideos(droppedPath);
+        videoFiles.push(...files);
         // Track dropped directory
         try {
           const prefs = await loadPreferences();
@@ -380,6 +318,7 @@ const {
   setPreferredQuality,
   setPreferredFormat,
   setLastOutputDestination,
+  sanitizeFailedOperation,
   addFailedOperation,
   removeFailedOperation,
   getFailedOperations,
@@ -1344,374 +1283,6 @@ ipcMain.handle('get-test-videos-path', async () => {
   }
 });
 
-// Get the path to bundled ffmpeg/ffprobe binaries
-function getBundledBinaryPath(binaryName) {
-  try {
-    if (app.isPackaged) {
-      // Packaged app: binaries are under <app>.app/Contents/Resources/resources/
-      // Use process.resourcesPath which is set by Electron
-      let resourcesPath = process.resourcesPath;
-      
-      // Fallback if process.resourcesPath is not set
-      if (!resourcesPath) {
-        try {
-          resourcesPath = app.getPath('resources');
-        } catch (e) {
-          try {
-            const exePath = app.getPath('exe');
-            resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
-          } catch (exeError) {
-            logger.error('getBundledBinaryPath: Error getting resources path', { 
-              resourcesPathError: e.message, 
-              exePathError: exeError.message 
-            });
-            resourcesPath = path.join(__dirname, '..');
-          }
-        }
-      }
-      
-      const binaryPath = path.join(resourcesPath, 'resources', binaryName);
-      
-      logger.debug('getBundledBinaryPath: Looking for binary', { 
-        binaryName, 
-        binaryPath, 
-        resourcesPath,
-        processResourcesPath: process.resourcesPath || 'undefined'
-      });
-      
-      // Check if the binary exists
-      if (fsSync.existsSync(binaryPath)) {
-        // Make sure it's executable
-        try {
-          fsSync.chmodSync(binaryPath, 0o755);
-          const stats = fsSync.statSync(binaryPath);
-          logger.info('getBundledBinaryPath: Found binary', { binaryName, binaryPath, size: stats.size });
-          return binaryPath;
-        } catch (e) {
-          logger.warn('getBundledBinaryPath: Failed to set executable permissions', { binaryPath, error: e.message });
-          // Still return the path even if chmod fails
-          return binaryPath;
-        }
-      } else {
-        logger.debug('getBundledBinaryPath: Binary not found at expected path', { 
-          binaryName, 
-          binaryPath,
-          resourcesDirExists: fsSync.existsSync(resourcesPath)
-        });
-        
-        if (fsSync.existsSync(resourcesPath)) {
-          const contents = fsSync.readdirSync(resourcesPath);
-          logger.debug('getBundledBinaryPath: Resources directory contents', { contents });
-          
-          // Check if 'resources' subdirectory exists
-          const resourcesSubdir = path.join(resourcesPath, 'resources');
-          if (fsSync.existsSync(resourcesSubdir)) {
-            const subdirContents = fsSync.readdirSync(resourcesSubdir);
-            logger.debug('getBundledBinaryPath: Resources subdirectory contents', { subdirContents });
-          }
-        }
-        
-        // Try alternative locations for debugging
-        const altPaths = [
-          path.join(resourcesPath, binaryName), // Direct in Resources
-          process.resourcesPath ? path.join(process.resourcesPath, 'resources', binaryName) : null, // Using process.resourcesPath
-        ];
-        // Try app.getPath('resources') if available
-        try {
-          altPaths.push(path.join(app.getPath('resources'), 'resources', binaryName));
-        } catch (e) {
-          // app.getPath('resources') not available, skip
-        }
-        const validAltPaths = altPaths.filter(p => p !== null);
-        
-        for (const altPath of validAltPaths) {
-          if (fsSync.existsSync(altPath)) {
-            logger.info('getBundledBinaryPath: Found binary at alternative location', { binaryName, altPath });
-            try {
-              fsSync.chmodSync(altPath, 0o755);
-            } catch (e) {
-              logger.warn('getBundledBinaryPath: Failed to chmod alternative path', { altPath, error: e.message });
-            }
-            return altPath;
-          }
-        }
-        logger.warn('getBundledBinaryPath: Binary not found in any location', { binaryName });
-        return null;
-      }
-    } else {
-      // Development: use the packages directly
-      try {
-        if (binaryName === 'ffmpeg') {
-          return require('ffmpeg-static');
-        } else if (binaryName === 'ffprobe') {
-          const ffprobeStatic = require('ffprobe-static');
-          // Handle both cases: path as string or object with .path property
-          return ffprobeStatic.path || ffprobeStatic;
-        }
-      } catch (e) {
-        // Packages not installed or not found
-        return null;
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    logger.error('Error getting bundled binary', { binaryName, error: error.message });
-    return null;
-  }
-}
-
-// Find the actual path to ffmpeg/ffprobe (system install)
-function findSystemExecutablePath(command) {
-  try {
-    // Common Homebrew paths
-    const commonPaths = [
-      '/opt/homebrew/bin',  // Apple Silicon
-      '/usr/local/bin',      // Intel Mac
-      '/usr/bin',
-      '/bin'
-    ];
-    
-    // First try using which with proper environment
-    try {
-      const envPath = process.env.PATH || '';
-      const fullPath = [envPath, ...commonPaths].filter(p => p).join(':');
-      const result = execSync(`which ${command}`, { 
-        encoding: 'utf8',
-        env: { ...process.env, PATH: fullPath },
-        shell: '/bin/bash'
-      }).trim();
-      if (result && result.length > 0) {
-        return result;
-      }
-    } catch (e) {
-      // which failed, try direct paths
-    }
-    
-    // Fallback: check common paths directly
-    for (const basePath of commonPaths) {
-      const fullCommandPath = path.join(basePath, command);
-      try {
-        fsSync.accessSync(fullCommandPath, fsSync.constants.F_OK);
-        return fullCommandPath;
-      } catch (e) {
-        // File doesn't exist, continue
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    return null;
-  }
-}
-
-// Get the path to ffmpeg/ffprobe, checking bundled first, then system
-function getFFmpegPath() {
-  if (ffmpegPath) return ffmpegPath;
-  
-  // First try bundled binary
-  const bundled = getBundledBinaryPath('ffmpeg');
-  if (bundled) {
-    ffmpegPath = bundled;
-    return ffmpegPath;
-  }
-  
-  // Fall back to system binary
-  ffmpegPath = findSystemExecutablePath('ffmpeg') || 'ffmpeg';
-  return ffmpegPath;
-}
-
-function getFFprobePath() {
-  if (ffprobePath) return ffprobePath;
-  
-  // First try bundled binary
-  const bundled = getBundledBinaryPath('ffprobe');
-  if (bundled) {
-    ffprobePath = bundled;
-    return ffprobePath;
-  }
-  
-  // Fall back to system binary
-  ffprobePath = findSystemExecutablePath('ffprobe') || 'ffprobe';
-  return ffprobePath;
-}
-
-async function checkFFmpeg() {
-  return new Promise((resolve) => {
-    // Check bundled binaries first
-    const bundledFFmpeg = getBundledBinaryPath('ffmpeg');
-    const bundledFFprobe = getBundledBinaryPath('ffprobe');
-    
-    logger.debug('checkFFmpeg: Bundled binaries', { bundledFFmpeg, bundledFFprobe });
-    
-    // Then check system binaries
-    const foundFFmpegPath = bundledFFmpeg || findSystemExecutablePath('ffmpeg');
-    const foundFFprobePath = bundledFFprobe || findSystemExecutablePath('ffprobe');
-    
-    logger.debug('checkFFmpeg: Found binaries', { foundFFmpegPath, foundFFprobePath });
-    
-    ffmpegPath = foundFFmpegPath;
-    ffprobePath = foundFFprobePath;
-    
-    let ffmpegFound = false;
-    let ffprobeFound = false;
-    let brewFound = false;
-    let ffmpegVersion = null;
-    let checksDone = 0;
-    let versionCheckDone = false;
-    
-    function checkComplete() {
-      checksDone++;
-      if (checksDone === 3 && versionCheckDone) {
-        logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
-        resolve({
-          installed: ffmpegFound && ffprobeFound,
-          ffmpegFound,
-          ffprobeFound,
-          brewFound,
-          ffmpegVersion
-        });
-      }
-    }
-    
-    // If we have bundled binaries, test them directly instead of using 'which'
-    if (bundledFFmpeg && bundledFFprobe) {
-      logger.debug('checkFFmpeg: Testing bundled binaries directly');
-      // Test bundled ffmpeg
-      try {
-        const testFFmpeg = spawn(bundledFFmpeg, ['-version'], { timeout: 5000 });
-        let ffmpegOutput = '';
-        testFFmpeg.stdout.on('data', (data) => {
-          ffmpegOutput += data.toString();
-        });
-        testFFmpeg.on('close', (code) => {
-          ffmpegFound = code === 0;
-          if (ffmpegFound) {
-            const match = ffmpegOutput.match(/ffmpeg version (\S+)/);
-            if (match) {
-              ffmpegVersion = match[1];
-            }
-          } else {
-            logger.debug('checkFFmpeg: Bundled ffmpeg test failed', { code });
-          }
-          
-          // Test bundled ffprobe
-          try {
-            const testFFprobe = spawn(bundledFFprobe, ['-version'], { timeout: 5000 });
-            testFFprobe.on('close', (code) => {
-              ffprobeFound = code === 0;
-              if (!ffprobeFound) {
-                logger.debug('checkFFmpeg: Bundled ffprobe test failed', { code });
-              }
-              
-              // Check for brew (still needed for install message)
-              const brewCheck = spawn('which', ['brew'], { 
-                shell: true,
-                env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-              });
-              brewCheck.on('close', (code) => {
-                brewFound = code === 0;
-                versionCheckDone = true;
-                checkComplete();
-              });
-              brewCheck.on('error', () => {
-                versionCheckDone = true;
-                checkComplete();
-              });
-            });
-            testFFprobe.on('error', (err) => {
-              logger.error('checkFFmpeg: Error testing bundled ffprobe', { error: err.message });
-              ffprobeFound = false;
-              versionCheckDone = true;
-              checkComplete();
-            });
-          } catch (err) {
-            logger.error('checkFFmpeg: Error spawning bundled ffprobe test', { error: err.message });
-            ffprobeFound = false;
-            versionCheckDone = true;
-            checkComplete();
-          }
-        });
-        testFFmpeg.on('error', (err) => {
-          logger.error('checkFFmpeg: Error testing bundled ffmpeg', { error: err.message });
-          ffmpegFound = false;
-          versionCheckDone = true;
-          checkComplete();
-        });
-      } catch (err) {
-        logger.error('checkFFmpeg: Error spawning bundled ffmpeg test', { error: err.message });
-        ffmpegFound = false;
-        versionCheckDone = true;
-        checkComplete();
-      }
-      return; // Exit early, we're testing bundled binaries
-    }
-    
-    // Fallback to system check (only if no bundled binaries)
-    // Check ffmpeg
-    const ffmpegCheck = spawn('which', ['ffmpeg'], { 
-      shell: true,
-      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-    });
-    ffmpegCheck.on('close', (code) => {
-      ffmpegFound = code === 0 || foundFFmpegPath !== null;
-      if (ffmpegFound && foundFFmpegPath) {
-        // Get version using found path
-        const versionCheck = spawn(foundFFmpegPath, ['-version']);
-        let output = '';
-        versionCheck.stdout.on('data', (data) => {
-          output += data.toString();
-        });
-        versionCheck.on('close', () => {
-          const match = output.match(/ffmpeg version (\S+)/);
-          if (match) {
-            ffmpegVersion = match[1];
-          }
-          versionCheckDone = true;
-          checkComplete();
-        });
-        versionCheck.on('error', () => {
-          versionCheckDone = true;
-          checkComplete();
-        });
-      } else {
-        versionCheckDone = true;
-        checkComplete();
-      }
-    });
-    ffmpegCheck.on('error', () => {
-      versionCheckDone = true;
-      checkComplete();
-    });
-    
-    // Check ffprobe
-    const ffprobeCheck = spawn('which', ['ffprobe'], { 
-      shell: true,
-      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-    });
-    ffprobeCheck.on('close', (code) => {
-      ffprobeFound = code === 0 || foundFFprobePath !== null;
-      checkComplete();
-    });
-    ffprobeCheck.on('error', () => {
-      checkComplete();
-    });
-    
-    // Check brew
-    const brewCheck = spawn('which', ['brew'], { 
-      shell: true,
-      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-    });
-    brewCheck.on('close', (code) => {
-      brewFound = code === 0;
-      checkComplete();
-    });
-    brewCheck.on('error', () => {
-      checkComplete();
-    });
-  });
-}
-
 // Install prerequisites
 ipcMain.handle('install-prerequisites', async () => {
   return new Promise((resolve, reject) => {
@@ -2367,61 +1938,6 @@ ipcMain.handle('set-auto-detect-sd-cards', async (event, enabled) => {
     throw error;
   }
 });
-
-// Add a failed operation for recovery
-function sanitizeFailedOperation(operation) {
-  const MAX_STRING_LENGTH = 1024;
-  const MAX_FILES = 100;
-  const MAX_SERIALIZED_LENGTH = 10 * 1024; // 10 KB
-
-  if (!operation || typeof operation !== 'object') {
-    throw new Error('Invalid failed operation: expected an object.');
-  }
-
-  const sanitized = {};
-
-  if (typeof operation.sessionId === 'string') {
-    sanitized.sessionId = operation.sessionId.trim().slice(0, MAX_STRING_LENGTH);
-  }
-  if (!sanitized.sessionId) {
-    throw new Error('Invalid failed operation: missing sessionId.');
-  }
-
-  if (typeof operation.outputPath === 'string') {
-    sanitized.outputPath = operation.outputPath.trim().slice(0, MAX_STRING_LENGTH);
-  }
-  if (!sanitized.outputPath) {
-    throw new Error('Invalid failed operation: missing outputPath.');
-  }
-
-  if (Array.isArray(operation.files)) {
-    sanitized.files = operation.files
-      .filter(f => typeof f === 'string')
-      .slice(0, MAX_FILES)
-      .map(f => f.slice(0, MAX_STRING_LENGTH));
-  } else {
-    sanitized.files = [];
-  }
-
-  if (typeof operation.timestamp === 'number' && Number.isFinite(operation.timestamp)) {
-    sanitized.timestamp = operation.timestamp;
-  } else {
-    sanitized.timestamp = Date.now();
-  }
-
-  if (typeof operation.error === 'string') {
-    sanitized.error = operation.error.slice(0, MAX_STRING_LENGTH);
-  } else {
-    sanitized.error = '';
-  }
-
-  const serialized = JSON.stringify(sanitized);
-  if (serialized.length > MAX_SERIALIZED_LENGTH) {
-    throw new Error('Failed operation too large to store.');
-  }
-
-  return sanitized;
-}
 
 ipcMain.handle('add-failed-operation', async (event, operation) => {
   try {
