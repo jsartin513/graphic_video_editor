@@ -1,4 +1,8 @@
 // Utility functions
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { formatBytes } = require('../src/format-utils');
+export { formatBytes };
 
 export function getFileName(filePath) {
   const parts = filePath.split(/[/\\]/);

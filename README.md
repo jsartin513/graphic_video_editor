@@ -15,6 +15,7 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - **SD card notifications** - Get notified when a GoPro SD card is detected with quick actions
 - View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
+- **Automatic updates** - get notified when new versions are available and install them with one click
 - **Recent folders** - Quick access to recently used directories
 - **Pin favorites** - Pin frequently used folders for instant access
 - **Smart filename preferences** - Remember and suggest filename patterns
@@ -67,6 +68,17 @@ npm start
 - AVI
 - MKV
 - M4V
+
+## Auto-Updates
+
+The app includes automatic update checking and installation:
+
+- **Automatic Check**: On startup, the app checks for new versions from the GitHub releases
+- **Update Notification**: When an update is available, a notification appears at the top of the window
+- **Easy Installation**: Download and install updates with a single click
+- **Flexible Options**: Choose to install immediately or on next app quit
+
+Updates are only checked in production builds (installed apps). Development builds skip the update check.
 
 ## Project Structure
 

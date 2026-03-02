@@ -94,6 +94,7 @@ jobs:
           path: |
             dist/*x64*fat*.dmg
             dist/*x64*fat*.zip
+            dist/latest-mac.yml
           if-no-files-found: error
           retention-days: 30
 
@@ -139,6 +140,7 @@ jobs:
           path: |
             dist/*x64*lite*.dmg
             dist/*x64*lite*.zip
+            dist/latest-mac.yml
           if-no-files-found: error
           retention-days: 30
 
@@ -204,6 +206,7 @@ jobs:
           path: |
             dist/*arm64*fat*.dmg
             dist/*arm64*fat*.zip
+            dist/latest-mac.yml
           retention-days: 30
 
   build-arm64-lite:
@@ -250,6 +253,7 @@ jobs:
           path: |
             dist/*arm64*lite*.dmg
             dist/*arm64*lite*.zip
+            dist/latest-mac.yml
           retention-days: 30
           if-no-files-found: error
 
@@ -333,6 +337,7 @@ jobs:
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.zip
+            artifacts/**/latest-mac.yml
           draft: false
           prerelease: ${{ steps.release.outputs.prerelease }}
           fail_on_unmatched_files: false  # Don't fail if some files are missing

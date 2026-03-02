@@ -46,6 +46,13 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
   isValidExecutable(ffmpegPath) &&
   isValidExecutable(ffprobePath);
 
+// Configure publish for auto-updates (generates latest-mac.yml when PUBLISH_TO_GITHUB=true)
+const publishConfig = process.env.PUBLISH_TO_GITHUB === 'true' ? {
+  provider: "github",
+  owner: "jsartin513",
+  repo: "graphic_video_editor"
+} : null;
+
 // Try multiple possible icon paths
 const iconPaths = [
   path.join(__dirname, 'build', 'icon.icns'),  // Standard location
@@ -67,7 +74,7 @@ if (!iconPath) {
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
-  publish: null,
+  publish: publishConfig,
   mac: {
     category: "public.app-category.video",
     ...(iconPath && { icon: iconPath }), // Only set icon property if iconPath exists
@@ -82,7 +89,9 @@ const baseConfig = {
     "main.js",
     "preload.js",
     "renderer/**/*",
-    "package.json"
+    "src/**/*",
+    "package.json",
+    "node_modules/electron-updater/**/*"
   ],
   directories: {
     buildResources: "build",

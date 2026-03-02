@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
+const { autoUpdater } = require('electron-updater');
 const { formatFileSize } = require('./src/main-utils');
 
 // Import logger
@@ -67,6 +68,10 @@ function setupAppIcon() {
   }
 }
 
+// Configure auto-updater
+autoUpdater.autoDownload = false; // Don't auto-download, ask user first
+autoUpdater.autoInstallOnAppQuit = true;
+
 function createWindow() {
   // Set window icon if available
   let windowIcon = null;
@@ -102,25 +107,42 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  if (mainWindow) mainWindow.webContents.send('update-checking');
+});
+autoUpdater.on('update-available', (info) => {
+  if (mainWindow) {
+    const packageJson = require('./package.json');
+    mainWindow.webContents.send('update-available', { ...info, currentVersion: packageJson.version || '1.0.0' });
+  }
+});
+autoUpdater.on('update-not-available', (info) => {
+  if (mainWindow) mainWindow.webContents.send('update-not-available', info);
+});
+autoUpdater.on('error', (err) => {
+  if (mainWindow) mainWindow.webContents.send('update-error', err.message);
+});
+autoUpdater.on('download-progress', (progressObj) => {
+  if (mainWindow) mainWindow.webContents.send('update-download-progress', progressObj);
+});
+autoUpdater.on('update-downloaded', (info) => {
+  if (mainWindow) {
+    const packageJson = require('./package.json');
+    mainWindow.webContents.send('update-downloaded', { ...info, currentVersion: packageJson.version || '1.0.0' });
+  }
+});
+
 app.whenReady().then(async () => {
-  // Initialize logger
   await logger.initialize();
-  
-  // Load preferences and set debug mode
   try {
     const prefs = await loadPreferences();
-    if (prefs.debugMode) {
-      logger.setDebugMode(true);
-    }
+    if (prefs.debugMode) logger.setDebugMode(true);
   } catch (error) {
     logger.error('Failed to load preferences for logger', { error: error.message });
   }
-  
   logger.info('Application started');
-  
-  // Set up app icon (for development - production uses electron-builder config)
   setupAppIcon();
-  
   createWindow();
   
   // Check prerequisites after window is ready
@@ -128,7 +150,13 @@ app.whenReady().then(async () => {
     checkPrerequisites();
   }, 500);
 
-  // Initialize SD card detection
+  if (app.isPackaged) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch(err => {
+        logger.error('Failed to check for updates', { error: err.message });
+      });
+    }, 3000);
+  }
   await initializeSDCardDetection();
 
   app.on('activate', () => {
@@ -1756,6 +1784,47 @@ ipcMain.handle('install-prerequisites', async () => {
   });
 });
 
+// Auto-update IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) {
+    return { available: false, message: 'Updates are only available in production builds' };
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { available: result && result.updateInfo, updateInfo: result ? result.updateInfo : null };
+  } catch (error) {
+    const errorMessage = error.message || String(error);
+    let userMessage = 'Failed to check for updates.';
+    if (errorMessage.includes('network') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
+      userMessage = 'Cannot check for updates. Please check your internet connection.';
+    } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+      userMessage = 'Update server not found. This may be a new release.';
+    }
+    return { available: false, error: true, message: userMessage };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  if (!app.isPackaged) {
+    return { success: false, error: 'Updates can only be downloaded in production builds' };
+  }
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error.message || String(error);
+    let userMessage = 'Failed to download update.';
+    if (errorMessage.includes('network') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
+      userMessage = 'Download failed. Please check your internet connection and try again.';
+    } else if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+      userMessage = 'Update file not found. Please try again later.';
+    } else if (errorMessage.includes('space') || errorMessage.includes('ENOSPC')) {
+      userMessage = 'Not enough disk space to download the update.';
+    }
+    return { success: false, error: userMessage };
+  }
+});
+
 // Preferences IPC handlers
 
 // Load user preferences
@@ -1910,6 +1979,30 @@ ipcMain.handle('map-error', async (event, errorMessage) => {
       code: 'MAPPING_ERROR',
       technicalDetails: errorMessage,
       originalError: error
+    };
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  if (!app.isPackaged) {
+    return { 
+      success: false, 
+      error: 'Updates can only be installed in production builds' 
+    };
+  }
+  
+  try {
+    // Note: quitAndInstall will quit the app, so code after this won't execute
+    // But we wrap it for consistency and in case the behavior changes
+    setImmediate(() => {
+      autoUpdater.quitAndInstall(false, true);
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error installing update:', error);
+    return {
+      success: false,
+      error: 'Failed to install update. The app will install the update on the next quit.'
     };
   }
 });

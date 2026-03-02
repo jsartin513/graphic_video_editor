@@ -10,6 +10,7 @@ import { initializeFailedOperations } from './failedOperations.js';
 import { initializeRecentDirectories } from './recentDirectories.js';
 import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
+import { initUpdateNotifications } from './updateNotification.js';
 
 // Shared application state
 const state = {
@@ -200,6 +201,9 @@ const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
 
 // Update keyboard shortcut hints to show platform-specific shortcuts
 updateShortcutHints();
+
+// Initialize update notifications
+initUpdateNotifications();
 
 // Make state accessible for debugging
 window.appState = state;

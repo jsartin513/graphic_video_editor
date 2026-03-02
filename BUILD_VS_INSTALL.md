@@ -106,3 +106,4 @@ brew install ffmpeg  # Requires Homebrew and command-line access
 
 That's why **fat builds are recommended** for distribution - users don't need anything else!
 
+

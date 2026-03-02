@@ -96,3 +96,4 @@ npm install ffmpeg-static ffprobe-static
 - Check that `electron-builder.config.js` exists
 - Verify it exports a valid config object
 
+
