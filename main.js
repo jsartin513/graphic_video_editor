@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -6,10 +6,7 @@ const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { formatFileSize } = require('./src/main-utils');
 
-// Import logger
 const { logger } = require('./src/logger');
-
-// Import video scanner
 const { scanDirectoryForVideos, VIDEO_EXTENSIONS } = require('./src/video-scanner');
 
 let mainWindow;
@@ -126,6 +123,9 @@ app.whenReady().then(async () => {
   logger.info('Application started');
   setupAppIcon();
   createWindow();
+
+  registerFileIpcHandlers(() => mainWindow);
+  registerPreferenceIpcHandlers();
   
   // Check prerequisites after window is ready
   setTimeout(() => {
@@ -176,157 +176,25 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Handle file selection dialog
-ipcMain.handle('select-files', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: 'Video Files', extensions: ['mp4', 'mov', 'avi', 'mkv', 'm4v', 'MP4', 'MOV', 'AVI', 'MKV', 'M4V'] },
-      { name: 'All Files', extensions: ['*'] }
-    ],
-    title: 'Select Video Files'
-  });
+// file IPC handlers moved to main/ipc-file.js
 
-  if (result.canceled) {
-    return { canceled: true, files: [] };
-  }
-
-  // Track directory of first selected file
-  if (result.filePaths.length > 0) {
-    const dirPath = path.dirname(result.filePaths[0]);
-    try {
-      const prefs = await loadPreferences();
-      const updated = addRecentDirectory(prefs, dirPath);
-      await savePreferences(updated);
-    } catch (error) {
-      console.error('Error tracking recent directory:', error);
-    }
-  }
-
-  return { canceled: false, files: result.filePaths };
-});
-
-// Handle folder selection dialog
-ipcMain.handle('select-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory'],
-    title: 'Select Folder with Video Files'
-  });
-
-  if (result.canceled) {
-    return { canceled: true, files: [] };
-  }
-
-  // Track selected folder
-  if (result.filePaths.length > 0) {
-    try {
-      const prefs = await loadPreferences();
-      const updated = addRecentDirectory(prefs, result.filePaths[0]);
-      await savePreferences(updated);
-    } catch (error) {
-      console.error('Error tracking recent directory:', error);
-    }
-  }
-
-  const videoFiles = result.filePaths.length > 0
-    ? await scanDirectoryForVideos(result.filePaths[0])
-    : [];
-
-  return { canceled: false, files: videoFiles };
-});
-
-// Handle getting file metadata
-ipcMain.handle('get-file-metadata', async (event, filePath) => {
-  // Validate filePath before processing
-  if (!filePath || typeof filePath !== 'string') {
-    logger.error('Error getting file metadata: invalid filePath', { type: typeof filePath });
-    return null;
-  }
-  
-  try {
-    const stats = await fs.stat(filePath);
-    return {
-      size: stats.size,
-      sizeFormatted: formatFileSize(stats.size),
-      modified: stats.mtime
-    };
-  } catch (error) {
-    logger.error('Error getting file metadata', { filePath, error: error.message });
-    return null;
-  }
-});
-
-// Handle processing dropped files/folders
-ipcMain.handle('process-dropped-paths', async (event, paths) => {
-  const videoFiles = [];
-
-  for (const droppedPath of paths) {
-    try {
-      const stats = await fs.stat(droppedPath);
-      if (stats.isDirectory()) {
-        const files = await scanDirectoryForVideos(droppedPath);
-        videoFiles.push(...files);
-        // Track dropped directory
-        try {
-          const prefs = await loadPreferences();
-          const updated = addRecentDirectory(prefs, droppedPath);
-          await savePreferences(updated);
-        } catch (error) {
-          console.error('Error tracking recent directory:', error);
-        }
-      } else if (stats.isFile()) {
-        const ext = path.extname(droppedPath);
-        if (VIDEO_EXTENSIONS.includes(ext)) {
-          videoFiles.push(droppedPath);
-          // Track directory of dropped file
-          const dirPath = path.dirname(droppedPath);
-          try {
-            const prefs = await loadPreferences();
-            const updated = addRecentDirectory(prefs, dirPath);
-            await savePreferences(updated);
-          } catch (error) {
-            console.error('Error tracking recent directory:', error);
-          }
-        }
-      }
-    } catch (error) {
-      logger.error('Error processing dropped path', { droppedPath, error: error.message });
-    }
-  }
-
-  return videoFiles;
-});
-
-// Import video grouping functions
-const { analyzeAndGroupVideos, derivePatternFromFilename } = require('./src/video-grouping');
-
-// Import preferences module
+const { analyzeAndGroupVideos } = require('./src/video-grouping');
 const {
   loadPreferences,
   savePreferences,
-  addRecentPattern,
-  setPreferredDateFormat,
-  applyDateTokens,
-  addRecentDirectory,
-  pinDirectory,
-  unpinDirectory,
-  clearRecentDirectories,
-  cleanupDirectories,
   addSDCardPath,
   setAutoDetectSDCards,
   setShowSDCardNotifications,
-  setPreferredQuality,
-  setPreferredFormat,
-  setLastOutputDestination,
   sanitizeFailedOperation,
   addFailedOperation,
   removeFailedOperation,
   getFailedOperations,
   clearFailedOperations
 } = require('./src/preferences');
-
-// Import error mapper module
 const { mapError } = require('./src/error-mapper');
+
+const { registerFileIpcHandlers } = require('./main/ipc-file');
+const { registerPreferenceIpcHandlers } = require('./main/ipc-preferences');
 
 // Import SD Card Detector
 const { SDCardDetector } = require('./src/sd-card-detector');
@@ -1396,316 +1264,7 @@ ipcMain.handle('download-update', async () => {
   }
 });
 
-// Preferences IPC handlers
-
-// Load user preferences
-ipcMain.handle('load-preferences', async () => {
-  try {
-    const prefs = await loadPreferences();
-    // Validate saved output destination: if path no longer exists, clear it
-    if (prefs.lastOutputDestination) {
-      try {
-        const stat = await fs.stat(prefs.lastOutputDestination);
-        if (!stat.isDirectory()) {
-          prefs.lastOutputDestination = null;
-        }
-      } catch {
-        prefs.lastOutputDestination = null;
-      }
-    }
-    return prefs;
-  } catch (error) {
-    logger.error('Error loading preferences', { error: error.message });
-    throw error;
-  }
-});
-
-// Save user preferences
-ipcMain.handle('save-preferences', async (event, preferences) => {
-  try {
-    await savePreferences(preferences);
-    return { success: true };
-  } catch (error) {
-    logger.error('Error saving preferences', { error: error.message });
-    throw error;
-  }
-});
-
-// Save a filename pattern to recent patterns
-ipcMain.handle('save-filename-pattern', async (event, pattern) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = addRecentPattern(prefs, pattern);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    logger.error('Error saving filename pattern', { error: error.message });
-    throw error;
-  }
-});
-
-// Derive patterns from selected filenames and save to recent patterns
-// e.g. GXAA0123.MP4 -> GXAA{sessionId}; GOPR0001.MP4 -> GOPR{sessionId}
-ipcMain.handle('save-patterns-from-selected-files', async (event, filePaths) => {
-  try {
-    if (!Array.isArray(filePaths) || filePaths.length === 0) return { success: true, saved: 0 };
-    const seen = new Set();
-    let prefs = await loadPreferences();
-    for (const filePath of filePaths) {
-      const filename = path.basename(filePath);
-      const pattern = derivePatternFromFilename(filename);
-      if (pattern && !seen.has(pattern)) {
-        seen.add(pattern);
-        prefs = addRecentPattern(prefs, pattern);
-      }
-    }
-    if (seen.size > 0) {
-      await savePreferences(prefs);
-    }
-    return { success: true, saved: seen.size };
-  } catch (error) {
-    logger.error('Error saving patterns from selected files', { error: error.message });
-    throw error;
-  }
-});
-
-// Set preferred date format
-ipcMain.handle('set-date-format', async (event, format) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = setPreferredDateFormat(prefs, format);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    logger.error('Error setting date format', { error: error.message });
-    throw error;
-  }
-});
-
-// Set preferred video quality
-const ALLOWED_QUALITIES = new Set(['copy', 'high', 'medium', 'low']);
-ipcMain.handle('set-preferred-quality', async (event, quality) => {
-  try {
-    if (typeof quality !== 'string' || !ALLOWED_QUALITIES.has(quality)) {
-      throw new Error(`Invalid quality value: ${String(quality)}`);
-    }
-
-    const prefs = await loadPreferences();
-    const updated = setPreferredQuality(prefs, quality);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error setting preferred quality:', error);
-    throw error;
-  }
-});
-
-// Set preferred format
-ipcMain.handle('set-preferred-format', async (event, format) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = setPreferredFormat(prefs, format);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error setting preferred format:', error);
-
-    throw error;
-  }
-});
-
-// Set last output destination
-ipcMain.handle('set-last-output-destination', async (event, destination) => {
-  try {
-    // Validate destination: allow only null or a non-empty absolute path string
-    let safeDestination = null;
-    if (!destination) {
-      safeDestination = null;
-    } else if (typeof destination === 'string' && path.isAbsolute(destination)) {
-      safeDestination = destination;
-    } else {
-      throw new Error('Invalid output destination');
-    }
-    const prefs = await loadPreferences();
-    const updated = setLastOutputDestination(prefs, safeDestination);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error setting last output destination:', error);
-    throw error;
-  }
-});
-
-// Map error to user-friendly message (for renderer)
-ipcMain.handle('map-error', async (event, errorMessage) => {
-  try {
-    return mapError(errorMessage);
-  } catch (error) {
-    console.error('Error mapping error:', error);
-    // Fallback to basic error structure
-    return {
-      userMessage: 'An Error Occurred',
-      suggestion: 'Something went wrong.',
-      fixes: ['Try again', 'Check console for details'],
-      code: 'MAPPING_ERROR',
-      technicalDetails: errorMessage,
-      originalError: error
-    };
-  }
-});
-
-ipcMain.handle('install-update', async () => {
-  if (!app.isPackaged) {
-    return { 
-      success: false, 
-      error: 'Updates can only be installed in production builds' 
-    };
-  }
-  
-  try {
-    // Note: quitAndInstall will quit the app, so code after this won't execute
-    // But we wrap it for consistency and in case the behavior changes
-    setImmediate(() => {
-      autoUpdater.quitAndInstall(false, true);
-    });
-    return { success: true };
-  } catch (error) {
-    console.error('Error installing update:', error);
-    return {
-      success: false,
-      error: 'Failed to install update. The app will install the update on the next quit.'
-    };
-  }
-});
-
-// Apply date tokens to a pattern
-ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) => {
-  try {
-    const date = dateStr ? new Date(dateStr) : new Date();
-    const result = applyDateTokens(pattern, date, dateFormat);
-    return { result };
-  } catch (error) {
-    logger.error('Error applying date tokens', { error: error.message });
-    throw error;
-  }
-});
-
-// Add a directory to recent directories
-ipcMain.handle('add-recent-directory', async (event, dirPath) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = addRecentDirectory(prefs, dirPath);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error adding recent directory:', error);
-    throw error;
-  }
-});
-
-// Pin a directory
-ipcMain.handle('pin-directory', async (event, dirPath) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = pinDirectory(prefs, dirPath);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error pinning directory:', error);
-    throw error;
-  }
-});
-
-// Unpin a directory
-ipcMain.handle('unpin-directory', async (event, dirPath) => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = unpinDirectory(prefs, dirPath);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error unpinning directory:', error);
-    throw error;
-  }
-});
-
-// Clear all recent directories
-ipcMain.handle('clear-recent-directories', async () => {
-  try {
-    const prefs = await loadPreferences();
-    const updated = clearRecentDirectories(prefs);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error clearing recent directories:', error);
-    throw error;
-  }
-});
-
-// Cleanup invalid directories
-ipcMain.handle('cleanup-directories', async () => {
-  try {
-    const prefs = await loadPreferences();
-    const existsCheck = async (dirPath) => {
-      try {
-        await fs.access(dirPath);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-    const updated = await cleanupDirectories(prefs, existsCheck);
-    await savePreferences(updated);
-    return { success: true, preferences: updated };
-  } catch (error) {
-    console.error('Error cleaning up directories:', error);
-    throw error;
-  }
-});
-
-// Open a recent directory and scan for video files
-ipcMain.handle('open-recent-directory', async (event, dirPath) => {
-  try {
-    // Verify directory exists
-    await fs.access(dirPath);
-    
-    // Update recent directories
-    const prefs = await loadPreferences();
-    const updated = addRecentDirectory(prefs, dirPath);
-    await savePreferences(updated);
-    
-    // Scan for video files
-    const videoFiles = [];
-    
-    async function scanDirectory(scanDirPath) {
-      try {
-        const entries = await fs.readdir(scanDirPath, { withFileTypes: true });
-        
-        for (const entry of entries) {
-          const fullPath = path.join(scanDirPath, entry.name);
-
-          if (entry.isDirectory()) {
-            await scanDirectory(fullPath);
-          } else if (entry.isFile()) {
-            const ext = path.extname(entry.name);
-            if (VIDEO_EXTENSIONS.includes(ext)) {
-              videoFiles.push(fullPath);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error scanning directory ${scanDirPath}:`, error);
-      }
-    }
-
-    await scanDirectory(dirPath);
-
-    return { success: true, files: videoFiles };
-  } catch (error) {
-    console.error('Error opening recent directory:', error);
-    throw error;
-  }
-});
+// preference IPC handlers moved to main/ipc-preferences.js
 
 // Logger IPC handlers
 ipcMain.handle('get-logs', async (event, filename = null, maxLines = 1000) => {
