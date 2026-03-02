@@ -7,6 +7,7 @@ describe('formatBytes', () => {
 
   test('formats bytes', () => {
     expect(formatBytes(1)).toBe('1 Bytes');
+    expect(formatBytes(1, { singularByte: true })).toBe('1 Byte');
     expect(formatBytes(500)).toBe('500 Bytes');
     expect(formatBytes(1023)).toBe('1023 Bytes');
   });

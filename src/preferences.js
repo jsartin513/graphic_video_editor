@@ -314,6 +314,66 @@ function pinDirectory(preferences, dirPath) {
 }
 
 /**
+ * Sanitize and validate a failed operation before storing
+ * @param {Object} operation - Raw operation from renderer
+ * @returns {Object} Sanitized operation
+ * @throws {Error} If operation is invalid or too large
+ */
+function sanitizeFailedOperation(operation) {
+  const MAX_STRING_LENGTH = 1024;
+  const MAX_FILES = 100;
+  const MAX_SERIALIZED_LENGTH = 10 * 1024; // 10 KB
+
+  if (!operation || typeof operation !== 'object') {
+    throw new Error('Invalid failed operation: expected an object.');
+  }
+
+  const sanitized = {};
+
+  if (typeof operation.sessionId === 'string') {
+    sanitized.sessionId = operation.sessionId.trim().slice(0, MAX_STRING_LENGTH);
+  }
+  if (!sanitized.sessionId) {
+    throw new Error('Invalid failed operation: missing sessionId.');
+  }
+
+  if (typeof operation.outputPath === 'string') {
+    sanitized.outputPath = operation.outputPath.trim().slice(0, MAX_STRING_LENGTH);
+  }
+  if (!sanitized.outputPath) {
+    throw new Error('Invalid failed operation: missing outputPath.');
+  }
+
+  if (Array.isArray(operation.files)) {
+    sanitized.files = operation.files
+      .filter(f => typeof f === 'string')
+      .slice(0, MAX_FILES)
+      .map(f => f.slice(0, MAX_STRING_LENGTH));
+  } else {
+    sanitized.files = [];
+  }
+
+  if (typeof operation.timestamp === 'number' && Number.isFinite(operation.timestamp)) {
+    sanitized.timestamp = operation.timestamp;
+  } else {
+    sanitized.timestamp = Date.now();
+  }
+
+  if (typeof operation.error === 'string') {
+    sanitized.error = operation.error.slice(0, MAX_STRING_LENGTH);
+  } else {
+    sanitized.error = '';
+  }
+
+  const serialized = JSON.stringify(sanitized);
+  if (serialized.length > MAX_SERIALIZED_LENGTH) {
+    throw new Error('Failed operation too large to store.');
+  }
+
+  return sanitized;
+}
+
+/**
  * Add a failed operation to the preferences for later recovery
  * @param {Object} preferences - Current preferences
  * @param {Object} operation - Failed operation details (sessionId, files, outputPath, error, timestamp)
@@ -516,6 +576,7 @@ module.exports = {
   addSDCardPath,
   setAutoDetectSDCards,
   setShowSDCardNotifications,
+  sanitizeFailedOperation,
   addFailedOperation,
   removeFailedOperation,
   getFailedOperations,
