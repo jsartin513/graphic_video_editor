@@ -27,7 +27,7 @@ describe('video-scanner', () => {
     it('includes expected video extensions', () => {
       expect(VIDEO_EXTENSIONS).toContain('.mp4');
       expect(VIDEO_EXTENSIONS).toContain('.mov');
-      expect(VIDEO_EXTENSIONS).toContain('.MP4');
+      expect(VIDEO_EXTENSIONS).not.toContain('.MP4');
     });
   });
 

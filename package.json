@@ -56,7 +56,6 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/**/*.test.js",
-      "!src/ffmpeg-resolver.js",
       "!**/node_modules/**"
     ],
     "coverageReporters": [

@@ -213,13 +213,27 @@ async function checkFFmpeg() {
 
     if (bundledFFmpeg && bundledFFprobe) {
       logger.debug('checkFFmpeg: Testing bundled binaries directly');
+
+      function bundledDone() {
+        logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
+        resolve({
+          installed: ffmpegFound && ffprobeFound,
+          ffmpegFound,
+          ffprobeFound,
+          brewFound,
+          ffmpegVersion
+        });
+      }
+
       try {
-        const testFFmpeg = spawn(bundledFFmpeg, ['-version'], { timeout: 5000 });
+        const testFFmpeg = spawn(bundledFFmpeg, ['-version']);
+        const ffmpegTimer = setTimeout(() => testFFmpeg.kill(), 5000);
         let ffmpegOutput = '';
         testFFmpeg.stdout.on('data', (data) => {
           ffmpegOutput += data.toString();
         });
         testFFmpeg.on('close', (code) => {
+          clearTimeout(ffmpegTimer);
           ffmpegFound = code === 0;
           if (ffmpegFound) {
             const match = ffmpegOutput.match(/ffmpeg version (\S+)/);
@@ -231,8 +245,10 @@ async function checkFFmpeg() {
           }
 
           try {
-            const testFFprobe = spawn(bundledFFprobe, ['-version'], { timeout: 5000 });
+            const testFFprobe = spawn(bundledFFprobe, ['-version']);
+            const ffprobeTimer = setTimeout(() => testFFprobe.kill(), 5000);
             testFFprobe.on('close', (code) => {
+              clearTimeout(ffprobeTimer);
               ffprobeFound = code === 0;
               if (!ffprobeFound) {
                 logger.debug('checkFFmpeg: Bundled ffprobe test failed', { code });
@@ -244,38 +260,34 @@ async function checkFFmpeg() {
               });
               brewCheck.on('close', (code) => {
                 brewFound = code === 0;
-                versionCheckDone = true;
-                checkComplete();
+                bundledDone();
               });
               brewCheck.on('error', () => {
-                versionCheckDone = true;
-                checkComplete();
+                bundledDone();
               });
             });
             testFFprobe.on('error', (err) => {
+              clearTimeout(ffprobeTimer);
               logger.error('checkFFmpeg: Error testing bundled ffprobe', { error: err.message });
               ffprobeFound = false;
-              versionCheckDone = true;
-              checkComplete();
+              bundledDone();
             });
           } catch (err) {
             logger.error('checkFFmpeg: Error spawning bundled ffprobe test', { error: err.message });
             ffprobeFound = false;
-            versionCheckDone = true;
-            checkComplete();
+            bundledDone();
           }
         });
         testFFmpeg.on('error', (err) => {
+          clearTimeout(ffmpegTimer);
           logger.error('checkFFmpeg: Error testing bundled ffmpeg', { error: err.message });
           ffmpegFound = false;
-          versionCheckDone = true;
-          checkComplete();
+          bundledDone();
         });
       } catch (err) {
         logger.error('checkFFmpeg: Error spawning bundled ffmpeg test', { error: err.message });
         ffmpegFound = false;
-        versionCheckDone = true;
-        checkComplete();
+        bundledDone();
       }
       return;
     }
