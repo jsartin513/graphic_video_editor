@@ -110,7 +110,7 @@ function registerFileIpcHandlers(getMainWindow) {
             console.error('Error tracking recent directory:', error);
           }
         } else if (stats.isFile()) {
-          const ext = path.extname(droppedPath);
+          const ext = path.extname(droppedPath).toLowerCase();
           if (VIDEO_EXTENSIONS.includes(ext)) {
             videoFiles.push(droppedPath);
             const dirPath = path.dirname(droppedPath);
@@ -152,7 +152,7 @@ function registerFileIpcHandlers(getMainWindow) {
             if (entry.isDirectory()) {
               await scanDirectory(fullPath);
             } else if (entry.isFile()) {
-              const ext = path.extname(entry.name);
+              const ext = path.extname(entry.name).toLowerCase();
               if (VIDEO_EXTENSIONS.includes(ext)) {
                 videoFiles.push(fullPath);
               }

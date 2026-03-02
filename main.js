@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -7,7 +7,6 @@ const { autoUpdater } = require('electron-updater');
 const { formatFileSize } = require('./src/main-utils');
 
 const { logger } = require('./src/logger');
-const { scanDirectoryForVideos, VIDEO_EXTENSIONS } = require('./src/video-scanner');
 
 let mainWindow;
 let sdCardDetector = null;

@@ -21,6 +21,7 @@ const {
 
 const { mapError } = require('../src/error-mapper');
 const { logger } = require('../src/logger');
+const { derivePatternFromFilename } = require('../src/video-grouping');
 
 /**
  * Register IPC handlers related to preferences, patterns, and updates.
@@ -75,7 +76,7 @@ function registerPreferenceIpcHandlers() {
       let prefs = await loadPreferences();
       for (const filePath of filePaths) {
         const filename = path.basename(filePath);
-        const pattern = require('../src/video-grouping').derivePatternFromFilename(filename);
+        const pattern = derivePatternFromFilename(filename);
         if (pattern && !seen.has(pattern)) {
           seen.add(pattern);
           prefs = addRecentPattern(prefs, pattern);
