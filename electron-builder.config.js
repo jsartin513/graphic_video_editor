@@ -46,14 +46,30 @@ const resourcesExist = fs.existsSync(resourcesDir) &&
   isValidExecutable(ffmpegPath) &&
   isValidExecutable(ffprobePath);
 
-// Configure publish for auto-updates
-// Note: We use --publish never in builds and let GitHub Actions handle releases
-// The publish config is needed so electron-builder generates latest-mac.yml for auto-updates
+// Configure publish for auto-updates (generates latest-mac.yml when PUBLISH_TO_GITHUB=true)
 const publishConfig = process.env.PUBLISH_TO_GITHUB === 'true' ? {
   provider: "github",
   owner: "jsartin513",
   repo: "graphic_video_editor"
 } : null;
+
+// Try multiple possible icon paths
+const iconPaths = [
+  path.join(__dirname, 'build', 'icon.icns'),  // Standard location
+  path.join(__dirname, 'build', 'icons', 'icon.icns'),  // Our custom location
+];
+
+let iconPath = null;
+for (const testPath of iconPaths) {
+  if (fs.existsSync(testPath)) {
+    iconPath = testPath;
+    break;
+  }
+}
+
+if (!iconPath) {
+  console.warn('⚠️  Warning: Custom icon not found, using default Electron icon');
+}
 
 const baseConfig = {
   appId: "com.videomerger.app",
@@ -61,10 +77,13 @@ const baseConfig = {
   publish: publishConfig,
   mac: {
     category: "public.app-category.video",
+    ...(iconPath && { icon: iconPath }), // Only set icon property if iconPath exists
     target: [
       "dmg",
       "zip"
-    ]
+    ],
+    // Ensure app name is shown correctly in Finder/Dock
+    name: "Video Merger"
   },
   files: [
     "main.js",
@@ -81,18 +100,35 @@ const baseConfig = {
 };
 
 // Conditionally include ffmpeg binaries if they exist
+const extraResourcesList = [];
+
 if (resourcesExist) {
-  baseConfig.extraResources = [
-    {
-      from: "resources",
-      to: "resources",
-      filter: ["**/*"]
-    }
-  ];
+  extraResourcesList.push({
+    from: "resources",
+    to: "resources"
+  });
   console.log('✓ Electron Builder: Including bundled ffmpeg binaries');
 } else {
-  baseConfig.extraResources = [];
   console.log('✓ Electron Builder: Excluding bundled ffmpeg binaries (using system ffmpeg)');
+}
+
+// Include test videos if the directory exists
+const testVideosDir = path.join(__dirname, 'test-videos');
+if (fs.existsSync(testVideosDir)) {
+  extraResourcesList.push({
+    from: "test-videos",
+    to: "test-videos",
+    filter: ["**/*.mp4"]
+  });
+  console.log('✓ Electron Builder: Including test video files');
+}
+
+baseConfig.extraResources = extraResourcesList;
+
+// Workaround: Manually copy resources using afterPack hook
+// This ensures binaries are copied even if extraResources fails
+if (resourcesExist) {
+  baseConfig.afterPack = 'scripts/after-pack.js';
 }
 
 module.exports = baseConfig;

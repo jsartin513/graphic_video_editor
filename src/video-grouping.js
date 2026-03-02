@@ -7,16 +7,18 @@ const path = require('path');
 
 /**
  * Extract session ID from GoPro filename
- * @param {string} filename - The filename (e.g., "GX0100001.MP4")
+ * Supports: GX010001, GXAA0123 (letters), GP010001, GOPR0001
+ * @param {string} filename - The filename (e.g., "GX010001.MP4" or "GXAA0123.MP4")
  * @returns {string|null} - The 4-digit session ID or null if not a GoPro file
  */
 function extractSessionId(filename) {
-  // Pattern: GX??????.MP4 -> extract last 4 digits
-  const gxMatch = filename.match(/GX\d{2}(\d{4})\.MP4$/i);
+  // Pattern: GX??????.MP4 -> extract last 4 digits (GX + 2 alphanumeric + 4 digits)
+  // Covers GX010001, GXAA0123, GX01ABCD, etc.
+  const gxMatch = filename.match(/GX[A-Z0-9]{2}(\d{4})\.MP4$/i);
   if (gxMatch) return gxMatch[1];
   
   // Pattern: GP??????.MP4 -> extract last 4 digits
-  const gpMatch = filename.match(/GP\d{2}(\d{4})\.MP4$/i);
+  const gpMatch = filename.match(/GP[A-Z0-9]{2}(\d{4})\.MP4$/i);
   if (gpMatch) return gpMatch[1];
   
   // Pattern: GOPR????.MP4 -> extract 4 digits
@@ -24,6 +26,22 @@ function extractSessionId(filename) {
   if (goprMatch) return goprMatch[1];
   
   return null;
+}
+
+/**
+ * Derive a filename pattern from a GoPro filename for output suggestions
+ * e.g. "GXAA0123.MP4" -> "GXAA{sessionId}", "GOPR0001.MP4" -> "GOPR{sessionId}"
+ * @param {string} filename - The filename (e.g., "GXAA0123.MP4")
+ * @returns {string|null} - A pattern with {sessionId} placeholder, or null
+ */
+function derivePatternFromFilename(filename) {
+  const sessionId = extractSessionId(filename);
+  if (!sessionId) return null;
+  const base = filename.replace(/\.MP4$/i, '');
+  // The sessionId is always the last 4 characters of the base; use slice to avoid
+  // replacing an earlier occurrence of the same digit sequence in the prefix.
+  const prefix = base.slice(0, -sessionId.length);
+  return `${prefix}{sessionId}`;
 }
 
 /**
@@ -98,6 +116,7 @@ function analyzeAndGroupVideos(filePaths) {
 
 module.exports = {
   extractSessionId,
+  derivePatternFromFilename,
   analyzeAndGroupVideos
 };
 

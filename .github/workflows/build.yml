@@ -48,18 +48,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'x64'
+        run: npm run prebuild:x64
+
+      - name: Verify binaries exist
+        run: |
+          if [ ! -f resources/ffmpeg ] || [ ! -f resources/ffprobe ]; then
+            echo "❌ Error: FFmpeg binaries not found in resources/ directory"
+            ls -la resources/ || echo "resources/ directory does not exist"
+            exit 1
+          fi
+          echo "✅ FFmpeg binaries found:"
+          ls -lh resources/ffmpeg resources/ffprobe
+          file resources/ffmpeg resources/ffprobe
+
       - name: Build for x64 (Intel) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
-        run: npm run build:x64 -- --publish never
+          TARGET_ARCH: 'x64'
+        run: npm run build:fat:x64
 
       - name: Rename x64 files to include architecture suffix
         run: |
           cd dist
           for file in *.dmg *.zip; do
             if [[ -f "$file" && "$file" != *"arm64"* && "$file" != *"x64"* && "$file" != *"fat"* && "$file" != *"lite"* ]]; then
-              newname="${file%.*}-x64-fat.${file##*.}"
+              ext="${file##*.}"
+              basename="${file%.*}"
+              newname="${basename}-x64-fat.${ext}"
               mv "$file" "$newname" || true
               echo "Renamed $file to $newname"
             fi
@@ -97,7 +118,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
-        run: npm run build:x64 -- --publish never
+          TARGET_ARCH: 'x64'
+        run: npm run build:x64
 
       - name: Rename x64 files to include architecture suffix
         run: |
@@ -138,11 +160,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'arm64'
+        run: npm run prebuild:arm64
+
+      - name: Verify binaries exist
+        run: |
+          if [ ! -f resources/ffmpeg ] || [ ! -f resources/ffprobe ]; then
+            echo "❌ Error: FFmpeg binaries not found in resources/ directory"
+            ls -la resources/ || echo "resources/ directory does not exist"
+            exit 1
+          fi
+          echo "✅ FFmpeg binaries found:"
+          ls -lh resources/ffmpeg resources/ffprobe
+          file resources/ffmpeg resources/ffprobe
+
       - name: Build for arm64 (Apple Silicon) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
-        run: npm run build:arm64 -- --publish never
+          TARGET_ARCH: 'arm64'
+        run: npm run build:fat:arm64
 
       - name: Rename arm64 files to include variant suffix
         run: |
@@ -188,7 +229,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
-        run: npm run build:arm64 -- --publish never
+          TARGET_ARCH: 'arm64'
+        run: npm run build:arm64
 
       - name: Rename arm64 files to include variant suffix
         run: |
@@ -218,7 +260,11 @@ jobs:
   release:
     needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Run on tag pushes OR pushes to main/master
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: write  # Required to create releases
+      id-token: write  # Required for OIDC token
     
     steps:
       - name: Download x64 fat artifacts
@@ -245,24 +291,56 @@ jobs:
           name: Video-Merger-arm64-lite
           path: artifacts/arm64-lite
 
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Artifacts structure ==="
+          find artifacts -type f -name "*" || echo "No artifacts found"
+          echo ""
+          echo "=== x64-fat ==="
+          ls -la artifacts/x64-fat/ || echo "x64-fat directory not found"
+          echo ""
+          echo "=== x64-lite ==="
+          ls -la artifacts/x64-lite/ || echo "x64-lite directory not found"
+          echo ""
+          echo "=== arm64-fat ==="
+          ls -la artifacts/arm64-fat/ || echo "arm64-fat directory not found"
+          echo ""
+          echo "=== arm64-lite ==="
+          ls -la artifacts/arm64-lite/ || echo "arm64-lite directory not found"
+
+      - name: Determine release tag and name
+        id: release
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Use the tag as the release tag
+            TAG_NAME="${{ github.ref_name }}"
+            RELEASE_NAME="Release ${{ github.ref_name }}"
+            IS_PRERELEASE="false"
+          else
+            # Use commit SHA for push to main
+            TAG_NAME="v${{ github.run_number }}-${{ github.sha }}"
+            RELEASE_NAME="Build from main (${{ github.sha }} - Run #${{ github.run_number }})"
+            IS_PRERELEASE="true"
+          fi
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+          echo "prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          echo "Tag: ${TAG_NAME}"
+          echo "Release name: ${RELEASE_NAME}"
+          echo "Prerelease: ${IS_PRERELEASE}"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.release.outputs.tag_name }}
+          name: ${{ steps.release.outputs.release_name }}
           files: |
-            artifacts/x64-fat/*.dmg
-            artifacts/x64-fat/*.zip
-            artifacts/x64-fat/latest-mac.yml
-            artifacts/x64-lite/*.dmg
-            artifacts/x64-lite/*.zip
-            artifacts/x64-lite/latest-mac.yml
-            artifacts/arm64-fat/*.dmg
-            artifacts/arm64-fat/*.zip
-            artifacts/arm64-fat/latest-mac.yml
-            artifacts/arm64-lite/*.dmg
-            artifacts/arm64-lite/*.zip
-            artifacts/arm64-lite/latest-mac.yml
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/latest-mac.yml
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.release.outputs.prerelease }}
+          fail_on_unmatched_files: false  # Don't fail if some files are missing
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
