@@ -52,7 +52,8 @@ function derivePatternFromFilename(filename) {
  */
 function analyzeAndGroupVideos(filePaths) {
   const groups = new Map();
-  
+  if (!Array.isArray(filePaths)) return [];
+
   for (const filePath of filePaths) {
     const filename = path.basename(filePath);
     const sessionId = extractSessionId(filename);

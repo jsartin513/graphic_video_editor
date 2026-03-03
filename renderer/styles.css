@@ -888,6 +888,106 @@ body {
   color: var(--text-secondary);
 }
 
+.event-naming-section {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-primary);
+}
+
+.event-naming-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.event-naming-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+.event-naming-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.event-naming-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.event-naming-field label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.event-naming-field input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.event-naming-field input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.event-template-controls {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.event-template-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.event-template-row:last-child {
+  margin-bottom: 0;
+}
+
+.event-template-row label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 60px;
+}
+
+.event-template-row select {
+  flex: 1;
+  max-width: 280px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.event-template-row select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.schedule-import-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 8px;
+}
+
 .preview-list {
   display: flex;
   flex-direction: column;
@@ -3162,6 +3262,40 @@ body {
 
 .trim-settings .form-group:last-child {
   margin-bottom: 0;
+}
+
+.split-settings .form-group {
+  margin-bottom: 16px;
+}
+
+.split-settings .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.split-pattern-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.split-pattern-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.split-pattern-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.optional {
+  font-weight: normal;
+  color: var(--text-secondary);
+  font-size: 0.9em;
 }
 
 .trim-settings label {

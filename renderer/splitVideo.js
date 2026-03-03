@@ -2,7 +2,7 @@
 
 import { getFileName, escapeHtml, formatDuration } from './utils.js';
 
-export function initializeSplitVideo(domElements) {
+export function initializeSplitVideo(domElements, appState = null) {
   let closeSplitModalBtn = null;
   let cancelSplitBtn = null;
   let executeSplitBtn = null;
@@ -29,6 +29,8 @@ export function initializeSplitVideo(domElements) {
     
     // Reset modal state
     segmentMinutesEl.value = '20';
+    const splitPatternEl = document.getElementById('splitFilenamePattern');
+    if (splitPatternEl) splitPatternEl.value = '';
     splitPreviewEl.textContent = 'Calculating...';
     executeBtn.disabled = false;
     executeBtn.style.display = 'inline-flex';
@@ -86,26 +88,54 @@ export function initializeSplitVideo(domElements) {
     const outputDir = modal.dataset.outputDir;
     const segmentMinutes = parseInt(document.getElementById('segmentMinutes').value) || 20;
     const segmentSeconds = segmentMinutes * 60;
-    
+    const customPattern = (document.getElementById('splitFilenamePattern')?.value || '').trim();
+
+    // Apply date tokens once if custom pattern has date tokens
+    let patternBase = customPattern;
+    if (customPattern && (customPattern.includes('{date}') || customPattern.includes('{year}') || customPattern.includes('{month}') || customPattern.includes('{day}'))) {
+      try {
+        const prefs = await window.electronAPI.loadPreferences();
+        const dateFormat = prefs?.preferredDateFormat || 'YYYY-MM-DD';
+        const result = await window.electronAPI.applyDateTokens(customPattern, null, dateFormat);
+        if (result?.result) patternBase = result.result;
+      } catch (e) {
+        console.error('Error applying date tokens to split pattern:', e);
+      }
+    }
+
     // Calculate splits
     const splits = [];
     let currentTime = 0;
     let segmentNum = 1;
-    
+    const baseName = getFileName(videoPath).replace(/\.MP4$/i, '');
+
     while (currentTime < totalDuration) {
       const remaining = totalDuration - currentTime;
       const duration = Math.min(segmentSeconds, remaining);
-      
-      // Get base filename without extension
-      const baseName = getFileName(videoPath).replace(/\.MP4$/i, '');
-      const segmentFilename = `${baseName}_part${segmentNum.toString().padStart(2, '0')}.MP4`;
-      
+
+      let segmentFilename;
+      if (customPattern) {
+        let name = patternBase.replace(/\{gameNumber\}/gi, segmentNum.toString().padStart(2, '0'));
+        const schedule = appState?.importedSchedule;
+        const scheduleRow = Array.isArray(schedule) && schedule[segmentNum - 1] ? schedule[segmentNum - 1] : null;
+        if (scheduleRow && (name.includes('{eventName}') || name.includes('{leagueName}') || name.includes('{weekName}'))) {
+          name = name.replace(/\{eventName\}/gi, (scheduleRow.event || '').trim());
+          name = name.replace(/\{leagueName\}/gi, (scheduleRow.league || '').trim());
+          name = name.replace(/\{weekName\}/gi, (scheduleRow.week || '').trim());
+        }
+        name = name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+        name = name.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '') || name;
+        segmentFilename = (name || `segment_${segmentNum}`) + '.MP4';
+      } else {
+        segmentFilename = `${baseName}_part${segmentNum.toString().padStart(2, '0')}.MP4`;
+      }
+
       splits.push({
         startTime: currentTime,
         duration: duration,
         filename: segmentFilename
       });
-      
+
       currentTime += duration;
       segmentNum++;
     }

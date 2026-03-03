@@ -13,6 +13,9 @@ function registerMiscIpcHandlers() {
   });
 
   ipcMain.handle('open-external', async (event, url) => {
+    if (url == null || typeof url !== 'string' || !url.trim()) {
+      throw new Error('Invalid URL');
+    }
     try {
       const parsedUrl = new URL(url);
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {

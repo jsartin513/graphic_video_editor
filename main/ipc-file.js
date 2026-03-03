@@ -94,6 +94,7 @@ function registerFileIpcHandlers(getMainWindow) {
   // Handle processing dropped files/folders
   ipcMain.handle('process-dropped-paths', async (event, paths) => {
     const videoFiles = [];
+    if (!Array.isArray(paths)) return videoFiles;
 
     for (const droppedPath of paths) {
       try {
@@ -133,6 +134,9 @@ function registerFileIpcHandlers(getMainWindow) {
 
   // Open a recent directory and scan for video files
   ipcMain.handle('open-recent-directory', async (event, dirPath) => {
+    if (!dirPath || typeof dirPath !== 'string' || !dirPath.trim()) {
+      throw new Error('Invalid directory path');
+    }
     try {
       await fs.access(dirPath);
 

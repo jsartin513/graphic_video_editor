@@ -155,9 +155,46 @@ describe('ipc-file', () => {
       expect(scanDirectoryForVideos).toHaveBeenCalledWith(dirPath);
       expect(result).toEqual(files);
     });
+
+    it('returns empty array when paths is null', async () => {
+      const handler = getHandler('process-dropped-paths');
+      const result = await handler(null, null);
+      expect(result).toEqual([]);
+      expect(fs.stat).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when paths is undefined', async () => {
+      const handler = getHandler('process-dropped-paths');
+      const result = await handler(null, undefined);
+      expect(result).toEqual([]);
+      expect(fs.stat).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when paths is not an array', async () => {
+      const handler = getHandler('process-dropped-paths');
+      expect(await handler(null, 'string')).toEqual([]);
+      expect(await handler(null, 123)).toEqual([]);
+      expect(await handler(null, {})).toEqual([]);
+      expect(fs.stat).not.toHaveBeenCalled();
+    });
   });
 
   describe('open-recent-directory', () => {
+    it('throws when dirPath is null, undefined, or empty string', async () => {
+      const handler = getHandler('open-recent-directory');
+      await expect(handler(null, null)).rejects.toThrow('Invalid directory path');
+      await expect(handler(null, undefined)).rejects.toThrow('Invalid directory path');
+      await expect(handler(null, '')).rejects.toThrow('Invalid directory path');
+      await expect(handler(null, '   ')).rejects.toThrow('Invalid directory path');
+      expect(fs.access).not.toHaveBeenCalled();
+    });
+
+    it('throws when dirPath is not a string', async () => {
+      const handler = getHandler('open-recent-directory');
+      await expect(handler(null, 123)).rejects.toThrow('Invalid directory path');
+      expect(fs.access).not.toHaveBeenCalled();
+    });
+
     it('returns success and files when directory is accessible', async () => {
       const dirPath = '/recent/dir';
       fs.access.mockResolvedValue(undefined);

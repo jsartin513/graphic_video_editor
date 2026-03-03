@@ -38,7 +38,9 @@ const DEFAULT_PREFERENCES = {
   knownSDCardPaths: [],
   lastSDCardPath: null,
   showSDCardNotifications: true,
-  failedOperations: [] // Track failed merge operations for recovery
+  failedOperations: [], // Track failed merge operations for recovery
+  eventTemplates: [], // Reusable filename patterns: [{ name, pattern }]
+  maxEventTemplates: 10
 };
 
 /**
@@ -59,7 +61,8 @@ async function loadPreferences() {
       dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
       // Ensure recent directories arrays exist
       recentDirectories: prefs.recentDirectories || [],
-      pinnedDirectories: prefs.pinnedDirectories || []
+      pinnedDirectories: prefs.pinnedDirectories || [],
+      eventTemplates: Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : []
     };
   } catch (error) {
     if (error.code === 'ENOENT') {
@@ -192,24 +195,35 @@ function formatDate(date, format) {
 /**
  * Apply date tokens to a filename pattern
  * Replaces tokens like {date}, {year}, {month}, {day} with actual values
+ * Also supports custom tokens: {eventName}, {leagueName}, {weekName}
  * @param {string} pattern - Pattern with date tokens
  * @param {Date} date - Date to use for tokens (defaults to current date)
  * @param {string} dateFormat - Preferred date format
+ * @param {Object} [customTokens] - Optional { eventName, leagueName, weekName }
  * @returns {string} Pattern with tokens replaced
  */
-function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD') {
+function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', customTokens = {}) {
   if (!pattern) return pattern;
-  
+
   const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   const formattedDate = formatDate(date, dateFormat);
-  
-  return pattern
+
+  let result = pattern
     .replace(/{date}/gi, formattedDate)
     .replace(/{year}/gi, year.toString())
     .replace(/{month}/gi, month)
     .replace(/{day}/gi, day);
+
+  if (customTokens && typeof customTokens === 'object') {
+    result = result
+      .replace(/\{eventName\}/gi, (customTokens.eventName || '').trim())
+      .replace(/\{leagueName\}/gi, (customTokens.leagueName || '').trim())
+      .replace(/\{weekName\}/gi, (customTokens.weekName || '').trim());
+  }
+
+  return result;
 }
 
 /**
@@ -558,6 +572,29 @@ function clearFailedOperations(preferences) {
   };
 }
 
+/**
+ * Add an event template (reusable filename pattern)
+ * @param {Object} preferences - Current preferences
+ * @param {Object} template - { name: string, pattern: string }
+ * @returns {Object} Updated preferences
+ */
+function addEventTemplate(preferences, template) {
+  if (!template || typeof template.name !== 'string' || !template.name.trim() ||
+      typeof template.pattern !== 'string' || !template.pattern.trim()) {
+    return preferences;
+  }
+  const name = template.name.trim();
+  const pattern = template.pattern.trim();
+  const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
+  const filtered = templates.filter(t => t.name !== name);
+  const updated = [{ name, pattern }, ...filtered];
+  const max = preferences.maxEventTemplates ?? DEFAULT_PREFERENCES.maxEventTemplates;
+  return {
+    ...preferences,
+    eventTemplates: updated.slice(0, max)
+  };
+}
+
 module.exports = {
   loadPreferences,
   savePreferences,
@@ -581,5 +618,6 @@ module.exports = {
   removeFailedOperation,
   getFailedOperations,
   clearFailedOperations,
+  addEventTemplate,
   DEFAULT_PREFERENCES
 };

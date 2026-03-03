@@ -7,6 +7,7 @@ const {
   loadPreferences,
   savePreferences,
   addRecentPattern,
+  addEventTemplate,
   setPreferredDateFormat,
   setPreferredQuality,
   setPreferredFormat,
@@ -191,10 +192,22 @@ function registerPreferenceIpcHandlers() {
     }
   });
 
-  ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) => {
+  ipcMain.handle('save-event-template', async (event, name, pattern) => {
+    try {
+      const prefs = await loadPreferences();
+      const updated = addEventTemplate(prefs, { name: name.trim(), pattern: pattern.trim() });
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error saving event template', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat, customTokens) => {
     try {
       const date = dateStr ? new Date(dateStr) : new Date();
-      const result = applyDateTokens(pattern, date, dateFormat);
+      const result = applyDateTokens(pattern, date, dateFormat, customTokens || {});
       return { result };
     } catch (error) {
       logger.error('Error applying date tokens', { error: error.message });

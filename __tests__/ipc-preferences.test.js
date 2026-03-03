@@ -92,6 +92,7 @@ describe('ipc-preferences', () => {
       expect(channels).toContain('map-error');
       expect(channels).toContain('install-update');
       expect(channels).toContain('apply-date-tokens');
+      expect(channels).toContain('save-event-template');
       expect(channels).toContain('add-recent-directory');
       expect(channels).toContain('pin-directory');
       expect(channels).toContain('unpin-directory');
@@ -144,6 +145,19 @@ describe('ipc-preferences', () => {
       expect(addRecentPattern).toHaveBeenCalledWith(expect.any(Object), pattern);
       expect(savePreferences).toHaveBeenCalledWith(updated);
       expect(result).toEqual({ success: true, preferences: updated });
+    });
+  });
+
+  describe('save-event-template', () => {
+    it('adds template and saves preferences', async () => {
+      loadPreferences.mockResolvedValue({ ...mockPrefs, eventTemplates: [] });
+      const handler = getHandler('save-event-template');
+      const result = await handler(null, 'BDL Open Gym', 'BDL Open Gym ({date} {eventName})');
+      expect(savePreferences).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      const savedPrefs = savePreferences.mock.calls[0][0];
+      expect(savedPrefs.eventTemplates).toHaveLength(1);
+      expect(savedPrefs.eventTemplates[0]).toEqual({ name: 'BDL Open Gym', pattern: 'BDL Open Gym ({date} {eventName})' });
     });
   });
 
