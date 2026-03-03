@@ -67,6 +67,20 @@ describe('ipc-video', () => {
       expect(analyzeAndGroupVideos).toHaveBeenCalledWith(['/path/a.mp4']);
       expect(result).toEqual(groups);
     });
+
+    it('returns empty array when filePaths is null or undefined', async () => {
+      const handler = getHandler('analyze-videos');
+      expect(await handler(null, null)).toEqual([]);
+      expect(await handler(null, undefined)).toEqual([]);
+      expect(analyzeAndGroupVideos).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when filePaths is not an array', async () => {
+      const handler = getHandler('analyze-videos');
+      expect(await handler(null, 'string')).toEqual([]);
+      expect(await handler(null, 123)).toEqual([]);
+      expect(analyzeAndGroupVideos).not.toHaveBeenCalled();
+    });
   });
 
   describe('get-total-file-size', () => {

@@ -12,7 +12,7 @@ function registerUpdatesIpcHandlers() {
     }
     try {
       const result = await autoUpdater.checkForUpdates();
-      return { available: result && result.updateInfo, updateInfo: result ? result.updateInfo : null };
+      return { available: Boolean(result?.updateInfo), updateInfo: result?.updateInfo ?? null };
     } catch (error) {
       const errorMessage = error.message || String(error);
       let userMessage = 'Failed to check for updates.';

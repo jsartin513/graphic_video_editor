@@ -9,10 +9,19 @@ const { checkFFmpeg } = require('../src/ffmpeg-resolver');
 
 function registerMiscIpcHandlers() {
   ipcMain.handle('open-folder', async (event, folderPath) => {
-    shell.openPath(folderPath);
+    if (folderPath == null || typeof folderPath !== 'string' || !folderPath.trim()) {
+      throw new Error('Invalid folder path');
+    }
+    const error = await shell.openPath(folderPath);
+    if (error && typeof error === 'string' && error.trim()) {
+      throw new Error(error);
+    }
   });
 
   ipcMain.handle('open-external', async (event, url) => {
+    if (url == null || typeof url !== 'string' || !url.trim()) {
+      throw new Error('Invalid URL');
+    }
     try {
       const parsedUrl = new URL(url);
       if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {

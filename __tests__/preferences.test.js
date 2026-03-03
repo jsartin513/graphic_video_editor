@@ -17,6 +17,7 @@ jest.mock('fs', () => {
 
 const {
   addRecentPattern,
+  addEventTemplate,
   setPreferredDateFormat,
   formatDate,
   applyDateTokens,
@@ -323,6 +324,53 @@ describe('applyDateTokens', () => {
     const result = applyDateTokens(null);
     expect(result).toBeNull();
   });
+
+  test('replaces custom tokens: eventName, leagueName, weekName', () => {
+    const date = new Date(2024, 0, 15);
+    const customTokens = { eventName: 'BDL Open Gym', leagueName: 'Rec League', weekName: 'Week 3' };
+    const result = applyDateTokens('BDL ({leagueName}) ({weekName})_{date}', date, 'YYYY-MM-DD', customTokens);
+    expect(result).toBe('BDL (Rec League) (Week 3)_2024-01-15');
+  });
+
+  test('replaces empty string when custom token not provided', () => {
+    const date = new Date(2024, 0, 15);
+    const result = applyDateTokens('Event_{eventName}_{date}', date, 'YYYY-MM-DD', {});
+    expect(result).toBe('Event__2024-01-15');
+  });
+
+  test('trims custom token values', () => {
+    const date = new Date(2024, 0, 15);
+    const result = applyDateTokens('{eventName}', date, 'YYYY-MM-DD', { eventName: '  BDL  ' });
+    expect(result).toBe('BDL');
+  });
+});
+
+describe('addEventTemplate', () => {
+  test('adds template to empty list', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, eventTemplates: [] };
+    const result = addEventTemplate(prefs, { name: 'BDL Open Gym', pattern: 'BDL Open Gym ({date})' });
+    expect(result.eventTemplates).toHaveLength(1);
+    expect(result.eventTemplates[0]).toEqual({ name: 'BDL Open Gym', pattern: 'BDL Open Gym ({date})' });
+  });
+
+  test('moves existing template to front when re-added', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      eventTemplates: [
+        { name: 'BDL League', pattern: 'BDL ({leagueName})' },
+        { name: 'BDL Open Gym', pattern: 'BDL Open Gym ({date})' }
+      ]
+    };
+    const result = addEventTemplate(prefs, { name: 'BDL Open Gym', pattern: 'BDL Open Gym ({date} {eventName})' });
+    expect(result.eventTemplates[0].name).toBe('BDL Open Gym');
+  });
+
+  test('ignores invalid template', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, eventTemplates: [] };
+    expect(addEventTemplate(prefs, null)).toEqual(prefs);
+    expect(addEventTemplate(prefs, { name: '', pattern: 'x' })).toEqual(prefs);
+    expect(addEventTemplate(prefs, { name: 'x', pattern: '' })).toEqual(prefs);
+  });
 });
 
 describe('sanitizeFailedOperation', () => {
@@ -356,6 +404,10 @@ describe('sanitizeFailedOperation', () => {
 
   test('throws for missing outputPath', () => {
     expect(() => sanitizeFailedOperation({ sessionId: 's1' })).toThrow('Invalid failed operation: missing outputPath.');
+  });
+
+  test('throws when outputPath trims to empty', () => {
+    expect(() => sanitizeFailedOperation({ sessionId: 's1', outputPath: '   ' })).toThrow('Invalid failed operation: missing outputPath.');
   });
 
   test('trims and truncates long strings', () => {

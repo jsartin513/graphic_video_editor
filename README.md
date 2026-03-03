@@ -86,7 +86,7 @@ Updates are only checked in production builds (installed apps). Development buil
 - `preload.js` - Secure preload script (exposes safe APIs to renderer)
 - `main/` - IPC handler modules (each registers a set of IPC channels)
   - `ipc-file.js` - File/folder selection, metadata, dropped paths, recent directories
-  - `ipc-preferences.js` - Preferences, patterns, date format, updates
+  - `ipc-preferences.js` - Preferences, patterns, date tokens, event templates
   - `ipc-video.js` - Video analysis, metadata, thumbnails, total file size
   - `ipc-merge-split.js` - Merge, split, trim, output destination
   - `ipc-misc.js` - Open folder/URL, ffmpeg check, test videos, prerequisites

@@ -4,6 +4,57 @@ import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName }
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
 
+function removeExtension(str) {
+  if (!str || typeof str !== 'string') return str || '';
+  return str.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+}
+
+/**
+ * Parse a single CSV line with RFC4180-style quoting (handles "field, with comma" and ""escaped"").
+ */
+function parseCSVLine(line) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      fields.push(current.trim());
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
+function parseScheduleCsv(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/^"|"$/g, ''));
+  const eventIdx = headers.findIndex(h => /^(event|event\s*name|game|game\s*slot|slot)$/.test(h));
+  const leagueIdx = headers.findIndex(h => /^(league|league\s*name)$/.test(h));
+  const weekIdx = headers.findIndex(h => /^(week|week\s*name)$/.test(h));
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
+    rows.push({
+      event: eventIdx >= 0 ? (values[eventIdx] || '') : '',
+      league: leagueIdx >= 0 ? (values[leagueIdx] || '') : '',
+      week: weekIdx >= 0 ? (values[weekIdx] || '') : ''
+    });
+  }
+  return rows;
+}
+
 export function initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo = null) {
   const {
     prepareMergeBtn,
@@ -234,7 +285,123 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
 
     renderPreviewList();
+    setupEventTemplateControls();
     loadPreviewThumbnails();
+  }
+
+  function setupEventTemplateControls() {
+    const templateSelect = document.getElementById('eventTemplateSelect');
+    const applyBtn = document.getElementById('applyTemplateBtn');
+    const saveBtn = document.getElementById('saveAsTemplateBtn');
+    if (!templateSelect) return;
+
+    // Populate template dropdown
+    templateSelect.innerHTML = '<option value="">— Select template —</option>';
+    const templates = userPreferences?.eventTemplates || [];
+    for (const t of templates) {
+      const opt = document.createElement('option');
+      opt.value = t.pattern;
+      opt.textContent = t.name;
+      templateSelect.appendChild(opt);
+    }
+    templateSelect.value = '';
+
+    // Remove old listeners by cloning (we re-run this each time preview is shown)
+    if (applyBtn) {
+      applyBtn.replaceWith(applyBtn.cloneNode(true));
+    }
+    if (saveBtn) {
+      saveBtn.replaceWith(saveBtn.cloneNode(true));
+    }
+
+    const newApplyBtn = document.getElementById('applyTemplateBtn');
+    const newSaveBtn = document.getElementById('saveAsTemplateBtn');
+
+    if (newApplyBtn) {
+      newApplyBtn.addEventListener('click', () => {
+        const pattern = templateSelect.value;
+        if (!pattern) return;
+        const ext = '.' + (selectedFormat || 'mp4').toLowerCase();
+        for (const i of state.selectedGroups) {
+          const group = state.videoGroups[i];
+          if (!group) continue;
+          const basePattern = pattern.replace(/\{sessionId\}/gi, group.sessionId);
+          const input = document.querySelector(`.filename-input[data-index="${i}"]`);
+          if (input) input.value = basePattern.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+          state.videoGroups[i].outputFilename = basePattern.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '') + ext;
+        }
+      });
+    }
+
+    const scheduleFileInput = document.getElementById('scheduleFileInput');
+    const importScheduleBtn = document.getElementById('importScheduleBtn');
+    const scheduleStatus = document.getElementById('scheduleImportStatus');
+    if (importScheduleBtn && scheduleFileInput) {
+      importScheduleBtn.replaceWith(importScheduleBtn.cloneNode(true));
+      const newImportBtn = document.getElementById('importScheduleBtn');
+      newImportBtn.addEventListener('click', () => scheduleFileInput.click());
+    }
+    const newScheduleFileInput = document.getElementById('scheduleFileInput');
+    if (newScheduleFileInput) {
+      newScheduleFileInput.value = '';
+      newScheduleFileInput.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const text = reader.result;
+            const rows = parseScheduleCsv(text);
+            if (rows.length === 0) {
+              state.importedSchedule = null;
+              if (scheduleStatus) scheduleStatus.textContent = 'No data in CSV';
+              return;
+            }
+            state.importedSchedule = rows;
+            const first = rows[0];
+            const eventInput = document.getElementById('eventNameInput');
+            const leagueInput = document.getElementById('leagueNameInput');
+            const weekInput = document.getElementById('weekNameInput');
+            if (eventInput && first.event) eventInput.value = first.event;
+            if (leagueInput && first.league) leagueInput.value = first.league;
+            if (weekInput && first.week) weekInput.value = first.week;
+            if (scheduleStatus) scheduleStatus.textContent = `Loaded ${rows.length} row(s)`;
+          } catch (err) {
+            console.error('Error parsing schedule:', err);
+            state.importedSchedule = null;
+            if (scheduleStatus) scheduleStatus.textContent = 'Invalid CSV';
+          }
+        };
+        reader.readAsText(file);
+      };
+    }
+
+    if (newSaveBtn) {
+      newSaveBtn.addEventListener('click', async () => {
+        const firstIndex = state.selectedGroups.size > 0 ? Math.min(...state.selectedGroups) : 0;
+        const group = state.videoGroups[firstIndex];
+        const input = document.querySelector(`.filename-input[data-index="${firstIndex}"]`);
+        const pattern = (input?.value || group?.outputFilename || '').trim().replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+        if (!pattern) {
+          alert('Enter a filename pattern first, then click Save pattern as template.');
+          return;
+        }
+        const name = prompt('Template name (e.g. "BDL Open Gym"):', '');
+        if (!name || !name.trim()) return;
+        try {
+          const result = await window.electronAPI.saveEventTemplate(name.trim(), pattern);
+          if (result?.success === false) {
+            alert(result.error || 'Could not save template.');
+            return;
+          }
+          await loadUserPreferences();
+          setupEventTemplateControls();
+        } catch (err) {
+          console.error('Error saving template:', err);
+          alert('Could not save template: ' + (err.message || err));
+        }
+      });
+    }
   }
 
   async function loadPreviewThumbnails() {
@@ -337,7 +504,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
             <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
           <div class="filename-help">
-            <small>💡 Use date tokens: {date}, {year}, {month}, {day}</small>
+            <small>💡 Tokens: {date}, {year}, {month}, {day}, {sessionId}, {eventName}, {leagueName}, {weekName}</small>
           </div>
         </div>
         <div class="input-files">
@@ -384,11 +551,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Store the original pattern before token replacement for preferences
       const originalPattern = value;
       
-      // Apply date tokens if any
+      // Apply date, custom, and sessionId tokens
+      value = value.replace(/\{sessionId\}/gi, group.sessionId);
       if (value.includes('{')) {
         try {
           const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
-          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat);
+          const customTokens = {
+            eventName: document.getElementById('eventNameInput')?.value || '',
+            leagueName: document.getElementById('leagueNameInput')?.value || '',
+            weekName: document.getElementById('weekNameInput')?.value || ''
+          };
+          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat, customTokens);
           if (result && result.result) {
             value = result.result;
           }
@@ -545,10 +718,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       if (!value) value = `PROCESSED${group.sessionId}`;
       value = value.replace(/\.MP4$/i, '');
 
+      value = value.replace(/\{sessionId\}/gi, group.sessionId);
       if (value.includes('{')) {
         try {
           const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
-          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat);
+          const customTokens = {
+            eventName: document.getElementById('eventNameInput')?.value || '',
+            leagueName: document.getElementById('leagueNameInput')?.value || '',
+            weekName: document.getElementById('weekNameInput')?.value || ''
+          };
+          const result = await window.electronAPI.applyDateTokens(value, null, dateFormat, customTokens);
           if (result && result.result) value = result.result;
         } catch (error) {
           console.error('Error applying date tokens:', error);

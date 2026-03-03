@@ -35,6 +35,14 @@ function formatTime(seconds) {
 function registerMergeSplitIpcHandlers(getMainWindow) {
   ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false) => {
     return new Promise((resolve, reject) => {
+      if (!Array.isArray(filePaths)) {
+        reject(new Error('filePaths must be an array'));
+        return;
+      }
+      if (!outputPath || typeof outputPath !== 'string') {
+        reject(new Error('outputPath is required'));
+        return;
+      }
       try {
         validateQualityOption(qualityOption);
       } catch (error) {
@@ -78,6 +86,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
           if (outputExt !== normalizedFormat) {
             const basePath = outputPath.replace(/\.[^/.]+$/, '');
             outputPath = basePath + '.' + normalizedFormat;
+            currentMergeOutputPath = outputPath;
           }
 
           const ffmpegArgs = ['-f', 'concat', '-safe', '0', '-i', tempFileList];
@@ -277,6 +286,18 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
   ipcMain.handle('split-video', async (event, videoPath, splits, outputDir) => {
     return new Promise(async (resolve, reject) => {
+      if (!videoPath || typeof videoPath !== 'string') {
+        reject(new Error('videoPath is required'));
+        return;
+      }
+      if (!Array.isArray(splits) || splits.length === 0) {
+        reject(new Error('splits must be a non-empty array'));
+        return;
+      }
+      if (!outputDir || typeof outputDir !== 'string') {
+        reject(new Error('outputDir is required'));
+        return;
+      }
       try {
         isCancelled = false;
         currentSplitProcesses = [];
@@ -376,6 +397,10 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
   ipcMain.handle('trim-video', async (event, options) => {
     return new Promise(async (resolve, reject) => {
+      if (!options || typeof options !== 'object') {
+        reject(new Error('options object is required'));
+        return;
+      }
       try {
         const { inputPath, outputPath, startTime, endTime } = options;
         if (!inputPath || !outputPath) {

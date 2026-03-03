@@ -70,9 +70,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadPreferences: () => ipcRenderer.invoke('load-preferences'),
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
+  saveEventTemplate: (name, pattern) => ipcRenderer.invoke('save-event-template', name, pattern),
   savePatternsFromSelectedFiles: (filePaths) => ipcRenderer.invoke('save-patterns-from-selected-files', filePaths),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
-  applyDateTokens: (pattern, dateStr, dateFormat) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat),
+  applyDateTokens: (pattern, dateStr, dateFormat, customTokens) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat, customTokens),
   // Recent directories API
   addRecentDirectory: (dirPath) => ipcRenderer.invoke('add-recent-directory', dirPath),
   pinDirectory: (dirPath) => ipcRenderer.invoke('pin-directory', dirPath),

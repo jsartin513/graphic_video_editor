@@ -88,6 +88,24 @@ describe('derivePatternFromFilename', () => {
 });
 
 describe('analyzeAndGroupVideos', () => {
+  test('returns empty array when filePaths is null', () => {
+    expect(analyzeAndGroupVideos(null)).toEqual([]);
+  });
+
+  test('returns empty array when filePaths is undefined', () => {
+    expect(analyzeAndGroupVideos(undefined)).toEqual([]);
+  });
+
+  test('returns empty array when filePaths is not an array', () => {
+    expect(analyzeAndGroupVideos('string')).toEqual([]);
+    expect(analyzeAndGroupVideos(123)).toEqual([]);
+    expect(analyzeAndGroupVideos({})).toEqual([]);
+  });
+
+  test('returns empty array for empty filePaths', () => {
+    expect(analyzeAndGroupVideos([])).toEqual([]);
+  });
+
   test('groups files by session ID from same directory', () => {
     const filePaths = [
       '/videos/folder1/GX010001.MP4',

@@ -33,8 +33,8 @@ function normalizeBoolean(enabled) {
 }
 
 /**
- * @param {() => import('./sd-card-detector').SDCardDetector|null} getSdCardDetector
- * @param {(detector: import('./sd-card-detector').SDCardDetector|null) => void} setSdCardDetector
+ * @param {() => import('../src/sd-card-detector').SDCardDetector|null} getSdCardDetector
+ * @param {(detector: import('../src/sd-card-detector').SDCardDetector|null) => void} setSdCardDetector
  * @param {() => Promise<void>} initializeSDCardDetection
  */
 function registerSDCardIpcHandlers(getSdCardDetector, setSdCardDetector, initializeSDCardDetection) {

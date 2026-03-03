@@ -14,10 +14,16 @@ const app = {
   quit: jest.fn()
 };
 
+const shell = {
+  openPath: jest.fn(),
+  openExternal: jest.fn().mockResolvedValue(undefined)
+};
+
 module.exports = {
   app,
   BrowserWindow: jest.fn(),
   dialog: { showOpenDialog: jest.fn(), showSaveDialog: jest.fn() },
   ipcMain: { handle: jest.fn(), on: jest.fn() },
-  nativeImage: { createFromPath: jest.fn(() => ({})) }
+  nativeImage: { createFromPath: jest.fn(() => ({})) },
+  shell
 };

@@ -102,6 +102,17 @@ describe('error-mapper', () => {
       expect(mapped.code).toBeDefined();
       expect(mapped.fixes).toBeDefined();
     });
+
+    test('should handle null and undefined without throwing', () => {
+      const mappedNull = mapError(null);
+      expect(mappedNull.userMessage).toBe('An Unexpected Error Occurred');
+      expect(mappedNull.code).toBe('UNKNOWN_ERROR');
+      expect(mappedNull.fixes).toBeDefined();
+
+      const mappedUndefined = mapError(undefined);
+      expect(mappedUndefined.userMessage).toBe('An Unexpected Error Occurred');
+      expect(mappedUndefined.code).toBe('UNKNOWN_ERROR');
+    });
   });
 
   describe('formatErrorForLog', () => {

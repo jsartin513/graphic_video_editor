@@ -19,7 +19,8 @@ const state = {
   currentScreen: 'fileList', // 'fileList', 'preview', 'progress'
   selectedOutputDestination: null, // null means use default
   selectedGroups: new Set(), // Track which groups are selected for batch merge
-  stopOnError: true // Stop batch processing on error by default
+  stopOnError: true, // Stop batch processing on error by default
+  importedSchedule: null // Parsed CSV rows [{ event, league, week, ... }] for naming
 };
 
 // DOM element references

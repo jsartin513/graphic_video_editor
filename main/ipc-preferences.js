@@ -7,6 +7,7 @@ const {
   loadPreferences,
   savePreferences,
   addRecentPattern,
+  addEventTemplate,
   setPreferredDateFormat,
   setPreferredQuality,
   setPreferredFormat,
@@ -191,10 +192,32 @@ function registerPreferenceIpcHandlers() {
     }
   });
 
-  ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat) => {
+  ipcMain.handle('save-event-template', async (event, name, pattern) => {
+    try {
+      if (typeof name !== 'string' || typeof pattern !== 'string') {
+        logger.error('Invalid event template input types', { nameType: typeof name, patternType: typeof pattern });
+        return { success: false, error: 'Invalid event template. Name and pattern must be non-empty strings.' };
+      }
+      const trimmedName = name.trim();
+      const trimmedPattern = pattern.trim();
+      if (!trimmedName || !trimmedPattern) {
+        logger.error('Empty event template name or pattern', { name, pattern });
+        return { success: false, error: 'Invalid event template. Name and pattern must be non-empty strings.' };
+      }
+      const prefs = await loadPreferences();
+      const updated = addEventTemplate(prefs, { name: trimmedName, pattern: trimmedPattern });
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error saving event template', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('apply-date-tokens', async (event, pattern, dateStr, dateFormat, customTokens) => {
     try {
       const date = dateStr ? new Date(dateStr) : new Date();
-      const result = applyDateTokens(pattern, date, dateFormat);
+      const result = applyDateTokens(pattern, date, dateFormat, customTokens || {});
       return { result };
     } catch (error) {
       logger.error('Error applying date tokens', { error: error.message });

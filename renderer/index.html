@@ -120,6 +120,42 @@
           <h2>Preview Merge</h2>
           <p class="preview-subtitle">Review and edit output filenames before merging</p>
         </div>
+
+        <div id="eventNamingSection" class="event-nning-section" aria-label="Optional event naming for filenames">
+          <h3 class="event-naming-label">Event naming <span class="optional">(optional)</span></h3>
+          <p class="event-naming-hint">Use these in filenames: {eventName}, {leagueName}, {weekName}. Apply to filenames by tabbing out or clicking Merge.</p>
+          <div class="event-naming-inputs">
+            <div class="event-naming-field">
+              <label for="eventNameInput">Event name</label>
+              <input type="text" id="eventNameInput" placeholder="e.g. BDL Open Gym" aria-label="Event name for filename tokens">
+            </div>
+            <div class="event-naming-field">
+              <label for="leagueNameInput">League</label>
+              <input type="text" id="leagueNameInput" placeholder="e.g. Rec League" aria-label="League name for filename tokens">
+            </div>
+            <div class="event-naming-field">
+              <label for="weekNameInput">Week</label>
+              <input type="text" id="weekNameInput" placeholder="e.g. Week 3" aria-label="Week name for filename tokens">
+            </div>
+          </div>
+          <div class="event-template-controls">
+            <div class="event-template-row">
+              <label for="eventTemplateSelect">Template</label>
+              <select id="eventTemplateSelect" aria-label="Select event template">
+                <option value="">— Select template —</option>
+              </select>
+              <button type="button" id="applyTemplateBtn" class="btn btn-secondary btn-small" aria-label="Apply template to all selected">Apply to all</button>
+            </div>
+            <div class="event-template-row">
+              <button type="button" id="saveAsTemplateBtn" class="btn btn-text btn-small" aria-label="Save current pattern as template">Save pattern as template</button>
+            </div>
+            <div class="event-template-row">
+              <input type="file" id="scheduleFileInput" accept=".csv" style="display: none" aria-label="Import schedule CSV">
+              <button type="button" id="importScheduleBtn" class="btn btn-text btn-small" aria-label="Import schedule from CSV">Import schedule (CSV)</button>
+              <span id="scheduleImportStatus" class="schedule-import-status"></span>
+            </div>
+          </div>
+        </div>
         
         <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
         
@@ -247,6 +283,13 @@
               <span class="duration-label">minutes</span>
             </div>
             <p class="form-hint">The video will be split into segments of this duration</p>
+          </div>
+
+          <div class="form-group">
+            <label for="splitFilenamePattern">Segment filename pattern <span class="optional">(optional)</span>:</label>
+            <input type="text" id="splitFilenamePattern" class="split-pattern-input" placeholder="e.g. BDL_Tournament_Game_{gameNumber}"
+                   aria-describedby="splitPatternHint">
+            <p id="splitPatternHint" class="form-hint">Use {gameNumber} for segment number (01, 02, …), {date}, {year}, {month}, {day} for date. Leave blank for default: VideoName_part01, _part02, …</p>
           </div>
           
           <div class="split-preview">
