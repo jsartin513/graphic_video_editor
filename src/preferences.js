@@ -586,7 +586,8 @@ function addEventTemplate(preferences, template) {
   const name = template.name.trim();
   const pattern = template.pattern.trim();
   const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
-  const filtered = templates.filter(t => t.name !== name);
+  const validTemplates = templates.filter(t => t && typeof t.name === 'string' && typeof t.pattern === 'string');
+  const filtered = validTemplates.filter(t => t.name !== name);
   const updated = [{ name, pattern }, ...filtered];
   const max = preferences.maxEventTemplates ?? DEFAULT_PREFERENCES.maxEventTemplates;
   return {

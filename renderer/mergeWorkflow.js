@@ -551,7 +551,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Store the original pattern before token replacement for preferences
       const originalPattern = value;
       
-      // Apply date and custom tokens if any
+      // Apply date, custom, and sessionId tokens
+      value = value.replace(/\{sessionId\}/gi, group.sessionId);
       if (value.includes('{')) {
         try {
           const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
@@ -717,6 +718,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       if (!value) value = `PROCESSED${group.sessionId}`;
       value = value.replace(/\.MP4$/i, '');
 
+      value = value.replace(/\{sessionId\}/gi, group.sessionId);
       if (value.includes('{')) {
         try {
           const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';

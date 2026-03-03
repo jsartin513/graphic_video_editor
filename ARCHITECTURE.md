@@ -16,7 +16,7 @@ IPC handlers are organized into modules under `main/`:
 | Module | Channels | Purpose |
 |--------|----------|---------|
 | `ipc-file.js` | select-files, select-folder, get-file-metadata, process-dropped-paths, open-recent-directory | File selection, metadata, drag-and-drop |
-| `ipc-preferences.js` | load-preferences, save-preferences, save-filename-pattern, set-date-format, etc. | Preferences, patterns, date tokens, updates |
+| `ipc-preferences.js` | load-preferences, save-preferences, save-filename-pattern, save-event-template, apply-date-tokens, etc. | Preferences, patterns, date tokens, event templates |
 | `ipc-video.js` | analyze-videos, get-video-duration, get-video-metadata, generate-thumbnail, get-total-file-size | Video analysis and metadata |
 | `ipc-merge-split.js` | merge-videos, cancel-merge, split-video, cancel-split, trim-video, get-output-directory, select-output-destination | Video merge, split, trim operations |
 | `ipc-misc.js` | open-folder, open-external, check-ffmpeg, get-test-videos-path, install-prerequisites | System utilities |
