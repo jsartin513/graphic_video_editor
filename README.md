@@ -82,17 +82,32 @@ Updates are only checked in production builds (installed apps). Development buil
 
 ## Project Structure
 
-- `main.js` - Electron main process (handles file dialogs and system operations)
+- `main.js` - Electron main process (app lifecycle, window creation, IPC registration)
 - `preload.js` - Secure preload script (exposes safe APIs to renderer)
+- `main/` - IPC handler modules (each registers a set of IPC channels)
+  - `ipc-file.js` - File/folder selection, metadata, dropped paths, recent directories
+  - `ipc-preferences.js` - Preferences, patterns, date format, updates
+  - `ipc-video.js` - Video analysis, metadata, thumbnails, total file size
+  - `ipc-merge-split.js` - Merge, split, trim, output destination
+  - `ipc-misc.js` - Open folder/URL, ffmpeg check, test videos, prerequisites
+  - `ipc-updates.js` - Auto-update check and download
+  - `ipc-logger.js` - Log viewing, export, debug mode
+  - `ipc-sd-card.js` - SD card detection, failed operations, error mapping
 - `src/` - Core modules
   - `video-grouping.js` - Groups GoPro videos by session ID
+  - `video-scanner.js` - Recursively scans directories for video files
   - `preferences.js` - User preferences storage and management
   - `sd-card-detector.js` - SD card detection and monitoring
+  - `ffmpeg-resolver.js` - FFmpeg/FFprobe path resolution
+  - `renderer-utils.js` - Pure formatting utilities (duration, paths, etc.)
+  - `undo-redo-manager.js` - Undo/redo state management
 - `renderer/` - UI files
   - `index.html` - Main HTML structure
   - `styles.css` - Application styling
   - `renderer.js` - UI logic and event handlers
   - `mergeWorkflow.js` - Video merging workflow with preferences
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed architecture overview.
 
 ## Video Metadata Viewing
 
