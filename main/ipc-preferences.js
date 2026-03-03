@@ -194,8 +194,18 @@ function registerPreferenceIpcHandlers() {
 
   ipcMain.handle('save-event-template', async (event, name, pattern) => {
     try {
+      if (typeof name !== 'string' || typeof pattern !== 'string') {
+        logger.error('Invalid event template input types', { nameType: typeof name, patternType: typeof pattern });
+        return { success: false, error: 'Invalid event template. Name and pattern must be non-empty strings.' };
+      }
+      const trimmedName = name.trim();
+      const trimmedPattern = pattern.trim();
+      if (!trimmedName || !trimmedPattern) {
+        logger.error('Empty event template name or pattern', { name, pattern });
+        return { success: false, error: 'Invalid event template. Name and pattern must be non-empty strings.' };
+      }
       const prefs = await loadPreferences();
-      const updated = addEventTemplate(prefs, { name: name.trim(), pattern: pattern.trim() });
+      const updated = addEventTemplate(prefs, { name: trimmedName, pattern: trimmedPattern });
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {

@@ -86,6 +86,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
           if (outputExt !== normalizedFormat) {
             const basePath = outputPath.replace(/\.[^/.]+$/, '');
             outputPath = basePath + '.' + normalizedFormat;
+            currentMergeOutputPath = outputPath;
           }
 
           const ffmpegArgs = ['-f', 'concat', '-safe', '0', '-i', tempFileList];

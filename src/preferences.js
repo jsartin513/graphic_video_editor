@@ -218,9 +218,9 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', 
 
   if (customTokens && typeof customTokens === 'object') {
     result = result
-      .replace(/\{eventName\}/gi, (customTokens.eventName || '').trim())
-      .replace(/\{leagueName\}/gi, (customTokens.leagueName || '').trim())
-      .replace(/\{weekName\}/gi, (customTokens.weekName || '').trim());
+      .replace(/\{eventName\}/gi, String(customTokens.eventName ?? '').trim())
+      .replace(/\{leagueName\}/gi, String(customTokens.leagueName ?? '').trim())
+      .replace(/\{weekName\}/gi, String(customTokens.weekName ?? '').trim());
   }
 
   return result;

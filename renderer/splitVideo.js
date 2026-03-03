@@ -124,7 +124,7 @@ export function initializeSplitVideo(domElements, appState = null) {
           name = name.replace(/\{weekName\}/gi, (scheduleRow.week || '').trim());
         }
         name = name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
-        name = name.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '') || name;
+        name = name.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
         segmentFilename = (name || `segment_${segmentNum}`) + '.MP4';
       } else {
         segmentFilename = `${baseName}_part${segmentNum.toString().padStart(2, '0')}.MP4`;

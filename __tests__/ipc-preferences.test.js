@@ -159,6 +159,15 @@ describe('ipc-preferences', () => {
       expect(savedPrefs.eventTemplates).toHaveLength(1);
       expect(savedPrefs.eventTemplates[0]).toEqual({ name: 'BDL Open Gym', pattern: 'BDL Open Gym ({date} {eventName})' });
     });
+
+    it('returns error for invalid name or pattern', async () => {
+      const handler = getHandler('save-event-template');
+      expect(await handler(null, null, 'pattern')).toEqual({ success: false, error: expect.any(String) });
+      expect(await handler(null, 'name', null)).toEqual({ success: false, error: expect.any(String) });
+      expect(await handler(null, '', 'pattern')).toEqual({ success: false, error: expect.any(String) });
+      expect(await handler(null, 'name', '   ')).toEqual({ success: false, error: expect.any(String) });
+      expect(loadPreferences).not.toHaveBeenCalled();
+    });
   });
 
   describe('save-patterns-from-selected-files', () => {

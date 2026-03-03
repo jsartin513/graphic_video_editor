@@ -9,17 +9,43 @@ function removeExtension(str) {
   return str.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
 }
 
+/**
+ * Parse a single CSV line with RFC4180-style quoting (handles "field, with comma" and ""escaped"").
+ */
+function parseCSVLine(line) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      fields.push(current.trim());
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
 function parseScheduleCsv(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length < 2) return [];
-  const headerLine = lines[0];
-  const headers = headerLine.split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+  const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/^"|"$/g, ''));
   const eventIdx = headers.findIndex(h => /^(event|event\s*name|game|game\s*slot|slot)$/.test(h));
   const leagueIdx = headers.findIndex(h => /^(league|league\s*name)$/.test(h));
   const weekIdx = headers.findIndex(h => /^(week|week\s*name)$/.test(h));
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'));
     rows.push({
       event: eventIdx >= 0 ? (values[eventIdx] || '') : '',
       league: leagueIdx >= 0 ? (values[leagueIdx] || '') : '',
@@ -363,7 +389,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         const name = prompt('Template name (e.g. "BDL Open Gym"):', '');
         if (!name || !name.trim()) return;
         try {
-          await window.electronAPI.saveEventTemplate(name.trim(), pattern);
+          const result = await window.electronAPI.saveEventTemplate(name.trim(), pattern);
+          if (result?.success === false) {
+            alert(result.error || 'Could not save template.');
+            return;
+          }
           await loadUserPreferences();
           setupEventTemplateControls();
         } catch (err) {

@@ -9,7 +9,10 @@ const { checkFFmpeg } = require('../src/ffmpeg-resolver');
 
 function registerMiscIpcHandlers() {
   ipcMain.handle('open-folder', async (event, folderPath) => {
-    shell.openPath(folderPath);
+    const error = await shell.openPath(folderPath);
+    if (error && typeof error === 'string' && error.trim()) {
+      throw new Error(error);
+    }
   });
 
   ipcMain.handle('open-external', async (event, url) => {
