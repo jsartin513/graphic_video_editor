@@ -23,7 +23,6 @@ Examples of files that should go here:
 
 - `CODE_SIGNING_SETUP.md` - Guide for setting up code signing
 - `GET_CERTIFICATE_STEPS.md` - Step-by-step certificate setup
-- `PR_REVIEW_SUMMARY.md` - PR review analysis
 - `check-signing-setup.js` - Helper script to verify signing setup
 - `get-pr-details.js` - Script to fetch PR details from GitHub
 
