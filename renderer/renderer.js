@@ -12,6 +12,7 @@ import { initializeSettings } from './settings.js';
 import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
 import { initUpdateNotifications } from './updateNotification.js';
+import { initializeHelpUi } from './helpUi.js';
 import { setAppPhase } from './appPhase.js';
 
 const SPLIT_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v']);
@@ -229,6 +230,8 @@ updateShortcutHints();
 
 // Initialize update notifications
 initUpdateNotifications();
+
+initializeHelpUi();
 
 // SD Card Detection
 let currentSDCard = null;

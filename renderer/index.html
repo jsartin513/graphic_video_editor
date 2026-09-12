@@ -14,10 +14,15 @@
     <header class="app-header" role="banner">
       <div class="app-header-row">
         <h1>Video Merger</h1>
-        <button type="button" id="openSettingsBtn" class="btn btn-text btn-small app-settings-btn" aria-label="Open settings">
-          Settings
-          <span class="btn-shortcut" id="settingsShortcutHint" aria-label="Keyboard shortcut"></span>
-        </button>
+        <div class="app-header-actions">
+          <button type="button" id="openHelpBtn" class="btn btn-text btn-small" aria-label="Open user guide in browser">
+            Help
+          </button>
+          <button type="button" id="openSettingsBtn" class="btn btn-text btn-small app-settings-btn" aria-label="Open settings">
+            Settings
+            <span class="btn-shortcut" id="settingsShortcutHint" aria-label="Keyboard shortcut"></span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -44,6 +49,10 @@
           </button>
         </div>
       </div>
+      <p class="form-hint sd-card-help">
+        <strong>Open Folder</strong> shows the card in Finder.
+        <strong>Load Videos</strong> adds clips from the card into this app.
+      </p>
     </div>
 
     <main id="main-content" class="main-content" role="main">
@@ -70,6 +79,9 @@
             </button>
           </div>
           <p id="dropZoneHint" class="drop-zone-hint">or drop files or a folder here</p>
+          <p class="form-hint add-videos-formats-hint">
+            Supports MP4, MOV, AVI, MKV, and M4V. Folders are scanned including subfolders.
+          </p>
         </div>
 
         <div id="filePickStatus" class="file-pick-status" role="status" aria-live="polite" hidden></div>
@@ -89,6 +101,7 @@
             Split video…
             <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
           </button>
+          <p class="form-hint pick-split-hint">Split one long file into shorter segments before merging.</p>
         </div>
       </div>
 
@@ -114,7 +127,7 @@
             Continue to Merge
             <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
           </button>
-          <button id="compareVideosBtn" class="btn btn-secondary" type="button" style="display: none;" aria-label="Compare the two selected videos">
+          <button id="compareVideosBtn" class="btn btn-secondary" type="button" style="display: none;" aria-label="Compare the two selected videos" title="Side-by-side preview to check resolution, frame rate, and codec before merging">
             Compare Videos
           </button>
           <button type="button" id="addMoreFromListBtn" class="btn btn-secondary" aria-label="Add more videos">
@@ -136,6 +149,9 @@
           </div>
         </div>
 
+        <p class="form-hint merge-sessions-hint">
+          Clips are grouped by GoPro <strong>session</strong>. Check each session you want in this merge; unchecked sessions are skipped.
+        </p>
         <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
 
         <section id="mergeNamingSection" class="merge-naming-section" aria-label="Merged video naming">
@@ -149,9 +165,10 @@
               </select>
               <button type="button" id="applyTemplateBtn" class="btn btn-secondary btn-small" aria-label="Apply template to all selected">Apply to all</button>
             </div>
-            <div class="event-template-row">
+            <div class="event-template-row field-with-hint">
               <label for="weekCountInput">Week number</label>
-              <input type="text" id="weekCountInput" inputmode="numeric" placeholder="e.g. 3" aria-label="Week number for count token in filename">
+              <input type="text" id="weekCountInput" inputmode="numeric" placeholder="e.g. 3" aria-label="Week number for count token in filename" aria-describedby="weekCountHelp">
+              <p id="weekCountHelp" class="form-hint">Fills the <code>{count}</code> token in filename patterns (for example week 3 of a season).</p>
             </div>
             <div class="event-template-row">
               <button type="button" id="saveAsTemplateBtn" class="btn btn-text btn-small" aria-label="Save current pattern as template">Save pattern as template</button>
@@ -230,6 +247,9 @@
           <div class="merge-sticky-info">
             <p id="mergeSummaryText" class="merge-summary" aria-live="polite">Ready to merge</p>
             <span id="outputDestinationPath" class="sr-only">merged_videos (default)</span>
+            <p id="outputDestinationHelp" class="form-hint merge-output-hint">
+              Merged files go in <strong>merged_videos</strong> next to your source clips unless you pick another folder.
+            </p>
             <div class="merge-sticky-destination">
               <button id="selectOutputDestinationBtn" class="btn btn-text btn-small" type="button" aria-label="Choose output folder">
                 Change folder
@@ -473,6 +493,11 @@
         <button id="closeSettingsModalBtn" class="modal-close-btn" aria-label="Close settings dialog">×</button>
       </div>
       <div class="modal-body">
+        <section class="settings-section" aria-labelledby="settingsHelpHeading">
+          <h3 id="settingsHelpHeading">Help</h3>
+          <p class="form-hint">Install, merge workflow, updates, and troubleshooting (non-technical guide).</p>
+          <button type="button" id="settingsOpenUserGuideBtn" class="btn btn-secondary btn-small">Open user guide</button>
+        </section>
         <section class="settings-section" aria-labelledby="settingsDateFormatHeading">
           <h3 id="settingsDateFormatHeading">Date format</h3>
           <p class="form-hint">Used for the {date} token in merged filenames.</p>

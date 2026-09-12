@@ -408,6 +408,11 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
         <div class="warning-content">
           <strong>Compatibility Warning:</strong>
           <p>The selected videos have different properties. This may affect merge quality:</p>
+          <p class="compatibility-help form-hint">
+            On the merge screen, use <strong>Video quality → Copy</strong> when clips match.
+            If they differ, try re-encoding with <strong>High</strong> or <strong>Medium</strong>, or remove mismatched clips.
+            Use <strong>Compare Videos</strong> when exactly two files are selected.
+          </p>
           <ul>
             ${warnings.map(w => {
               const propName = w.property === 'fps' ? 'frame rate' : 
