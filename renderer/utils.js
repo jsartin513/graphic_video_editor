@@ -111,16 +111,20 @@ function formatTimeForFFmpeg(seconds) {
 export function sanitizeFilenameForOutput(name) {
   if (!name || typeof name !== 'string') return '';
   const WINDOWS_RESERVED = new Set([
-    'con', 'prn', 'aux', 'nul',
+    'con', 'conin$', 'conout$', 'prn', 'aux', 'nul',
     'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
     'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9'
   ]);
+  const deviceStem = (basename) => {
+    const segment = basename.split(/[/\\]/).pop() || basename;
+    const dotIndex = segment.indexOf('.');
+    return (dotIndex === -1 ? segment : segment.slice(0, dotIndex)).toLowerCase();
+  };
   let result = name.replace(/[\u0000-\u001f\u007f]/g, '_');
   result = result.replace(/[/\\:*?"<>|]/g, '_');
   result = result.replace(/[.\s]+$/g, '').trim();
   if (!result) return 'output';
-  const stem = result.includes('.') ? result.slice(0, result.lastIndexOf('.')) : result;
-  if (WINDOWS_RESERVED.has(stem.toLowerCase())) {
+  if (WINDOWS_RESERVED.has(deviceStem(result))) {
     result = `_${result}`;
   }
   return result;

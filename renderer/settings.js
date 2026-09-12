@@ -21,6 +21,7 @@ export function initializeSettings() {
   let editingTemplateName = null;
   let currentPreferences = null;
   let previousFocus = null;
+  let settingsOpenInProgress = false;
 
   function isModalVisible() {
     return modal && modal.style.display !== 'none';
@@ -72,7 +73,7 @@ export function initializeSettings() {
   }
 
   function showModal() {
-    if (!modal) return;
+    if (!modal || isModalVisible()) return;
     previousFocus = document.activeElement;
     modal.style.display = 'flex';
     document.addEventListener('keydown', onSettingsKeyDown, true);
@@ -111,7 +112,7 @@ export function initializeSettings() {
       return;
     }
     templateList.innerHTML = templates.map((t) => `
-      <div class="settings-template-item" data-name="${escapeAttr(t.name)}">
+      <div class="settings-template-item" role="listitem" data-name="${escapeAttr(t.name)}">
         <div class="settings-template-info">
           <strong>${escapeHtml(t.name)}</strong>
           <span class="settings-template-pattern">${escapeHtml(t.pattern)}</span>
@@ -204,8 +205,14 @@ export function initializeSettings() {
 
   if (openBtn) {
     openBtn.addEventListener('click', async () => {
-      await loadAndRender();
-      showModal();
+      if (isModalVisible() || settingsOpenInProgress) return;
+      settingsOpenInProgress = true;
+      try {
+        await loadAndRender();
+        showModal();
+      } finally {
+        settingsOpenInProgress = false;
+      }
     });
   }
 
@@ -237,8 +244,14 @@ export function initializeSettings() {
 
   return {
     openSettings: async () => {
-      await loadAndRender();
-      showModal();
+      if (isModalVisible() || settingsOpenInProgress) return;
+      settingsOpenInProgress = true;
+      try {
+        await loadAndRender();
+        showModal();
+      } finally {
+        settingsOpenInProgress = false;
+      }
     }
   };
 }

@@ -16,6 +16,7 @@ jest.mock('fs', () => {
 const {
   MERGE_LOG_FILENAME,
   createMergeLogEntry,
+  buildMergeLogEntryForCompletedMerge,
   appendMergeLogEntry
 } = require('../src/merge-log');
 
@@ -63,6 +64,27 @@ describe('merge-log', () => {
         naming: { templateName: '', weekCount: '  ' }
       });
       expect(entry.naming).toBeUndefined();
+    });
+  });
+
+  describe('buildMergeLogEntryForCompletedMerge', () => {
+    it('uses merge handler paths and settings with optional naming context', () => {
+      const entry = buildMergeLogEntryForCompletedMerge({
+        filePaths: ['/in/a.mp4', '/in/b.mp4'],
+        outputPath: '/out/merged_videos/session.mp4',
+        qualityOption: 'copy',
+        format: 'mp4',
+        normalizeAudio: false,
+        mergeLogContext: {
+          sessionId: '0534',
+          naming: { templateName: 'BDL Open Gym', dateFormat: 'YYYY-MM-DD' }
+        }
+      });
+      expect(entry.inputFiles).toEqual(['/in/a.mp4', '/in/b.mp4']);
+      expect(entry.outputPath).toBe('/out/merged_videos/session.mp4');
+      expect(entry.settings).toEqual({ quality: 'copy', format: 'mp4', normalizeAudio: false });
+      expect(entry.sessionId).toBe('0534');
+      expect(entry.naming.templateName).toBe('BDL Open Gym');
     });
   });
 

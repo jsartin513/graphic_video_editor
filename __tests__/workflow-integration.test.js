@@ -124,14 +124,14 @@ describe('Video Merge Workflow Integration', () => {
       const byot = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Fall 2026 BYOT');
 
       const openGymName = sanitizeFilenameForOutput(
-        applyDateTokens(openGym.pattern, date, 'YYYY-MM-DD')
+        applyDateTokens(openGym.pattern.replace(/\{sessionId\}/gi, '0534'), date, 'YYYY-MM-DD')
       );
-      expect(openGymName).toBe('BDL Open Gym 2026-09-12');
+      expect(openGymName).toBe('BDL Open Gym 2026-09-12 0534');
 
       const byotName = sanitizeFilenameForOutput(
-        applyDateTokens(byot.pattern, date, 'YYYY-MM-DD', { count: '3' })
+        applyDateTokens(byot.pattern.replace(/\{sessionId\}/gi, '0534'), date, 'YYYY-MM-DD', { count: '3' })
       );
-      expect(byotName).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12');
+      expect(byotName).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12 0534');
     });
 
     test('apply template workflow: PROCESSED placeholder then BYOT pattern with sessionId', () => {
@@ -145,7 +145,7 @@ describe('Video Merge Workflow Integration', () => {
       let mergedName = applyDateTokens(pattern, date, 'YYYY-MM-DD', { count: '2' });
       mergedName = sanitizeFilenameForOutput(mergedName);
 
-      expect(mergedName).toBe('BDL Fall 2026 BYOT Week 2 2026-09-12');
+      expect(mergedName).toBe('BDL Fall 2026 BYOT Week 2 2026-09-12 0534');
       expect(mergedName).not.toContain('PROCESSED');
     });
 

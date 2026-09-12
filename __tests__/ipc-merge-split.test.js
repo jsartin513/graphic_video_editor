@@ -80,30 +80,6 @@ describe('ipc-merge-split', () => {
     });
   });
 
-  describe('append-merge-log', () => {
-    it('writes merge_log.jsonl entry for valid payload', async () => {
-      const handler = getHandler('append-merge-log');
-      const outputDir = path.join('/Users', 'test', 'merged_videos');
-      const payload = {
-        sessionId: '0001',
-        inputFiles: ['/in/GX010001.MP4'],
-        outputPath: path.join(outputDir, 'out.mp4'),
-        outputFilename: 'out.mp4',
-        settings: { quality: 'copy', format: 'mp4', normalizeAudio: false }
-      };
-      const result = await handler(null, outputDir, payload);
-      expect(result.success).toBe(true);
-      expect(result.logPath).toContain('merge_log.jsonl');
-      expect(fs.appendFile).toHaveBeenCalled();
-    });
-
-    it('returns error for relative output directory', async () => {
-      const handler = getHandler('append-merge-log');
-      const result = await handler(null, 'relative/path', { outputPath: '/x.mp4', inputFiles: [] });
-      expect(result.success).toBe(false);
-    });
-  });
-
   describe('trim-video validation', () => {
     it('rejects when options is null or undefined', async () => {
       const handler = getHandler('trim-video');

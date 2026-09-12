@@ -16,8 +16,8 @@ function getPreferencesPath() {
 }
 
 const DEFAULT_EVENT_TEMPLATES = [
-  { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date}' },
-  { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date}' }
+  { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date} {sessionId}' },
+  { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date} {sessionId}' }
 ];
 
 // Default preferences
@@ -97,7 +97,11 @@ async function loadPreferences() {
     const prefs = JSON.parse(data);
     const { merged, needsTemplateMigration } = mergeLoadedPreferences(prefs);
     if (needsTemplateMigration) {
-      await savePreferences(merged);
+      try {
+        await savePreferences(merged);
+      } catch (saveError) {
+        logger.error('Error persisting template migration', { error: saveError.message });
+      }
     }
     return merged;
   } catch (error) {

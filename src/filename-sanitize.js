@@ -1,8 +1,24 @@
 const WINDOWS_RESERVED = new Set([
-  'con', 'prn', 'aux', 'nul',
+  'con', 'conin$', 'conout$', 'prn', 'aux', 'nul',
   'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
   'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9'
 ]);
+
+/**
+ * Windows treats the segment before the first dot as the device name (e.g. CON.notes.v1).
+ * @param {string} basename
+ * @returns {string}
+ */
+function windowsDeviceStem(basename) {
+  if (!basename || typeof basename !== 'string') return '';
+  const segment = basename.split(/[/\\]/).pop() || basename;
+  const dotIndex = segment.indexOf('.');
+  return (dotIndex === -1 ? segment : segment.slice(0, dotIndex)).toLowerCase();
+}
+
+function isWindowsReservedBasename(basename) {
+  return WINDOWS_RESERVED.has(windowsDeviceStem(basename));
+}
 
 /**
  * Remove characters invalid in filenames on common desktop OSes; preserve spaces.
@@ -16,14 +32,14 @@ function sanitizeFilenameForOutput(name) {
   result = result.replace(/[/\\:*?"<>|]/g, '_');
   result = result.replace(/[.\s]+$/g, '').trim();
   if (!result) return 'output';
-  const stem = result.includes('.') ? result.slice(0, result.lastIndexOf('.')) : result;
-  const reservedStem = stem.toLowerCase();
-  if (WINDOWS_RESERVED.has(reservedStem)) {
+  if (isWindowsReservedBasename(result)) {
     result = `_${result}`;
   }
   return result;
 }
 
 module.exports = {
-  sanitizeFilenameForOutput
+  sanitizeFilenameForOutput,
+  isWindowsReservedBasename,
+  windowsDeviceStem
 };

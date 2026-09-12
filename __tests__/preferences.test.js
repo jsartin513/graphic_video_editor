@@ -134,6 +134,16 @@ describe('loadPreferences', () => {
     expect(fs.writeFile).not.toHaveBeenCalled();
   });
 
+  test('returns merged preferences when template migration save fails', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ preferredQuality: 'high', eventTemplates: [] }));
+    fs.writeFile.mockRejectedValue(new Error('disk full'));
+
+    const result = await loadPreferences();
+
+    expect(result.preferredQuality).toBe('high');
+    expect(result.eventTemplates).toEqual(DEFAULT_EVENT_TEMPLATES);
+  });
+
   test('seeds default event templates when key is missing', async () => {
     fs.readFile.mockResolvedValue(JSON.stringify({ preferredQuality: 'high' }));
 
@@ -423,8 +433,9 @@ describe('applyDateTokens', () => {
     const date = new Date(2026, 8, 12);
     const byot = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Fall 2026 BYOT');
     expect(byot).toBeDefined();
-    const result = applyDateTokens(byot.pattern, date, 'YYYY-MM-DD', { count: '3' });
-    expect(result).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12');
+    const pattern = byot.pattern.replace(/\{sessionId\}/gi, '0534');
+    const result = applyDateTokens(pattern, date, 'YYYY-MM-DD', { count: '3' });
+    expect(result).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12 0534');
   });
 });
 
@@ -534,6 +545,7 @@ describe('sanitizeFilenameForOutput', () => {
   test('prefixes Windows reserved device names', () => {
     expect(sanitizeFilenameForOutput('CON')).toBe('_CON');
     expect(sanitizeFilenameForOutput('nul.mp4')).toBe('_nul.mp4');
+    expect(sanitizeFilenameForOutput('CON.notes.v1')).toBe('_CON.notes.v1');
   });
 });
 
@@ -544,8 +556,8 @@ describe('DEFAULT_PREFERENCES', () => {
 
   test('DEFAULT_EVENT_TEMPLATES includes BDL Open Gym and BYOT patterns', () => {
     expect(DEFAULT_EVENT_TEMPLATES).toEqual([
-      { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date}' },
-      { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date}' }
+      { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date} {sessionId}' },
+      { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date} {sessionId}' }
     ]);
   });
 

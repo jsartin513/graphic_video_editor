@@ -104,11 +104,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
   function getFilenameCustomTokens() {
     const weekCountInput = document.getElementById('weekCountInput');
+    const count = weekCountInput != null
+      ? weekCountInput.value.trim()
+      : (userPreferences?.lastWeekCount || '');
     return {
       eventName: document.getElementById('eventNameInput')?.value || '',
       leagueName: document.getElementById('leagueNameInput')?.value || '',
       weekName: document.getElementById('weekNameInput')?.value || '',
-      count: weekCountInput?.value?.trim() || userPreferences?.lastWeekCount || ''
+      count
     };
   }
 
@@ -933,6 +936,25 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           });
           return;
         }
+    }
+
+    const duplicateNames = new Map();
+    for (const index of indicesToMerge) {
+      const group = state.videoGroups[index];
+      const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+      const normalizedName = (baseName + '.' + selectedFormat.toLowerCase()).toLowerCase();
+      if (duplicateNames.has(normalizedName)) {
+        const otherSession = duplicateNames.get(normalizedName);
+        showError(`Duplicate output filename for Sessions ${otherSession} and ${group.sessionId}`, {
+          operation: 'Merge Videos',
+          suggestions: [
+            'Each selected session needs a unique output filename',
+            'Apply a template with {sessionId} or edit filenames before merging'
+          ]
+        });
+        return;
+      }
+      duplicateNames.set(normalizedName, group.sessionId);
     }
     
     // Get output directory (use custom if selected, otherwise default)

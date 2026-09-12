@@ -46,7 +46,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTotalFileSize: (filePaths) => ipcRenderer.invoke('get-total-file-size', filePaths),
   mergeVideos: (filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload) =>
     ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload),
-  appendMergeLog: (outputDir, payload) => ipcRenderer.invoke('append-merge-log', outputDir, payload),
   cancelMerge: () => ipcRenderer.invoke('cancel-merge'),
   setPreferredFormat: (format) => ipcRenderer.invoke('set-preferred-format', format),
   splitVideo: (videoPath, splits, outputDir) => ipcRenderer.invoke('split-video', videoPath, splits, outputDir),

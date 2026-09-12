@@ -16,7 +16,7 @@ const {
   QUALITY_SETTINGS,
   validateQualityOption
 } = require('../src/quality-utils');
-const { createMergeLogEntry, appendMergeLogEntry } = require('../src/merge-log');
+const { buildMergeLogEntryForCompletedMerge, appendMergeLogEntry } = require('../src/merge-log');
 
 let currentMergeProcess = null;
 let currentMergeTempFile = null;
@@ -54,6 +54,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
       isCancelled = false;
       currentMergeOutputPath = outputPath;
+      const mergeLogContext = mergeLogPayload && typeof mergeLogPayload === 'object'
+        ? { sessionId: mergeLogPayload.sessionId, naming: mergeLogPayload.naming }
+        : null;
 
       const validFilePaths = filePaths.filter(filePath => {
         const filename = path.basename(filePath);
@@ -239,21 +242,18 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
               logger.info('merge-videos: Merge completed', { outputPath: outputFile });
               (async () => {
                 try {
-                  if (mergeLogPayload && typeof mergeLogPayload === 'object') {
-                    try {
-                      const outputDir = typeof mergeLogPayload.outputDir === 'string' && path.isAbsolute(mergeLogPayload.outputDir.trim())
-                        ? mergeLogPayload.outputDir.trim()
-                        : path.dirname(outputFile);
-                      const entry = createMergeLogEntry({
-                        ...mergeLogPayload,
-                        outputPath: outputFile,
-                        outputFilename: mergeLogPayload.outputFilename || path.basename(outputFile),
-                        outputDir
-                      });
-                      await appendMergeLogEntry(outputDir, entry);
-                    } catch (logError) {
-                      logger.error('merge-videos: merge log append failed', { error: logError.message });
-                    }
+                  try {
+                    const entry = buildMergeLogEntryForCompletedMerge({
+                      filePaths: validFilePaths,
+                      outputPath: outputFile,
+                      qualityOption,
+                      format: normalizedFormat,
+                      normalizeAudio,
+                      mergeLogContext
+                    });
+                    await appendMergeLogEntry(path.dirname(outputFile), entry);
+                  } catch (logError) {
+                    logger.error('merge-videos: merge log append failed', { error: logError.message });
                   }
                   resolve({ success: true, outputPath: outputFile });
                 } catch (err) {
@@ -305,20 +305,6 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
       return outputDir;
     } catch (error) {
       throw new Error(`Failed to create output directory: ${error.message}`);
-    }
-  });
-
-  ipcMain.handle('append-merge-log', async (event, outputDir, payload) => {
-    try {
-      if (typeof outputDir !== 'string' || !path.isAbsolute(outputDir.trim())) {
-        return { success: false, error: 'Invalid output directory.' };
-      }
-      const entry = createMergeLogEntry(payload);
-      const { logPath } = await appendMergeLogEntry(outputDir.trim(), entry);
-      return { success: true, logPath };
-    } catch (error) {
-      logger.error('Error appending merge log', { error: error.message });
-      return { success: false, error: error.message };
     }
   });
 

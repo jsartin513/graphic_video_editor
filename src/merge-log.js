@@ -82,6 +82,35 @@ function createMergeLogEntry(payload) {
 }
 
 /**
+ * Build audit entry from merge handler data; optional context supplies sessionId and naming only.
+ * @param {Object} params
+ * @returns {Object}
+ */
+function buildMergeLogEntryForCompletedMerge({
+  filePaths,
+  outputPath,
+  qualityOption,
+  format,
+  normalizeAudio,
+  mergeLogContext
+}) {
+  const ctx = mergeLogContext && typeof mergeLogContext === 'object' ? mergeLogContext : {};
+  return createMergeLogEntry({
+    sessionId: ctx.sessionId,
+    inputFiles: filePaths,
+    outputPath,
+    outputFilename: path.basename(outputPath),
+    outputDir: path.dirname(outputPath),
+    settings: {
+      quality: typeof qualityOption === 'string' ? qualityOption : 'copy',
+      format: typeof format === 'string' ? format : 'mp4',
+      normalizeAudio: !!normalizeAudio
+    },
+    naming: ctx.naming
+  });
+}
+
+/**
  * Append one JSON line to merge_log.jsonl in outputDir.
  * @param {string} outputDir
  * @param {Object} entry - Sanitized entry object
@@ -108,5 +137,6 @@ async function appendMergeLogEntry(outputDir, entry) {
 module.exports = {
   MERGE_LOG_FILENAME,
   createMergeLogEntry,
+  buildMergeLogEntryForCompletedMerge,
   appendMergeLogEntry
 };
