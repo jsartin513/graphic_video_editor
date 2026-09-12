@@ -9,6 +9,7 @@ resources/
 .env
 .env.local
 .env.*.local
+docs/local/release-*.pid
 
 # Test coverage
 coverage/
