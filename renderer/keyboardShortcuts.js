@@ -44,9 +44,12 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
 
   // Handle keyboard events
   function handleKeyDown(e) {
+    const targetIsTextInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+
     // Escape - Go back or cancel
     if (e.key === 'Escape') {
-      if (state.currentScreen === 'preview' && backBtn && !backBtn.disabled) {
+      const allowPreviewEscape = !targetIsTextInput || Boolean(e.target.closest('.filename-input-container'));
+      if (state.currentScreen === 'preview' && allowPreviewEscape && backBtn && !backBtn.disabled) {
         e.preventDefault();
         backBtn.click();
         return;
@@ -61,7 +64,7 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
     }
 
     // Don't trigger shortcuts when typing in inputs
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    if (targetIsTextInput) {
       // Allow Enter to work in inputs for filename editing
       if (e.key === 'Enter' && e.target.closest('.filename-input-container')) {
         // Let it bubble up to submit filename
