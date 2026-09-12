@@ -79,6 +79,7 @@ export CSC_NAME
 echo "Building arm64 fat (ffmpeg bundled)..."
 killall "Video Merger" 2>/dev/null || true
 rm -rf dist/mac-arm64
+rm -f "$ROOT"/dist/Video\ Merger-*-arm64-fat.dmg "$ROOT"/dist/Video\ Merger-*-arm64-fat.zip
 npm run build:fat:arm64
 
 APP="$ROOT/dist/mac-arm64/Video Merger.app"
