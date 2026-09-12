@@ -1,8 +1,10 @@
 const { analyzeAndGroupVideos } = require('../src/video-grouping');
-const { 
+const {
   addRecentPattern,
   applyDateTokens,
-  DEFAULT_PREFERENCES 
+  sanitizeFilenameForOutput,
+  DEFAULT_PREFERENCES,
+  DEFAULT_EVENT_TEMPLATES
 } = require('../src/preferences');
 
 describe('Video Merge Workflow Integration', () => {
@@ -114,6 +116,58 @@ describe('Video Merge Workflow Integration', () => {
       expect(filename).toContain('Trip_2024-01-15');
       expect(filename).toContain('Session0001');
       expect(filename).not.toContain('{');
+    });
+
+    test('applies default BDL templates to produce deliverable-style filenames', () => {
+      const date = new Date(2026, 8, 12);
+      const openGym = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Open Gym');
+      const byot = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Fall 2026 BYOT');
+
+      const openGymName = sanitizeFilenameForOutput(
+        applyDateTokens(openGym.pattern, date, 'YYYY-MM-DD')
+      );
+      expect(openGymName).toBe('BDL Open Gym 2026-09-12');
+
+      const byotName = sanitizeFilenameForOutput(
+        applyDateTokens(byot.pattern, date, 'YYYY-MM-DD', { count: '3' })
+      );
+      expect(byotName).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12');
+    });
+
+    test('apply template workflow: PROCESSED placeholder then BYOT pattern with sessionId', () => {
+      const files = ['/court1/GX010534.MP4', '/court1/GX020534.MP4'];
+      const groups = analyzeAndGroupVideos(files);
+      expect(groups[0].outputFilename).toBe('PROCESSED0534.MP4');
+
+      const byot = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Fall 2026 BYOT');
+      const date = new Date(2026, 8, 12);
+      let pattern = byot.pattern.replace(/\{sessionId\}/gi, groups[0].sessionId);
+      let mergedName = applyDateTokens(pattern, date, 'YYYY-MM-DD', { count: '2' });
+      mergedName = sanitizeFilenameForOutput(mergedName);
+
+      expect(mergedName).toBe('BDL Fall 2026 BYOT Week 2 2026-09-12');
+      expect(mergedName).not.toContain('PROCESSED');
+    });
+
+    test('merge log entry captures template and settings for audit', () => {
+      const { createMergeLogEntry } = require('../src/merge-log');
+      const entry = createMergeLogEntry({
+        sessionId: '0534',
+        inputFiles: ['/court1/GX010534.MP4'],
+        outputPath: '/court1/merged_videos/BDL Fall 2026 BYOT Week 3 2026-09-12.mp4',
+        outputFilename: 'BDL Fall 2026 BYOT Week 3 2026-09-12.mp4',
+        outputDir: '/court1/merged_videos',
+        settings: { quality: 'copy', format: 'mp4', normalizeAudio: false },
+        naming: {
+          templateName: 'BDL Fall 2026 BYOT',
+          templatePattern: 'BDL Fall 2026 BYOT Week {count} {date}',
+          weekCount: '3',
+          dateFormat: 'YYYY-MM-DD',
+          appliedAt: '2026-09-12T16:00:00.000Z'
+        }
+      });
+      expect(entry.type).toBe('merge');
+      expect(entry.naming.templatePattern).toContain('{count}');
     });
   });
 

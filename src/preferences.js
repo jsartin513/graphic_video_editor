@@ -14,6 +14,11 @@ function getPreferencesPath() {
   return path.join(userDataPath, 'preferences.json');
 }
 
+const DEFAULT_EVENT_TEMPLATES = [
+  { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date}' },
+  { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date}' }
+];
+
 // Default preferences
 const DEFAULT_PREFERENCES = {
   recentFilenamePatterns: [],
@@ -39,9 +44,23 @@ const DEFAULT_PREFERENCES = {
   lastSDCardPath: null,
   showSDCardNotifications: true,
   failedOperations: [], // Track failed merge operations for recovery
-  eventTemplates: [], // Reusable filename patterns: [{ name, pattern }]
-  maxEventTemplates: 10
+  eventTemplates: [...DEFAULT_EVENT_TEMPLATES], // Reusable filename patterns: [{ name, pattern }]
+  maxEventTemplates: 10,
+  lastWeekCount: '' // Remembered week number for {count} in BYOT templates
 };
+
+function mergeLoadedPreferences(prefs) {
+  const eventTemplates = Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : [];
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...prefs,
+    dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
+    recentDirectories: prefs.recentDirectories || [],
+    pinnedDirectories: prefs.pinnedDirectories || [],
+    eventTemplates: eventTemplates.length > 0 ? eventTemplates : [...DEFAULT_EVENT_TEMPLATES],
+    lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : '')
+  };
+}
 
 /**
  * Load user preferences from disk
@@ -52,25 +71,21 @@ async function loadPreferences() {
     const prefsPath = getPreferencesPath();
     const data = await fs.readFile(prefsPath, 'utf8');
     const prefs = JSON.parse(data);
-    
-    // Merge with defaults to ensure all keys exist
-    return {
-      ...DEFAULT_PREFERENCES,
-      ...prefs,
-      // Ensure dateFormats includes defaults
-      dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
-      // Ensure recent directories arrays exist
-      recentDirectories: prefs.recentDirectories || [],
-      pinnedDirectories: prefs.pinnedDirectories || [],
-      eventTemplates: Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : []
-    };
+    const merged = mergeLoadedPreferences(prefs);
+    const rawTemplates = prefs.eventTemplates;
+    const needsTemplateSeed =
+      !Array.isArray(rawTemplates) || rawTemplates.length === 0;
+    if (needsTemplateSeed) {
+      await savePreferences(merged);
+    }
+    return merged;
   } catch (error) {
     if (error.code === 'ENOENT') {
       // File doesn't exist yet, return defaults
-      return { ...DEFAULT_PREFERENCES };
+      return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES] };
     }
     logger.error('Error loading preferences', { error: error.message });
-    return { ...DEFAULT_PREFERENCES };
+    return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES] };
   }
 }
 
@@ -195,11 +210,11 @@ function formatDate(date, format) {
 /**
  * Apply date tokens to a filename pattern
  * Replaces tokens like {date}, {year}, {month}, {day} with actual values
- * Also supports custom tokens: {eventName}, {leagueName}, {weekName}
+ * Also supports custom tokens: {eventName}, {leagueName}, {weekName}, {count}
  * @param {string} pattern - Pattern with date tokens
  * @param {Date} date - Date to use for tokens (defaults to current date)
  * @param {string} dateFormat - Preferred date format
- * @param {Object} [customTokens] - Optional { eventName, leagueName, weekName }
+ * @param {Object} [customTokens] - Optional { eventName, leagueName, weekName, count }
  * @returns {string} Pattern with tokens replaced
  */
 function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', customTokens = {}) {
@@ -220,10 +235,35 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', 
     result = result
       .replace(/\{eventName\}/gi, String(customTokens.eventName ?? '').trim())
       .replace(/\{leagueName\}/gi, String(customTokens.leagueName ?? '').trim())
-      .replace(/\{weekName\}/gi, String(customTokens.weekName ?? '').trim());
+      .replace(/\{weekName\}/gi, String(customTokens.weekName ?? '').trim())
+      .replace(/\{count\}/gi, String(customTokens.count ?? '').trim());
   }
 
   return result;
+}
+
+/**
+ * Remove characters invalid in filenames on common desktop OSes; preserve spaces.
+ * @param {string} name
+ * @returns {string}
+ */
+function sanitizeFilenameForOutput(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name.replace(/[/\\:*?"<>|]/g, '_').trim();
+}
+
+/**
+ * Remember week number for {count} token
+ * @param {Object} preferences
+ * @param {string|number|null} count
+ * @returns {Object}
+ */
+function setLastWeekCount(preferences, count) {
+  const value = count == null ? '' : String(count).trim();
+  return {
+    ...preferences,
+    lastWeekCount: value
+  };
 }
 
 /**
@@ -578,6 +618,18 @@ function clearFailedOperations(preferences) {
  * @param {Object} template - { name: string, pattern: string }
  * @returns {Object} Updated preferences
  */
+function removeEventTemplate(preferences, name) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return preferences;
+  }
+  const trimmed = name.trim();
+  const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
+  return {
+    ...preferences,
+    eventTemplates: templates.filter(t => t && t.name !== trimmed)
+  };
+}
+
 function addEventTemplate(preferences, template) {
   if (!template || typeof template.name !== 'string' || !template.name.trim() ||
       typeof template.pattern !== 'string' || !template.pattern.trim()) {
@@ -620,5 +672,9 @@ module.exports = {
   getFailedOperations,
   clearFailedOperations,
   addEventTemplate,
+  removeEventTemplate,
+  setLastWeekCount,
+  sanitizeFilenameForOutput,
+  DEFAULT_EVENT_TEMPLATES,
   DEFAULT_PREFERENCES
 };

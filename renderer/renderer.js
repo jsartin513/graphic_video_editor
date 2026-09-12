@@ -8,6 +8,7 @@ import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShor
 import { getFileName, getDirectoryPath } from './utils.js';
 import { initializeFailedOperations } from './failedOperations.js';
 import { initializeRecentDirectories } from './recentDirectories.js';
+import { initializeSettings } from './settings.js';
 import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
 import { initUpdateNotifications } from './updateNotification.js';
@@ -170,6 +171,7 @@ const failedOperations = initializeFailedOperations(domElements);
 mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo);
 setAppPhase('pick');
 const recentDirectories = initializeRecentDirectories(state, domElements, fileHandling);
+const settings = initializeSettings();
 initializeVideoComparison(state, domElements);
 
 // Set up lazy loading for prerequisites
@@ -218,7 +220,8 @@ const keyboardShortcuts = initializeKeyboardShortcuts(state, domElements, {
     if (window.electronAPI?.cancelMerge) {
       window.electronAPI.cancelMerge();
     }
-  })
+  }),
+  openSettings: () => settings.openSettings()
 });
 
 // Update keyboard shortcut hints to show platform-specific shortcuts

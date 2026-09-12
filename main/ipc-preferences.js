@@ -8,6 +8,8 @@ const {
   savePreferences,
   addRecentPattern,
   addEventTemplate,
+  removeEventTemplate,
+  setLastWeekCount,
   setPreferredDateFormat,
   setPreferredQuality,
   setPreferredFormat,
@@ -210,6 +212,33 @@ function registerPreferenceIpcHandlers() {
       return { success: true, preferences: updated };
     } catch (error) {
       logger.error('Error saving event template', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('delete-event-template', async (event, name) => {
+    try {
+      if (typeof name !== 'string' || !name.trim()) {
+        return { success: false, error: 'Template name is required.' };
+      }
+      const prefs = await loadPreferences();
+      const updated = removeEventTemplate(prefs, name.trim());
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error deleting event template', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('set-last-week-count', async (event, count) => {
+    try {
+      const prefs = await loadPreferences();
+      const updated = setLastWeekCount(prefs, count);
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error setting last week count', { error: error.message });
       throw error;
     }
   });

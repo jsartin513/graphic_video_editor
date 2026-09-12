@@ -70,6 +70,21 @@ The preferences file contains:
 - Recent filename patterns (up to 10)
 - Preferred date format
 - Last used pattern
+- Event naming templates and last week number
+
+## Merge audit log (`merge_log.jsonl`)
+
+After each **successful** merge, the app appends one JSON line to `merge_log.jsonl` in the output folder (same directory as the merged file — typically `merged_videos/` next to your clips, or your custom output folder).
+
+Each line records timestamp, input file paths, output path, quality/format settings, and naming context (template name/pattern, week number, date format, etc.). Use this alongside `recording_notes.txt` for event-day documentation.
+
+Example:
+
+```json
+{"type":"merge","timestamp":"2026-09-12T20:15:00.000Z","sessionId":"0534","inputFiles":["/path/GX010534.MP4"],"outputPath":"/path/merged_videos/BDL Open Gym 2026-09-12.mp4","settings":{"quality":"copy","format":"mp4","normalizeAudio":false},"naming":{"templateName":"BDL Open Gym","templatePattern":"BDL Open Gym {date}","dateFormat":"YYYY-MM-DD"}}
+```
+
+Log failures do not block the merge; check the app console if a line is missing.
 
 ## Tips
 

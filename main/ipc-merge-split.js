@@ -16,6 +16,7 @@ const {
   QUALITY_SETTINGS,
   validateQualityOption
 } = require('../src/quality-utils');
+const { createMergeLogEntry, appendMergeLogEntry } = require('../src/merge-log');
 
 let currentMergeProcess = null;
 let currentMergeTempFile = null;
@@ -282,6 +283,20 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
       return outputDir;
     } catch (error) {
       throw new Error(`Failed to create output directory: ${error.message}`);
+    }
+  });
+
+  ipcMain.handle('append-merge-log', async (event, outputDir, payload) => {
+    try {
+      if (typeof outputDir !== 'string' || !path.isAbsolute(outputDir.trim())) {
+        return { success: false, error: 'Invalid output directory.' };
+      }
+      const entry = createMergeLogEntry(payload);
+      const { logPath } = await appendMergeLogEntry(outputDir.trim(), entry);
+      return { success: true, logPath };
+    } catch (error) {
+      logger.error('Error appending merge log', { error: error.message });
+      return { success: false, error: error.message };
     }
   });
 

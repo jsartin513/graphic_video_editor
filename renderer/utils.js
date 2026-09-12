@@ -107,6 +107,12 @@ function formatTimeForFFmpeg(seconds) {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
+/** Remove characters invalid in filenames; preserve spaces. */
+export function sanitizeFilenameForOutput(name) {
+  if (!name || typeof name !== 'string') return '';
+  return name.replace(/[/\\:*?"<>|]/g, '_').trim();
+}
+
 export {
   formatBytes,
   getFileName,

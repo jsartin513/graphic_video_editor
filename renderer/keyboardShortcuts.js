@@ -73,6 +73,15 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
       return;
     }
 
+    // Cmd+, / Ctrl+, - Open settings
+    if (hasModifier(e) && e.key === ',') {
+      e.preventDefault();
+      if (callbacks.openSettings) {
+        callbacks.openSettings();
+      }
+      return;
+    }
+
     // Cmd+O / Ctrl+O - Open files dialog
     if (hasModifier(e) && e.key.toLowerCase() === 'o') {
       e.preventDefault();
@@ -193,5 +202,10 @@ export function updateShortcutHints() {
   const mergeShortcut = mergeBtn?.querySelector('.btn-shortcut');
   if (mergeShortcut) {
     mergeShortcut.textContent = 'Enter';
+  }
+
+  const settingsHint = document.getElementById('settingsShortcutHint');
+  if (settingsHint) {
+    settingsHint.textContent = formatShortcut(',', true, false);
   }
 }

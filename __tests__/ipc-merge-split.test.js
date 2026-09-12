@@ -10,6 +10,7 @@ jest.mock('../src/ffmpeg-resolver', () => ({ getFFmpegPath: () => '/usr/bin/ffmp
 jest.mock('child_process', () => ({ spawn: jest.fn(() => ({ on: jest.fn(), once: jest.fn(), kill: jest.fn(), killed: false })) }));
 
 const fs = require('fs').promises;
+const path = require('path');
 jest.mock('fs', () => {
   const actual = jest.requireActual('fs');
   return {
@@ -17,7 +18,9 @@ jest.mock('fs', () => {
     promises: {
       ...actual.promises,
       writeFile: jest.fn().mockResolvedValue(undefined),
-      unlink: jest.fn().mockResolvedValue(undefined)
+      unlink: jest.fn().mockResolvedValue(undefined),
+      mkdir: jest.fn().mockResolvedValue(undefined),
+      appendFile: jest.fn().mockResolvedValue(undefined)
     }
   };
 });
@@ -74,6 +77,30 @@ describe('ipc-merge-split', () => {
       const handler = getHandler('split-video');
       await expect(handler(null, '/video.mp4', [{ start: 0, end: 10 }], null)).rejects.toThrow('outputDir is required');
       await expect(handler(null, '/video.mp4', [{ start: 0, end: 10 }], '')).rejects.toThrow('outputDir is required');
+    });
+  });
+
+  describe('append-merge-log', () => {
+    it('writes merge_log.jsonl entry for valid payload', async () => {
+      const handler = getHandler('append-merge-log');
+      const outputDir = path.join('/Users', 'test', 'merged_videos');
+      const payload = {
+        sessionId: '0001',
+        inputFiles: ['/in/GX010001.MP4'],
+        outputPath: path.join(outputDir, 'out.mp4'),
+        outputFilename: 'out.mp4',
+        settings: { quality: 'copy', format: 'mp4', normalizeAudio: false }
+      };
+      const result = await handler(null, outputDir, payload);
+      expect(result.success).toBe(true);
+      expect(result.logPath).toContain('merge_log.jsonl');
+      expect(fs.appendFile).toHaveBeenCalled();
+    });
+
+    it('returns error for relative output directory', async () => {
+      const handler = getHandler('append-merge-log');
+      const result = await handler(null, 'relative/path', { outputPath: '/x.mp4', inputFiles: [] });
+      expect(result.success).toBe(false);
     });
   });
 
