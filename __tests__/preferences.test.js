@@ -18,6 +18,10 @@ jest.mock('fs', () => {
 const {
   addRecentPattern,
   addEventTemplate,
+  removeEventTemplate,
+  replaceEventTemplate,
+  setLastWeekCount,
+  sanitizeFilenameForOutput,
   setPreferredDateFormat,
   formatDate,
   applyDateTokens,
@@ -33,6 +37,7 @@ const {
   setLastOutputDestination,
   setAutoDetectSDCards,
   setShowSDCardNotifications,
+  DEFAULT_EVENT_TEMPLATES,
   DEFAULT_PREFERENCES
 } = require('../src/preferences');
 
@@ -94,10 +99,12 @@ describe('addRecentPattern', () => {
 describe('loadPreferences', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    fs.mkdir.mockResolvedValue(undefined);
+    fs.writeFile.mockResolvedValue(undefined);
   });
 
   test('returns merged preferences when file exists', async () => {
-    const stored = { preferredDateFormat: 'MM-DD-YYYY', recentFilenamePatterns: ['P1'] };
+    const stored = { preferredDateFormat: 'MM-DD-YYYY', recentFilenamePatterns: ['P1'], eventTemplates: [{ name: 'Custom', pattern: 'X {date}' }] };
     fs.readFile.mockResolvedValue(JSON.stringify(stored));
 
     const result = await loadPreferences();
@@ -105,6 +112,66 @@ describe('loadPreferences', () => {
     expect(result.preferredDateFormat).toBe('MM-DD-YYYY');
     expect(result.recentFilenamePatterns).toEqual(['P1']);
     expect(result.preferredQuality).toBe('copy'); // from defaults
+    expect(result.eventTemplates).toEqual([{ name: 'Custom', pattern: 'X {date}' }]);
+  });
+
+  test('seeds default event templates when stored list is empty and not yet seeded', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ eventTemplates: [] }));
+
+    const result = await loadPreferences();
+
+    expect(result.eventTemplates).toEqual(DEFAULT_EVENT_TEMPLATES);
+    expect(result.eventTemplatesSeeded).toBe(true);
+    expect(fs.writeFile).toHaveBeenCalled();
+  });
+
+  test('keeps empty event templates when user cleared list after seeding', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ eventTemplates: [], eventTemplatesSeeded: true }));
+
+    const result = await loadPreferences();
+
+    expect(result.eventTemplates).toEqual([]);
+    expect(fs.writeFile).not.toHaveBeenCalled();
+  });
+
+  test('returns merged preferences when template migration save fails', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ preferredQuality: 'high', eventTemplates: [] }));
+    fs.writeFile.mockRejectedValue(new Error('disk full'));
+
+    const result = await loadPreferences();
+
+    expect(result.preferredQuality).toBe('high');
+    expect(result.eventTemplates).toEqual(DEFAULT_EVENT_TEMPLATES);
+  });
+
+  test('seeds default event templates when key is missing', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ preferredQuality: 'high' }));
+
+    const result = await loadPreferences();
+
+    expect(result.eventTemplates).toEqual(DEFAULT_EVENT_TEMPLATES);
+    expect(fs.writeFile).toHaveBeenCalled();
+  });
+
+  test('does not persist seed when custom event templates exist', async () => {
+    const custom = [{ name: 'Mine', pattern: 'Mine {date}' }];
+    fs.readFile.mockResolvedValue(JSON.stringify({
+      eventTemplates: custom,
+      eventTemplatesSeeded: true
+    }));
+
+    const result = await loadPreferences();
+
+    expect(result.eventTemplates).toEqual(custom);
+    expect(fs.writeFile).not.toHaveBeenCalled();
+  });
+
+  test('merges lastWeekCount from stored preferences', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ lastWeekCount: '12' }));
+
+    const result = await loadPreferences();
+
+    expect(result.lastWeekCount).toBe('12');
   });
 
   test('returns defaults when file does not exist (ENOENT)', async () => {
@@ -343,6 +410,33 @@ describe('applyDateTokens', () => {
     const result = applyDateTokens('{eventName}', date, 'YYYY-MM-DD', { eventName: '  BDL  ' });
     expect(result).toBe('BDL');
   });
+
+  test('replaces {count} token', () => {
+    const date = new Date(2024, 0, 15);
+    const result = applyDateTokens('Week {count} {date}', date, 'YYYY-MM-DD', { count: '3' });
+    expect(result).toBe('Week 3 2024-01-15');
+  });
+
+  test('trims {count} token value', () => {
+    const date = new Date(2024, 0, 15);
+    const result = applyDateTokens('{count}', date, 'YYYY-MM-DD', { count: '  5  ' });
+    expect(result).toBe('5');
+  });
+
+  test('replaces empty {count} when not provided', () => {
+    const date = new Date(2024, 0, 15);
+    const result = applyDateTokens('Week {count}', date, 'YYYY-MM-DD', {});
+    expect(result).toBe('Week ');
+  });
+
+  test('resolves default BYOT template pattern with count and date', () => {
+    const date = new Date(2026, 8, 12);
+    const byot = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Fall 2026 BYOT');
+    expect(byot).toBeDefined();
+    const pattern = byot.pattern.replace(/\{sessionId\}/gi, '0534');
+    const result = applyDateTokens(pattern, date, 'YYYY-MM-DD', { count: '3' });
+    expect(result).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12 0534');
+  });
 });
 
 describe('addEventTemplate', () => {
@@ -370,6 +464,105 @@ describe('addEventTemplate', () => {
     expect(addEventTemplate(prefs, null)).toEqual(prefs);
     expect(addEventTemplate(prefs, { name: '', pattern: 'x' })).toEqual(prefs);
     expect(addEventTemplate(prefs, { name: 'x', pattern: '' })).toEqual(prefs);
+  });
+});
+
+describe('removeEventTemplate', () => {
+  test('removes template by name', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      eventTemplates: [
+        { name: 'A', pattern: 'a' },
+        { name: 'B', pattern: 'b' }
+      ]
+    };
+    const result = removeEventTemplate(prefs, 'A');
+    expect(result.eventTemplates).toEqual([{ name: 'B', pattern: 'b' }]);
+  });
+
+  test('ignores blank template name', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, eventTemplates: [{ name: 'A', pattern: 'a' }] };
+    expect(removeEventTemplate(prefs, '')).toEqual(prefs);
+    expect(removeEventTemplate(prefs, '   ')).toEqual(prefs);
+  });
+});
+
+describe('replaceEventTemplate', () => {
+  test('renames template in one step', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      eventTemplates: [
+        { name: 'Old', pattern: 'old {date}' },
+        { name: 'Keep', pattern: 'keep {date}' }
+      ]
+    };
+    const result = replaceEventTemplate(prefs, 'Old', { name: 'New', pattern: 'new {date}' });
+    expect(result.eventTemplates).toEqual([
+      { name: 'New', pattern: 'new {date}' },
+      { name: 'Keep', pattern: 'keep {date}' }
+    ]);
+  });
+});
+
+describe('setLastWeekCount', () => {
+  test('stores trimmed week count as string', () => {
+    const result = setLastWeekCount(DEFAULT_PREFERENCES, '  4  ');
+    expect(result.lastWeekCount).toBe('4');
+  });
+
+  test('coerces numeric week count to string', () => {
+    const result = setLastWeekCount(DEFAULT_PREFERENCES, 9);
+    expect(result.lastWeekCount).toBe('9');
+  });
+
+  test('clears week count when null', () => {
+    const prefs = { ...DEFAULT_PREFERENCES, lastWeekCount: '2' };
+    const result = setLastWeekCount(prefs, null);
+    expect(result.lastWeekCount).toBe('');
+  });
+});
+
+describe('sanitizeFilenameForOutput', () => {
+  test('preserves spaces and strips invalid characters', () => {
+    expect(sanitizeFilenameForOutput('BDL Open Gym 2026-09-12')).toBe('BDL Open Gym 2026-09-12');
+    expect(sanitizeFilenameForOutput('bad/name:test')).toBe('bad_name_test');
+  });
+
+  test('strips quotes angle brackets and asterisk', () => {
+    expect(sanitizeFilenameForOutput('a*b?c"d<e>|f\\g')).toBe('a_b_c_d_e__f_g');
+  });
+
+  test('returns empty string for non-string input', () => {
+    expect(sanitizeFilenameForOutput(null)).toBe('');
+    expect(sanitizeFilenameForOutput(undefined)).toBe('');
+  });
+
+  test('strips control characters and trailing dots', () => {
+    expect(sanitizeFilenameForOutput('name\u0001test')).toBe('name_test');
+    expect(sanitizeFilenameForOutput('file. ')).toBe('file');
+  });
+
+  test('prefixes Windows reserved device names', () => {
+    expect(sanitizeFilenameForOutput('CON')).toBe('_CON');
+    expect(sanitizeFilenameForOutput('nul.mp4')).toBe('_nul.mp4');
+    expect(sanitizeFilenameForOutput('CON.notes.v1')).toBe('_CON.notes.v1');
+  });
+});
+
+describe('DEFAULT_PREFERENCES', () => {
+  test('includes seeded event templates', () => {
+    expect(DEFAULT_PREFERENCES.eventTemplates).toEqual(DEFAULT_EVENT_TEMPLATES);
+  });
+
+  test('DEFAULT_EVENT_TEMPLATES includes BDL Open Gym and BYOT patterns', () => {
+    expect(DEFAULT_EVENT_TEMPLATES).toEqual([
+      { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date} {sessionId}' },
+      { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date} {sessionId}' }
+    ]);
+  });
+
+  test('defaults lastWeekCount to empty string', () => {
+    expect(DEFAULT_PREFERENCES.lastWeekCount).toBe('');
   });
 });
 

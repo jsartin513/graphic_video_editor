@@ -1,6 +1,6 @@
 // Video merging workflow functionality
 
-import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
+import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName, sanitizeFilenameForOutput } from './utils.js';
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
 import { setAppPhase, resetToEmptyPick, isAddingMoreVideos } from './appPhase.js';
@@ -93,9 +93,114 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         selectedFormat = userPreferences.preferredFormat;
         if (formatSelect) formatSelect.value = selectedFormat;
       }
+      const weekCountInput = document.getElementById('weekCountInput');
+      if (weekCountInput && userPreferences?.lastWeekCount != null && userPreferences.lastWeekCount !== '') {
+        weekCountInput.value = userPreferences.lastWeekCount;
+      }
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
+  }
+
+  function getFilenameCustomTokens() {
+    const weekCountInput = document.getElementById('weekCountInput');
+    const count = weekCountInput != null
+      ? weekCountInput.value.trim()
+      : (userPreferences?.lastWeekCount || '');
+    return {
+      eventName: document.getElementById('eventNameInput')?.value || '',
+      leagueName: document.getElementById('leagueNameInput')?.value || '',
+      weekName: document.getElementById('weekNameInput')?.value || '',
+      count
+    };
+  }
+
+  async function persistWeekCount(count) {
+    const value = count == null ? '' : String(count).trim();
+    try {
+      const result = await window.electronAPI.setLastWeekCount(value);
+      if (result?.preferences) {
+        userPreferences = result.preferences;
+      } else if (userPreferences) {
+        userPreferences.lastWeekCount = value;
+      }
+    } catch (error) {
+      console.error('Error saving week count:', error);
+    }
+  }
+
+  async function resolveFilenamePattern(pattern, sessionId) {
+    let value = pattern.replace(/\{sessionId\}/gi, sessionId);
+    if (value.includes('{')) {
+      const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+      const customTokens = getFilenameCustomTokens();
+      const result = await window.electronAPI.applyDateTokens(value, null, dateFormat, customTokens);
+      if (result && result.result) {
+        value = result.result;
+      }
+    }
+    value = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+    return sanitizeFilenameForOutput(value);
+  }
+
+  async function applyTemplateToSelectedGroups(pattern) {
+    if (!pattern) return;
+    const customTokens = getFilenameCustomTokens();
+    const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+    await persistWeekCount(customTokens.count);
+    const templateSelect = document.getElementById('eventTemplateSelect');
+    const selectedOpt = templateSelect?.options[templateSelect.selectedIndex];
+    const templateName = selectedOpt?.textContent?.trim() || '';
+    const appliedAt = new Date().toISOString();
+    const ext = '.' + (selectedFormat || 'mp4').toLowerCase();
+    for (const i of state.selectedGroups) {
+      const group = state.videoGroups[i];
+      if (!group) continue;
+      const value = await resolveFilenamePattern(pattern, group.sessionId);
+      const input = document.querySelector(`.filename-input[data-index="${i}"]`);
+      if (input) input.value = value;
+      state.videoGroups[i].outputFilename = value + ext;
+      state.videoGroups[i].appliedNaming = {
+        templateName,
+        templatePattern: pattern,
+        weekCount: customTokens.count,
+        eventName: customTokens.eventName,
+        leagueName: customTokens.leagueName,
+        weekName: customTokens.weekName,
+        dateFormat,
+        appliedAt
+      };
+    }
+  }
+
+  function buildMergeLogPayload(group, outputDir, outputPath, outputFilename) {
+    const applied = group.appliedNaming;
+    const naming = applied
+      ? {
+          templateName: applied.templateName || undefined,
+          templatePattern: applied.templatePattern || undefined,
+          weekCount: applied.weekCount || undefined,
+          eventName: applied.eventName || undefined,
+          leagueName: applied.leagueName || undefined,
+          weekName: applied.weekName || undefined,
+          dateFormat: applied.dateFormat || undefined,
+          appliedAt: applied.appliedAt || undefined
+        }
+      : {};
+
+    return {
+      sessionId: group.sessionId,
+      inputFiles: group.files,
+      outputPath,
+      outputFilename,
+      outputDir,
+      settings: {
+        quality: selectedQuality,
+        format: selectedFormat,
+        normalizeAudio
+      },
+      naming
+    };
   }
   
   // Initialize preferences
@@ -361,20 +466,26 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
     const newApplyBtn = document.getElementById('applyTemplateBtn');
     const newSaveBtn = document.getElementById('saveAsTemplateBtn');
+    const weekCountInput = document.getElementById('weekCountInput');
+
+    if (weekCountInput) {
+      weekCountInput.replaceWith(weekCountInput.cloneNode(true));
+    }
+    const newWeekCountInput = document.getElementById('weekCountInput');
+    if (newWeekCountInput) {
+      if (userPreferences?.lastWeekCount) {
+        newWeekCountInput.value = userPreferences.lastWeekCount;
+      }
+      newWeekCountInput.addEventListener('change', () => {
+        persistWeekCount(newWeekCountInput.value);
+      });
+    }
 
     if (newApplyBtn) {
-      newApplyBtn.addEventListener('click', () => {
+      newApplyBtn.addEventListener('click', async () => {
         const pattern = templateSelect.value;
         if (!pattern) return;
-        const ext = '.' + (selectedFormat || 'mp4').toLowerCase();
-        for (const i of state.selectedGroups) {
-          const group = state.videoGroups[i];
-          if (!group) continue;
-          const basePattern = pattern.replace(/\{sessionId\}/gi, group.sessionId);
-          const input = document.querySelector(`.filename-input[data-index="${i}"]`);
-          if (input) input.value = basePattern.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
-          state.videoGroups[i].outputFilename = basePattern.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '') + ext;
-        }
+        await applyTemplateToSelectedGroups(pattern);
       });
     }
 
@@ -596,11 +707,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       if (value.includes('{')) {
         try {
           const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
-          const customTokens = {
-            eventName: document.getElementById('eventNameInput')?.value || '',
-            leagueName: document.getElementById('leagueNameInput')?.value || '',
-            weekName: document.getElementById('weekNameInput')?.value || ''
-          };
+          const customTokens = getFilenameCustomTokens();
           const result = await window.electronAPI.applyDateTokens(value, null, dateFormat, customTokens);
           if (result && result.result) {
             value = result.result;
@@ -610,9 +717,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
       }
       
-      // Remove invalid characters but preserve hyphens and underscores
-      // This happens after date token replacement to preserve date formatting
-      value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      value = sanitizeFilenameForOutput(value);
       const extension = '.' + selectedFormat.toLowerCase();
       state.videoGroups[index].outputFilename = value + extension;
       e.target.value = value;
@@ -794,18 +899,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       if (value.includes('{')) {
         try {
           const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
-          const customTokens = {
-            eventName: document.getElementById('eventNameInput')?.value || '',
-            leagueName: document.getElementById('leagueNameInput')?.value || '',
-            weekName: document.getElementById('weekNameInput')?.value || ''
-          };
+          const customTokens = getFilenameCustomTokens();
           const result = await window.electronAPI.applyDateTokens(value, null, dateFormat, customTokens);
           if (result && result.result) value = result.result;
         } catch (error) {
           console.error('Error applying date tokens:', error);
         }
       }
-      value = value.replace(/[^a-zA-Z0-9_\-]/g, '_');
+      value = sanitizeFilenameForOutput(value);
       group.outputFilename = value + '.MP4';
     }
   }
@@ -835,6 +936,25 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           });
           return;
         }
+    }
+
+    const duplicateNames = new Map();
+    for (const index of indicesToMerge) {
+      const group = state.videoGroups[index];
+      const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+      const normalizedName = (baseName + '.' + selectedFormat.toLowerCase()).toLowerCase();
+      if (duplicateNames.has(normalizedName)) {
+        const otherSession = duplicateNames.get(normalizedName);
+        showError(`Duplicate output filename for Sessions ${otherSession} and ${group.sessionId}`, {
+          operation: 'Merge Videos',
+          suggestions: [
+            'Each selected session needs a unique output filename',
+            'Apply a template with {sessionId} or edit filenames before merging'
+          ]
+        });
+        return;
+      }
+      duplicateNames.set(normalizedName, group.sessionId);
     }
     
     // Get output directory (use custom if selected, otherwise default)
@@ -887,7 +1007,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
+        const mergeLogPayload = buildMergeLogPayload(group, outputDir, outputPath, outputFilename);
+        await window.electronAPI.mergeVideos(
+          group.files,
+          outputPath,
+          selectedQuality,
+          selectedFormat,
+          normalizeAudio,
+          mergeLogPayload
+        );
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
@@ -1441,6 +1569,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   if (cancelMergeBtn) {
     cancelMergeBtn.addEventListener('click', handleCancelMerge);
   }
+
+  window.addEventListener('preferences-updated', async () => {
+    await loadUserPreferences();
+    if (previewScreen.style.display !== 'none' && state.videoGroups?.length) {
+      setupEventTemplateControls();
+    }
+  });
+
   // qualitySelect and formatSelect already have listeners attached above (getElementById blocks)
 
   return {

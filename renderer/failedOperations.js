@@ -179,20 +179,32 @@ export function initializeFailedOperations(domElements) {
 
       closeModal();
       
-      // Get the quality preference
+      // Get merge settings
       let selectedQuality = 'copy';
+      let selectedFormat = 'mp4';
       try {
         const prefs = await window.electronAPI.loadPreferences();
-        if (prefs && prefs.preferredQuality) {
-          selectedQuality = prefs.preferredQuality;
-        }
+        if (prefs?.preferredQuality) selectedQuality = prefs.preferredQuality;
+        if (prefs?.preferredFormat) selectedFormat = prefs.preferredFormat;
       } catch (error) {
         console.error('Error loading preferences:', error);
       }
-      
+
+      const mergeLogPayload = {
+        sessionId: op.sessionId,
+        naming: undefined
+      };
+
       // Attempt the merge
       try {
-        await window.electronAPI.mergeVideos(op.files, op.outputPath, selectedQuality);
+        await window.electronAPI.mergeVideos(
+          op.files,
+          op.outputPath,
+          selectedQuality,
+          selectedFormat,
+          false,
+          mergeLogPayload
+        );
         
         // Success! Remove from failed operations
         await window.electronAPI.removeFailedOperation(op.sessionId, op.outputPath);

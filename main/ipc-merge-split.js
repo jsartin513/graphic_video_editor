@@ -16,6 +16,7 @@ const {
   QUALITY_SETTINGS,
   validateQualityOption
 } = require('../src/quality-utils');
+const { buildMergeLogEntryForCompletedMerge, appendMergeLogEntry } = require('../src/merge-log');
 
 let currentMergeProcess = null;
 let currentMergeTempFile = null;
@@ -34,7 +35,7 @@ function formatTime(seconds) {
  * @param {() => import('electron').BrowserWindow|null} getMainWindow
  */
 function registerMergeSplitIpcHandlers(getMainWindow) {
-  ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false) => {
+  ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false, mergeLogPayload = null) => {
     return new Promise((resolve, reject) => {
       if (!Array.isArray(filePaths)) {
         reject(new Error('filePaths must be an array'));
@@ -53,6 +54,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
       isCancelled = false;
       currentMergeOutputPath = outputPath;
+      const mergeLogContext = mergeLogPayload && typeof mergeLogPayload === 'object'
+        ? { sessionId: mergeLogPayload.sessionId, naming: mergeLogPayload.naming }
+        : null;
 
       const validFilePaths = filePaths.filter(filePath => {
         const filename = path.basename(filePath);
@@ -235,8 +239,27 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             }
 
             if (code === 0) {
-              logger.info('merge-videos: Merge completed', { outputPath });
-              resolve({ success: true, outputPath });
+              logger.info('merge-videos: Merge completed', { outputPath: outputFile });
+              (async () => {
+                try {
+                  try {
+                    const entry = buildMergeLogEntryForCompletedMerge({
+                      filePaths: validFilePaths,
+                      outputPath: outputFile,
+                      qualityOption,
+                      format: normalizedFormat,
+                      normalizeAudio,
+                      mergeLogContext
+                    });
+                    await appendMergeLogEntry(path.dirname(outputFile), entry);
+                  } catch (logError) {
+                    logger.error('merge-videos: merge log append failed', { error: logError.message });
+                  }
+                  resolve({ success: true, outputPath: outputFile });
+                } catch (err) {
+                  reject(err);
+                }
+              })();
             } else {
               logger.error('merge-videos: FFmpeg failed', { code, errorOutput });
               const mapped = mapError(`ffmpeg failed: ${errorOutput}`);

@@ -7,12 +7,18 @@ const fs = require('fs').promises;
 const path = require('path');
 const { app } = require('electron');
 const { logger } = require('./logger');
+const { sanitizeFilenameForOutput } = require('./filename-sanitize');
 
 // Get preferences file path (in user data directory)
 function getPreferencesPath() {
   const userDataPath = app.getPath('userData');
   return path.join(userDataPath, 'preferences.json');
 }
+
+const DEFAULT_EVENT_TEMPLATES = [
+  { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date} {sessionId}' },
+  { name: 'BDL Fall 2026 BYOT', pattern: 'BDL Fall 2026 BYOT Week {count} {date} {sessionId}' }
+];
 
 // Default preferences
 const DEFAULT_PREFERENCES = {
@@ -39,9 +45,46 @@ const DEFAULT_PREFERENCES = {
   lastSDCardPath: null,
   showSDCardNotifications: true,
   failedOperations: [], // Track failed merge operations for recovery
-  eventTemplates: [], // Reusable filename patterns: [{ name, pattern }]
-  maxEventTemplates: 10
+  eventTemplates: [...DEFAULT_EVENT_TEMPLATES], // Reusable filename patterns: [{ name, pattern }]
+  maxEventTemplates: 10,
+  lastWeekCount: '', // Remembered week number for {count} in BYOT templates
+  eventTemplatesSeeded: true // false only before first migration; empty list is intentional once seeded
 };
+
+function mergeLoadedPreferences(prefs) {
+  const rawHasTemplatesKey = Object.prototype.hasOwnProperty.call(prefs, 'eventTemplates');
+  const storedTemplates = Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : [];
+  const alreadySeeded = prefs.eventTemplatesSeeded === true;
+
+  let eventTemplates = storedTemplates;
+  let eventTemplatesSeeded = alreadySeeded;
+  let needsTemplateMigration = false;
+
+  if (!alreadySeeded) {
+    if (!rawHasTemplatesKey || storedTemplates.length === 0) {
+      eventTemplates = [...DEFAULT_EVENT_TEMPLATES];
+      eventTemplatesSeeded = true;
+      needsTemplateMigration = true;
+    } else {
+      eventTemplatesSeeded = true;
+      needsTemplateMigration = true;
+    }
+  }
+
+  return {
+    merged: {
+      ...DEFAULT_PREFERENCES,
+      ...prefs,
+      dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
+      recentDirectories: prefs.recentDirectories || [],
+      pinnedDirectories: prefs.pinnedDirectories || [],
+      eventTemplates,
+      eventTemplatesSeeded,
+      lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : '')
+    },
+    needsTemplateMigration
+  };
+}
 
 /**
  * Load user preferences from disk
@@ -52,25 +95,22 @@ async function loadPreferences() {
     const prefsPath = getPreferencesPath();
     const data = await fs.readFile(prefsPath, 'utf8');
     const prefs = JSON.parse(data);
-    
-    // Merge with defaults to ensure all keys exist
-    return {
-      ...DEFAULT_PREFERENCES,
-      ...prefs,
-      // Ensure dateFormats includes defaults
-      dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
-      // Ensure recent directories arrays exist
-      recentDirectories: prefs.recentDirectories || [],
-      pinnedDirectories: prefs.pinnedDirectories || [],
-      eventTemplates: Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : []
-    };
+    const { merged, needsTemplateMigration } = mergeLoadedPreferences(prefs);
+    if (needsTemplateMigration) {
+      try {
+        await savePreferences(merged);
+      } catch (saveError) {
+        logger.error('Error persisting template migration', { error: saveError.message });
+      }
+    }
+    return merged;
   } catch (error) {
     if (error.code === 'ENOENT') {
       // File doesn't exist yet, return defaults
-      return { ...DEFAULT_PREFERENCES };
+      return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES], eventTemplatesSeeded: true };
     }
     logger.error('Error loading preferences', { error: error.message });
-    return { ...DEFAULT_PREFERENCES };
+    return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES], eventTemplatesSeeded: true };
   }
 }
 
@@ -195,11 +235,11 @@ function formatDate(date, format) {
 /**
  * Apply date tokens to a filename pattern
  * Replaces tokens like {date}, {year}, {month}, {day} with actual values
- * Also supports custom tokens: {eventName}, {leagueName}, {weekName}
+ * Also supports custom tokens: {eventName}, {leagueName}, {weekName}, {count}
  * @param {string} pattern - Pattern with date tokens
  * @param {Date} date - Date to use for tokens (defaults to current date)
  * @param {string} dateFormat - Preferred date format
- * @param {Object} [customTokens] - Optional { eventName, leagueName, weekName }
+ * @param {Object} [customTokens] - Optional { eventName, leagueName, weekName, count }
  * @returns {string} Pattern with tokens replaced
  */
 function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', customTokens = {}) {
@@ -220,10 +260,25 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', 
     result = result
       .replace(/\{eventName\}/gi, String(customTokens.eventName ?? '').trim())
       .replace(/\{leagueName\}/gi, String(customTokens.leagueName ?? '').trim())
-      .replace(/\{weekName\}/gi, String(customTokens.weekName ?? '').trim());
+      .replace(/\{weekName\}/gi, String(customTokens.weekName ?? '').trim())
+      .replace(/\{count\}/gi, String(customTokens.count ?? '').trim());
   }
 
   return result;
+}
+
+/**
+ * Remember week number for {count} token
+ * @param {Object} preferences
+ * @param {string|number|null} count
+ * @returns {Object}
+ */
+function setLastWeekCount(preferences, count) {
+  const value = count == null ? '' : String(count).trim();
+  return {
+    ...preferences,
+    lastWeekCount: value
+  };
 }
 
 /**
@@ -578,6 +633,58 @@ function clearFailedOperations(preferences) {
  * @param {Object} template - { name: string, pattern: string }
  * @returns {Object} Updated preferences
  */
+function removeEventTemplate(preferences, name) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return preferences;
+  }
+  const trimmed = name.trim();
+  const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
+  return {
+    ...preferences,
+    eventTemplates: templates.filter(t => t && t.name !== trimmed),
+    eventTemplatesSeeded: true
+  };
+}
+
+/**
+ * Rename or replace an event template in one step
+ * @param {Object} preferences
+ * @param {string} originalName
+ * @param {{ name: string, pattern: string }} template
+ * @returns {Object}
+ */
+function replaceEventTemplate(preferences, originalName, template) {
+  if (!template || typeof template.name !== 'string' || !template.name.trim() ||
+      typeof template.pattern !== 'string' || !template.pattern.trim()) {
+    return preferences;
+  }
+  if (!originalName || typeof originalName !== 'string' || !originalName.trim()) {
+    return addEventTemplate(preferences, template);
+  }
+
+  const orig = originalName.trim();
+  const name = template.name.trim();
+  const pattern = template.pattern.trim();
+  const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
+  const validTemplates = templates.filter(t => t && typeof t.name === 'string' && typeof t.pattern === 'string');
+  const withoutNameConflict = validTemplates.filter((t) => t.name !== name || t.name === orig);
+  const index = withoutNameConflict.findIndex((t) => t.name === orig);
+
+  if (index === -1) {
+    return addEventTemplate(preferences, { name, pattern });
+  }
+
+  const updated = [...withoutNameConflict];
+  updated[index] = { name, pattern };
+  const max = preferences.maxEventTemplates ?? DEFAULT_PREFERENCES.maxEventTemplates;
+
+  return {
+    ...preferences,
+    eventTemplates: updated.slice(0, max),
+    eventTemplatesSeeded: true
+  };
+}
+
 function addEventTemplate(preferences, template) {
   if (!template || typeof template.name !== 'string' || !template.name.trim() ||
       typeof template.pattern !== 'string' || !template.pattern.trim()) {
@@ -592,7 +699,8 @@ function addEventTemplate(preferences, template) {
   const max = preferences.maxEventTemplates ?? DEFAULT_PREFERENCES.maxEventTemplates;
   return {
     ...preferences,
-    eventTemplates: updated.slice(0, max)
+    eventTemplates: updated.slice(0, max),
+    eventTemplatesSeeded: true
   };
 }
 
@@ -620,5 +728,10 @@ module.exports = {
   getFailedOperations,
   clearFailedOperations,
   addEventTemplate,
+  removeEventTemplate,
+  replaceEventTemplate,
+  setLastWeekCount,
+  sanitizeFilenameForOutput,
+  DEFAULT_EVENT_TEMPLATES,
   DEFAULT_PREFERENCES
 };

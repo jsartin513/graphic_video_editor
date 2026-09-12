@@ -46,6 +46,15 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
   function handleKeyDown(e) {
     const targetIsTextInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
 
+    // Cmd+, / Ctrl+, - Open settings (works while typing in fields)
+    if (hasModifier(e) && e.key === ',') {
+      e.preventDefault();
+      if (callbacks.openSettings) {
+        callbacks.openSettings();
+      }
+      return;
+    }
+
     // Escape - Go back or cancel
     if (e.key === 'Escape') {
       const allowPreviewEscape = !targetIsTextInput || Boolean(e.target.closest('.filename-input-container'));
@@ -193,5 +202,10 @@ export function updateShortcutHints() {
   const mergeShortcut = mergeBtn?.querySelector('.btn-shortcut');
   if (mergeShortcut) {
     mergeShortcut.textContent = 'Enter';
+  }
+
+  const settingsHint = document.getElementById('settingsShortcutHint');
+  if (settingsHint) {
+    settingsHint.textContent = formatShortcut(',', true, false);
   }
 }

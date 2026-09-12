@@ -8,6 +8,9 @@ const {
   savePreferences,
   addRecentPattern,
   addEventTemplate,
+  removeEventTemplate,
+  replaceEventTemplate,
+  setLastWeekCount,
   setPreferredDateFormat,
   setPreferredQuality,
   setPreferredFormat,
@@ -192,7 +195,7 @@ function registerPreferenceIpcHandlers() {
     }
   });
 
-  ipcMain.handle('save-event-template', async (event, name, pattern) => {
+  ipcMain.handle('save-event-template', async (event, name, pattern, originalName) => {
     try {
       if (typeof name !== 'string' || typeof pattern !== 'string') {
         logger.error('Invalid event template input types', { nameType: typeof name, patternType: typeof pattern });
@@ -205,11 +208,40 @@ function registerPreferenceIpcHandlers() {
         return { success: false, error: 'Invalid event template. Name and pattern must be non-empty strings.' };
       }
       const prefs = await loadPreferences();
-      const updated = addEventTemplate(prefs, { name: trimmedName, pattern: trimmedPattern });
+      const updated = typeof originalName === 'string' && originalName.trim()
+        ? replaceEventTemplate(prefs, originalName.trim(), { name: trimmedName, pattern: trimmedPattern })
+        : addEventTemplate(prefs, { name: trimmedName, pattern: trimmedPattern });
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {
       logger.error('Error saving event template', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('delete-event-template', async (event, name) => {
+    try {
+      if (typeof name !== 'string' || !name.trim()) {
+        return { success: false, error: 'Template name is required.' };
+      }
+      const prefs = await loadPreferences();
+      const updated = removeEventTemplate(prefs, name.trim());
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error deleting event template', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('set-last-week-count', async (event, count) => {
+    try {
+      const prefs = await loadPreferences();
+      const updated = setLastWeekCount(prefs, count);
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error setting last week count', { error: error.message });
       throw error;
     }
   });

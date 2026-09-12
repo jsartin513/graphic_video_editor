@@ -10,6 +10,7 @@ jest.mock('../src/ffmpeg-resolver', () => ({ getFFmpegPath: () => '/usr/bin/ffmp
 jest.mock('child_process', () => ({ spawn: jest.fn(() => ({ on: jest.fn(), once: jest.fn(), kill: jest.fn(), killed: false })) }));
 
 const fs = require('fs').promises;
+const path = require('path');
 jest.mock('fs', () => {
   const actual = jest.requireActual('fs');
   return {
@@ -17,7 +18,9 @@ jest.mock('fs', () => {
     promises: {
       ...actual.promises,
       writeFile: jest.fn().mockResolvedValue(undefined),
-      unlink: jest.fn().mockResolvedValue(undefined)
+      unlink: jest.fn().mockResolvedValue(undefined),
+      mkdir: jest.fn().mockResolvedValue(undefined),
+      appendFile: jest.fn().mockResolvedValue(undefined)
     }
   };
 });

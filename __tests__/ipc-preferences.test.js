@@ -93,6 +93,8 @@ describe('ipc-preferences', () => {
       expect(channels).toContain('install-update');
       expect(channels).toContain('apply-date-tokens');
       expect(channels).toContain('save-event-template');
+      expect(channels).toContain('delete-event-template');
+      expect(channels).toContain('set-last-week-count');
       expect(channels).toContain('add-recent-directory');
       expect(channels).toContain('pin-directory');
       expect(channels).toContain('unpin-directory');
@@ -168,6 +170,61 @@ describe('ipc-preferences', () => {
       expect(await handler(null, 'name', '   ')).toEqual({ success: false, error: expect.any(String) });
       expect(loadPreferences).not.toHaveBeenCalled();
     });
+
+    it('renames template atomically when originalName is provided', async () => {
+      loadPreferences.mockResolvedValue({
+        ...mockPrefs,
+        eventTemplates: [
+          { name: 'Old Name', pattern: 'old {date}' },
+          { name: 'Other', pattern: 'other {date}' }
+        ]
+      });
+      const handler = getHandler('save-event-template');
+      const result = await handler(null, 'New Name', 'new {date}', 'Old Name');
+      expect(result.success).toBe(true);
+      const savedPrefs = savePreferences.mock.calls[0][0];
+      expect(savedPrefs.eventTemplates).toEqual([
+        { name: 'New Name', pattern: 'new {date}' },
+        { name: 'Other', pattern: 'other {date}' }
+      ]);
+    });
+  });
+
+  describe('delete-event-template', () => {
+    it('removes template and saves preferences', async () => {
+      loadPreferences.mockResolvedValue({
+        ...mockPrefs,
+        eventTemplates: [
+          { name: 'BDL Open Gym', pattern: 'BDL Open Gym {date}' },
+          { name: 'Other', pattern: 'Other {date}' }
+        ]
+      });
+      const handler = getHandler('delete-event-template');
+      const result = await handler(null, 'BDL Open Gym');
+      expect(result.success).toBe(true);
+      expect(savePreferences).toHaveBeenCalled();
+      const savedPrefs = savePreferences.mock.calls[0][0];
+      expect(savedPrefs.eventTemplates).toEqual([{ name: 'Other', pattern: 'Other {date}' }]);
+    });
+
+    it('returns error for empty name without loading preferences', async () => {
+      const handler = getHandler('delete-event-template');
+      const result = await handler(null, '   ');
+      expect(result).toEqual({ success: false, error: expect.any(String) });
+      expect(loadPreferences).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('set-last-week-count', () => {
+    it('persists trimmed week count', async () => {
+      loadPreferences.mockResolvedValue({ ...mockPrefs, lastWeekCount: '' });
+      const handler = getHandler('set-last-week-count');
+      const result = await handler(null, '  7  ');
+      expect(result.success).toBe(true);
+      expect(savePreferences).toHaveBeenCalled();
+      const savedPrefs = savePreferences.mock.calls[0][0];
+      expect(savedPrefs.lastWeekCount).toBe('7');
+    });
   });
 
   describe('save-patterns-from-selected-files', () => {
@@ -228,6 +285,19 @@ describe('ipc-preferences', () => {
       const handler = getHandler('apply-date-tokens');
       const result = await handler(null, 'out_{date}.mp4', '2025-01-01', 'YYYY-MM-DD');
       expect(result).toEqual({ result: 'out_2025.mp4' });
+    });
+
+    it('forwards customTokens including count to applyDateTokens', async () => {
+      applyDateTokens.mockReturnValue('BDL Fall 2026 BYOT Week 3 2026-09-12');
+      const handler = getHandler('apply-date-tokens');
+      const customTokens = { count: '3', eventName: 'BDL Open Gym' };
+      await handler(null, 'BDL Fall 2026 BYOT Week {count} {date}', null, 'YYYY-MM-DD', customTokens);
+      expect(applyDateTokens).toHaveBeenCalledWith(
+        'BDL Fall 2026 BYOT Week {count} {date}',
+        expect.any(Date),
+        'YYYY-MM-DD',
+        customTokens
+      );
     });
   });
 
