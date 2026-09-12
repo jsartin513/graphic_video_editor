@@ -1,8 +1,10 @@
-import { escapeHtml } from './utils.js';
+import { escapeHtml, escapeAttr } from './utils.js';
 
 function dispatchPreferencesUpdated(preferences) {
   window.dispatchEvent(new CustomEvent('preferences-updated', { detail: preferences }));
 }
+
+const FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 export function initializeSettings() {
   const modal = document.getElementById('settingsModal');
@@ -18,16 +20,64 @@ export function initializeSettings() {
 
   let editingTemplateName = null;
   let currentPreferences = null;
+  let previousFocus = null;
+
+  function isModalVisible() {
+    return modal && modal.style.display !== 'none';
+  }
+
+  function getFocusableElements() {
+    if (!modal) return [];
+    return Array.from(modal.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+      (el) => !el.disabled && el.getAttribute('aria-hidden') !== 'true'
+    );
+  }
+
+  function onSettingsKeyDown(e) {
+    if (!isModalVisible()) return;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      hideModal();
+      return;
+    }
+
+    if (e.key !== 'Tab') return;
+
+    const focusable = getFocusableElements();
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   function hideModal() {
     if (modal) modal.style.display = 'none';
+    document.removeEventListener('keydown', onSettingsKeyDown, true);
     editingTemplateName = null;
     if (templateNameInput) templateNameInput.value = '';
     if (templatePatternInput) templatePatternInput.value = '';
+    if (previousFocus && typeof previousFocus.focus === 'function') {
+      previousFocus.focus();
+    }
+    previousFocus = null;
   }
 
   function showModal() {
-    if (modal) modal.style.display = 'flex';
+    if (!modal) return;
+    previousFocus = document.activeElement;
+    modal.style.display = 'flex';
+    document.addEventListener('keydown', onSettingsKeyDown, true);
+    const focusable = getFocusableElements();
+    (focusable[0] || closeBtn)?.focus();
   }
 
   async function loadAndRender() {
@@ -61,14 +111,14 @@ export function initializeSettings() {
       return;
     }
     templateList.innerHTML = templates.map((t) => `
-      <div class="settings-template-item" data-name="${escapeHtml(t.name)}">
+      <div class="settings-template-item" data-name="${escapeAttr(t.name)}">
         <div class="settings-template-info">
           <strong>${escapeHtml(t.name)}</strong>
           <span class="settings-template-pattern">${escapeHtml(t.pattern)}</span>
         </div>
         <div class="settings-template-actions">
-          <button type="button" class="btn btn-text btn-small settings-edit-template" data-name="${escapeHtml(t.name)}" aria-label="Edit ${escapeHtml(t.name)}">Edit</button>
-          <button type="button" class="btn btn-text btn-small settings-delete-template" data-name="${escapeHtml(t.name)}" aria-label="Delete ${escapeHtml(t.name)}">Delete</button>
+          <button type="button" class="btn btn-text btn-small settings-edit-template" data-name="${escapeAttr(t.name)}" aria-label="Edit ${escapeAttr(t.name)}">Edit</button>
+          <button type="button" class="btn btn-text btn-small settings-delete-template" data-name="${escapeAttr(t.name)}" aria-label="Delete ${escapeAttr(t.name)}">Delete</button>
         </div>
       </div>
     `).join('');
@@ -119,15 +169,9 @@ export function initializeSettings() {
       alert('Enter both a template name and pattern.');
       return;
     }
-    if (editingTemplateName && editingTemplateName !== name) {
-      const del = await window.electronAPI.deleteEventTemplate(editingTemplateName);
-      if (del?.success === false) {
-        alert(del.error || 'Could not update template.');
-        return;
-      }
-    }
     try {
-      const result = await window.electronAPI.saveEventTemplate(name, pattern);
+      const originalName = editingTemplateName || undefined;
+      const result = await window.electronAPI.saveEventTemplate(name, pattern, originalName);
       if (result?.success === false) {
         alert(result.error || 'Could not save template.');
         return;

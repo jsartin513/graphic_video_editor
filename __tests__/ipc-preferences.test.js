@@ -170,6 +170,24 @@ describe('ipc-preferences', () => {
       expect(await handler(null, 'name', '   ')).toEqual({ success: false, error: expect.any(String) });
       expect(loadPreferences).not.toHaveBeenCalled();
     });
+
+    it('renames template atomically when originalName is provided', async () => {
+      loadPreferences.mockResolvedValue({
+        ...mockPrefs,
+        eventTemplates: [
+          { name: 'Old Name', pattern: 'old {date}' },
+          { name: 'Other', pattern: 'other {date}' }
+        ]
+      });
+      const handler = getHandler('save-event-template');
+      const result = await handler(null, 'New Name', 'new {date}', 'Old Name');
+      expect(result.success).toBe(true);
+      const savedPrefs = savePreferences.mock.calls[0][0];
+      expect(savedPrefs.eventTemplates).toEqual([
+        { name: 'New Name', pattern: 'new {date}' },
+        { name: 'Other', pattern: 'other {date}' }
+      ]);
+    });
   });
 
   describe('delete-event-template', () => {

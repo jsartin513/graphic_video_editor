@@ -35,7 +35,7 @@ function formatTime(seconds) {
  * @param {() => import('electron').BrowserWindow|null} getMainWindow
  */
 function registerMergeSplitIpcHandlers(getMainWindow) {
-  ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false) => {
+  ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false, mergeLogPayload = null) => {
     return new Promise((resolve, reject) => {
       if (!Array.isArray(filePaths)) {
         reject(new Error('filePaths must be an array'));
@@ -236,8 +236,30 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             }
 
             if (code === 0) {
-              logger.info('merge-videos: Merge completed', { outputPath });
-              resolve({ success: true, outputPath });
+              logger.info('merge-videos: Merge completed', { outputPath: outputFile });
+              (async () => {
+                try {
+                  if (mergeLogPayload && typeof mergeLogPayload === 'object') {
+                    try {
+                      const outputDir = typeof mergeLogPayload.outputDir === 'string' && path.isAbsolute(mergeLogPayload.outputDir.trim())
+                        ? mergeLogPayload.outputDir.trim()
+                        : path.dirname(outputFile);
+                      const entry = createMergeLogEntry({
+                        ...mergeLogPayload,
+                        outputPath: outputFile,
+                        outputFilename: mergeLogPayload.outputFilename || path.basename(outputFile),
+                        outputDir
+                      });
+                      await appendMergeLogEntry(outputDir, entry);
+                    } catch (logError) {
+                      logger.error('merge-videos: merge log append failed', { error: logError.message });
+                    }
+                  }
+                  resolve({ success: true, outputPath: outputFile });
+                } catch (err) {
+                  reject(err);
+                }
+              })();
             } else {
               logger.error('merge-videos: FFmpeg failed', { code, errorOutput });
               const mapped = mapError(`ffmpeg failed: ${errorOutput}`);

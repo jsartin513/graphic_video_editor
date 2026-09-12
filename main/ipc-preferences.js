@@ -9,6 +9,7 @@ const {
   addRecentPattern,
   addEventTemplate,
   removeEventTemplate,
+  replaceEventTemplate,
   setLastWeekCount,
   setPreferredDateFormat,
   setPreferredQuality,
@@ -194,7 +195,7 @@ function registerPreferenceIpcHandlers() {
     }
   });
 
-  ipcMain.handle('save-event-template', async (event, name, pattern) => {
+  ipcMain.handle('save-event-template', async (event, name, pattern, originalName) => {
     try {
       if (typeof name !== 'string' || typeof pattern !== 'string') {
         logger.error('Invalid event template input types', { nameType: typeof name, patternType: typeof pattern });
@@ -207,7 +208,9 @@ function registerPreferenceIpcHandlers() {
         return { success: false, error: 'Invalid event template. Name and pattern must be non-empty strings.' };
       }
       const prefs = await loadPreferences();
-      const updated = addEventTemplate(prefs, { name: trimmedName, pattern: trimmedPattern });
+      const updated = typeof originalName === 'string' && originalName.trim()
+        ? replaceEventTemplate(prefs, originalName.trim(), { name: trimmedName, pattern: trimmedPattern })
+        : addEventTemplate(prefs, { name: trimmedName, pattern: trimmedPattern });
       await savePreferences(updated);
       return { success: true, preferences: updated };
     } catch (error) {

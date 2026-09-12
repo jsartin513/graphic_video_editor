@@ -19,6 +19,7 @@ const {
   addRecentPattern,
   addEventTemplate,
   removeEventTemplate,
+  replaceEventTemplate,
   setLastWeekCount,
   sanitizeFilenameForOutput,
   setPreferredDateFormat,
@@ -114,13 +115,23 @@ describe('loadPreferences', () => {
     expect(result.eventTemplates).toEqual([{ name: 'Custom', pattern: 'X {date}' }]);
   });
 
-  test('seeds default event templates when stored list is empty', async () => {
+  test('seeds default event templates when stored list is empty and not yet seeded', async () => {
     fs.readFile.mockResolvedValue(JSON.stringify({ eventTemplates: [] }));
 
     const result = await loadPreferences();
 
     expect(result.eventTemplates).toEqual(DEFAULT_EVENT_TEMPLATES);
+    expect(result.eventTemplatesSeeded).toBe(true);
     expect(fs.writeFile).toHaveBeenCalled();
+  });
+
+  test('keeps empty event templates when user cleared list after seeding', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ eventTemplates: [], eventTemplatesSeeded: true }));
+
+    const result = await loadPreferences();
+
+    expect(result.eventTemplates).toEqual([]);
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 
   test('seeds default event templates when key is missing', async () => {
@@ -134,7 +145,10 @@ describe('loadPreferences', () => {
 
   test('does not persist seed when custom event templates exist', async () => {
     const custom = [{ name: 'Mine', pattern: 'Mine {date}' }];
-    fs.readFile.mockResolvedValue(JSON.stringify({ eventTemplates: custom }));
+    fs.readFile.mockResolvedValue(JSON.stringify({
+      eventTemplates: custom,
+      eventTemplatesSeeded: true
+    }));
 
     const result = await loadPreferences();
 
@@ -462,6 +476,23 @@ describe('removeEventTemplate', () => {
   });
 });
 
+describe('replaceEventTemplate', () => {
+  test('renames template in one step', () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      eventTemplates: [
+        { name: 'Old', pattern: 'old {date}' },
+        { name: 'Keep', pattern: 'keep {date}' }
+      ]
+    };
+    const result = replaceEventTemplate(prefs, 'Old', { name: 'New', pattern: 'new {date}' });
+    expect(result.eventTemplates).toEqual([
+      { name: 'New', pattern: 'new {date}' },
+      { name: 'Keep', pattern: 'keep {date}' }
+    ]);
+  });
+});
+
 describe('setLastWeekCount', () => {
   test('stores trimmed week count as string', () => {
     const result = setLastWeekCount(DEFAULT_PREFERENCES, '  4  ');
@@ -493,6 +524,16 @@ describe('sanitizeFilenameForOutput', () => {
   test('returns empty string for non-string input', () => {
     expect(sanitizeFilenameForOutput(null)).toBe('');
     expect(sanitizeFilenameForOutput(undefined)).toBe('');
+  });
+
+  test('strips control characters and trailing dots', () => {
+    expect(sanitizeFilenameForOutput('name\u0001test')).toBe('name_test');
+    expect(sanitizeFilenameForOutput('file. ')).toBe('file');
+  });
+
+  test('prefixes Windows reserved device names', () => {
+    expect(sanitizeFilenameForOutput('CON')).toBe('_CON');
+    expect(sanitizeFilenameForOutput('nul.mp4')).toBe('_nul.mp4');
   });
 });
 

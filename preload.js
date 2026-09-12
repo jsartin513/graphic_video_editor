@@ -44,7 +44,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVideoMetadata: (videoPath) => ipcRenderer.invoke('get-video-metadata', videoPath),
   generateThumbnail: (videoPath, timestamp) => ipcRenderer.invoke('generate-thumbnail', videoPath, timestamp),
   getTotalFileSize: (filePaths) => ipcRenderer.invoke('get-total-file-size', filePaths),
-  mergeVideos: (filePaths, outputPath, qualityOption, format, normalizeAudio) => ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format, normalizeAudio),
+  mergeVideos: (filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload) =>
+    ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload),
   appendMergeLog: (outputDir, payload) => ipcRenderer.invoke('append-merge-log', outputDir, payload),
   cancelMerge: () => ipcRenderer.invoke('cancel-merge'),
   setPreferredFormat: (format) => ipcRenderer.invoke('set-preferred-format', format),
@@ -105,7 +106,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadPreferences: () => ipcRenderer.invoke('load-preferences'),
   savePreferences: (preferences) => ipcRenderer.invoke('save-preferences', preferences),
   saveFilenamePattern: (pattern) => ipcRenderer.invoke('save-filename-pattern', pattern),
-  saveEventTemplate: (name, pattern) => ipcRenderer.invoke('save-event-template', name, pattern),
+  saveEventTemplate: (name, pattern, originalName) => ipcRenderer.invoke('save-event-template', name, pattern, originalName),
   deleteEventTemplate: (name) => ipcRenderer.invoke('delete-event-template', name),
   setLastWeekCount: (count) => ipcRenderer.invoke('set-last-week-count', count),
   savePatternsFromSelectedFiles: (filePaths) => ipcRenderer.invoke('save-patterns-from-selected-files', filePaths),

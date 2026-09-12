@@ -7,6 +7,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { app } = require('electron');
 const { logger } = require('./logger');
+const { sanitizeFilenameForOutput } = require('./filename-sanitize');
 
 // Get preferences file path (in user data directory)
 function getPreferencesPath() {
@@ -46,19 +47,42 @@ const DEFAULT_PREFERENCES = {
   failedOperations: [], // Track failed merge operations for recovery
   eventTemplates: [...DEFAULT_EVENT_TEMPLATES], // Reusable filename patterns: [{ name, pattern }]
   maxEventTemplates: 10,
-  lastWeekCount: '' // Remembered week number for {count} in BYOT templates
+  lastWeekCount: '', // Remembered week number for {count} in BYOT templates
+  eventTemplatesSeeded: true // false only before first migration; empty list is intentional once seeded
 };
 
 function mergeLoadedPreferences(prefs) {
-  const eventTemplates = Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : [];
+  const rawHasTemplatesKey = Object.prototype.hasOwnProperty.call(prefs, 'eventTemplates');
+  const storedTemplates = Array.isArray(prefs.eventTemplates) ? prefs.eventTemplates : [];
+  const alreadySeeded = prefs.eventTemplatesSeeded === true;
+
+  let eventTemplates = storedTemplates;
+  let eventTemplatesSeeded = alreadySeeded;
+  let needsTemplateMigration = false;
+
+  if (!alreadySeeded) {
+    if (!rawHasTemplatesKey || storedTemplates.length === 0) {
+      eventTemplates = [...DEFAULT_EVENT_TEMPLATES];
+      eventTemplatesSeeded = true;
+      needsTemplateMigration = true;
+    } else {
+      eventTemplatesSeeded = true;
+      needsTemplateMigration = true;
+    }
+  }
+
   return {
-    ...DEFAULT_PREFERENCES,
-    ...prefs,
-    dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
-    recentDirectories: prefs.recentDirectories || [],
-    pinnedDirectories: prefs.pinnedDirectories || [],
-    eventTemplates: eventTemplates.length > 0 ? eventTemplates : [...DEFAULT_EVENT_TEMPLATES],
-    lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : '')
+    merged: {
+      ...DEFAULT_PREFERENCES,
+      ...prefs,
+      dateFormats: prefs.dateFormats || DEFAULT_PREFERENCES.dateFormats,
+      recentDirectories: prefs.recentDirectories || [],
+      pinnedDirectories: prefs.pinnedDirectories || [],
+      eventTemplates,
+      eventTemplatesSeeded,
+      lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : '')
+    },
+    needsTemplateMigration
   };
 }
 
@@ -71,21 +95,18 @@ async function loadPreferences() {
     const prefsPath = getPreferencesPath();
     const data = await fs.readFile(prefsPath, 'utf8');
     const prefs = JSON.parse(data);
-    const merged = mergeLoadedPreferences(prefs);
-    const rawTemplates = prefs.eventTemplates;
-    const needsTemplateSeed =
-      !Array.isArray(rawTemplates) || rawTemplates.length === 0;
-    if (needsTemplateSeed) {
+    const { merged, needsTemplateMigration } = mergeLoadedPreferences(prefs);
+    if (needsTemplateMigration) {
       await savePreferences(merged);
     }
     return merged;
   } catch (error) {
     if (error.code === 'ENOENT') {
       // File doesn't exist yet, return defaults
-      return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES] };
+      return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES], eventTemplatesSeeded: true };
     }
     logger.error('Error loading preferences', { error: error.message });
-    return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES] };
+    return { ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES], eventTemplatesSeeded: true };
   }
 }
 
@@ -240,16 +261,6 @@ function applyDateTokens(pattern, date = new Date(), dateFormat = 'YYYY-MM-DD', 
   }
 
   return result;
-}
-
-/**
- * Remove characters invalid in filenames on common desktop OSes; preserve spaces.
- * @param {string} name
- * @returns {string}
- */
-function sanitizeFilenameForOutput(name) {
-  if (!name || typeof name !== 'string') return '';
-  return name.replace(/[/\\:*?"<>|]/g, '_').trim();
 }
 
 /**
@@ -626,7 +637,47 @@ function removeEventTemplate(preferences, name) {
   const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
   return {
     ...preferences,
-    eventTemplates: templates.filter(t => t && t.name !== trimmed)
+    eventTemplates: templates.filter(t => t && t.name !== trimmed),
+    eventTemplatesSeeded: true
+  };
+}
+
+/**
+ * Rename or replace an event template in one step
+ * @param {Object} preferences
+ * @param {string} originalName
+ * @param {{ name: string, pattern: string }} template
+ * @returns {Object}
+ */
+function replaceEventTemplate(preferences, originalName, template) {
+  if (!template || typeof template.name !== 'string' || !template.name.trim() ||
+      typeof template.pattern !== 'string' || !template.pattern.trim()) {
+    return preferences;
+  }
+  if (!originalName || typeof originalName !== 'string' || !originalName.trim()) {
+    return addEventTemplate(preferences, template);
+  }
+
+  const orig = originalName.trim();
+  const name = template.name.trim();
+  const pattern = template.pattern.trim();
+  const templates = Array.isArray(preferences.eventTemplates) ? preferences.eventTemplates : [];
+  const validTemplates = templates.filter(t => t && typeof t.name === 'string' && typeof t.pattern === 'string');
+  const withoutNameConflict = validTemplates.filter((t) => t.name !== name || t.name === orig);
+  const index = withoutNameConflict.findIndex((t) => t.name === orig);
+
+  if (index === -1) {
+    return addEventTemplate(preferences, { name, pattern });
+  }
+
+  const updated = [...withoutNameConflict];
+  updated[index] = { name, pattern };
+  const max = preferences.maxEventTemplates ?? DEFAULT_PREFERENCES.maxEventTemplates;
+
+  return {
+    ...preferences,
+    eventTemplates: updated.slice(0, max),
+    eventTemplatesSeeded: true
   };
 }
 
@@ -644,7 +695,8 @@ function addEventTemplate(preferences, template) {
   const max = preferences.maxEventTemplates ?? DEFAULT_PREFERENCES.maxEventTemplates;
   return {
     ...preferences,
-    eventTemplates: updated.slice(0, max)
+    eventTemplates: updated.slice(0, max),
+    eventTemplatesSeeded: true
   };
 }
 
@@ -673,6 +725,7 @@ module.exports = {
   clearFailedOperations,
   addEventTemplate,
   removeEventTemplate,
+  replaceEventTemplate,
   setLastWeekCount,
   sanitizeFilenameForOutput,
   DEFAULT_EVENT_TEMPLATES,

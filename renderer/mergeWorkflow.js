@@ -143,6 +143,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   async function applyTemplateToSelectedGroups(pattern) {
     if (!pattern) return;
     const customTokens = getFilenameCustomTokens();
+    const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
     await persistWeekCount(customTokens.count);
     const templateSelect = document.getElementById('eventTemplateSelect');
     const selectedOpt = templateSelect?.options[templateSelect.selectedIndex];
@@ -160,23 +161,30 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         templateName,
         templatePattern: pattern,
         weekCount: customTokens.count,
+        eventName: customTokens.eventName,
+        leagueName: customTokens.leagueName,
+        weekName: customTokens.weekName,
+        dateFormat,
         appliedAt
       };
     }
   }
 
   function buildMergeLogPayload(group, outputDir, outputPath, outputFilename) {
-    const templateSelect = document.getElementById('eventTemplateSelect');
-    let templateName = group.appliedNaming?.templateName || null;
-    let templatePattern = group.appliedNaming?.templatePattern || null;
-    let appliedAt = group.appliedNaming?.appliedAt || null;
+    const applied = group.appliedNaming;
+    const naming = applied
+      ? {
+          templateName: applied.templateName || undefined,
+          templatePattern: applied.templatePattern || undefined,
+          weekCount: applied.weekCount || undefined,
+          eventName: applied.eventName || undefined,
+          leagueName: applied.leagueName || undefined,
+          weekName: applied.weekName || undefined,
+          dateFormat: applied.dateFormat || undefined,
+          appliedAt: applied.appliedAt || undefined
+        }
+      : {};
 
-    if (!templatePattern && templateSelect?.value) {
-      templatePattern = templateSelect.value;
-      templateName = templateSelect.options[templateSelect.selectedIndex]?.textContent?.trim() || null;
-    }
-
-    const tokens = getFilenameCustomTokens();
     return {
       sessionId: group.sessionId,
       inputFiles: group.files,
@@ -188,29 +196,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         format: selectedFormat,
         normalizeAudio
       },
-      naming: {
-        templateName: templateName || undefined,
-        templatePattern: templatePattern || undefined,
-        weekCount: tokens.count || group.appliedNaming?.weekCount || undefined,
-        eventName: tokens.eventName || undefined,
-        leagueName: tokens.leagueName || undefined,
-        weekName: tokens.weekName || undefined,
-        dateFormat: userPreferences?.preferredDateFormat || 'YYYY-MM-DD',
-        appliedAt: appliedAt || undefined
-      }
+      naming
     };
-  }
-
-  async function recordSuccessfulMerge(group, outputDir, outputPath, outputFilename) {
-    try {
-      const payload = buildMergeLogPayload(group, outputDir, outputPath, outputFilename);
-      const result = await window.electronAPI.appendMergeLog(outputDir, payload);
-      if (result?.success === false) {
-        console.warn('Merge log not written:', result.error);
-      }
-    } catch (error) {
-      console.error('Error writing merge log:', error);
-    }
   }
   
   // Initialize preferences
@@ -998,8 +985,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       
       try {
-        await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
-        await recordSuccessfulMerge(group, outputDir, outputPath, outputFilename);
+        const mergeLogPayload = buildMergeLogPayload(group, outputDir, outputPath, outputFilename);
+        await window.electronAPI.mergeVideos(
+          group.files,
+          outputPath,
+          selectedQuality,
+          selectedFormat,
+          normalizeAudio,
+          mergeLogPayload
+        );
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
         updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);

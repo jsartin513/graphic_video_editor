@@ -107,10 +107,23 @@ function formatTimeForFFmpeg(seconds) {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-/** Remove characters invalid in filenames; preserve spaces. */
+/** Remove characters invalid in filenames; preserve spaces. Matches src/filename-sanitize.js */
 export function sanitizeFilenameForOutput(name) {
   if (!name || typeof name !== 'string') return '';
-  return name.replace(/[/\\:*?"<>|]/g, '_').trim();
+  const WINDOWS_RESERVED = new Set([
+    'con', 'prn', 'aux', 'nul',
+    'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+    'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9'
+  ]);
+  let result = name.replace(/[\u0000-\u001f\u007f]/g, '_');
+  result = result.replace(/[/\\:*?"<>|]/g, '_');
+  result = result.replace(/[.\s]+$/g, '').trim();
+  if (!result) return 'output';
+  const stem = result.includes('.') ? result.slice(0, result.lastIndexOf('.')) : result;
+  if (WINDOWS_RESERVED.has(stem.toLowerCase())) {
+    result = `_${result}`;
+  }
+  return result;
 }
 
 export {
