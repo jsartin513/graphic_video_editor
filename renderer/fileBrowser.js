@@ -121,6 +121,31 @@ export function openFileBrowser(options = {}) {
           updateConfirmButton();
         });
 
+        row.tabIndex = entry.isDirectory || mode !== 'folder' ? 0 : -1;
+        row.setAttribute('aria-selected', selected ? 'true' : 'false');
+        row.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          row.click();
+        });
+        const check = row.querySelector('.file-browser-check');
+        if (check) {
+          check.addEventListener('click', (e) => e.stopPropagation());
+          check.addEventListener('change', (e) => {
+            e.stopPropagation();
+            if (mode === 'folder') return;
+            if (mode === 'single-file') {
+              selectedFiles = check.checked ? new Set([entry.path]) : new Set();
+            } else if (check.checked) {
+              selectedFiles.add(entry.path);
+            } else {
+              selectedFiles.delete(entry.path);
+            }
+            renderEntries(listing);
+            updateConfirmButton();
+          });
+        }
+
         listEl.appendChild(row);
       }
     }

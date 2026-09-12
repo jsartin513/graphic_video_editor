@@ -104,6 +104,7 @@
         renderEntries(listing);
         updateConfirmButton();
       });
+      wireFileBrowserRow(row, entry, listing);
       listEl.appendChild(row);
     });
   }
@@ -191,10 +192,38 @@
   }
 
   function countAddedFromResult(result) {
-    if (!result || !Array.isArray(result.added)) {
-      return 0;
+    if (window.electronAPI && typeof window.electronAPI.countAddedVideosFromBrowserResult === 'function') {
+      return window.electronAPI.countAddedVideosFromBrowserResult(result);
     }
-    return result.added.length;
+    return 0;
+  }
+
+  function wireFileBrowserRow(row, entry, listing) {
+    var inMergeList = !entry.isDirectory && alreadyInMergeList(entry.path);
+    var selected = !entry.isDirectory && (
+      Object.prototype.hasOwnProperty.call(selectedFiles, entry.path) || inMergeList
+    );
+    row.setAttribute('tabindex', entry.isDirectory || mode !== 'folder' ? '0' : '-1');
+    row.setAttribute('aria-selected', selected ? 'true' : 'false');
+    row.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      row.click();
+    });
+    var check = row.querySelector('.file-browser-check');
+    if (check) {
+      check.addEventListener('click', function (e) {
+        e.stopPropagation();
+      });
+      check.addEventListener('change', function (e) {
+        e.stopPropagation();
+        if (inMergeList) return;
+        if (check.checked) selectedFiles[entry.path] = true;
+        else delete selectedFiles[entry.path];
+        renderEntries(listing);
+        updateConfirmButton();
+      });
+    }
   }
 
   async function addSelected() {

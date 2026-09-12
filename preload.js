@@ -3,6 +3,7 @@ const {
   isOsFileDrop,
   pathsFromDataTransfer
 } = require('./src/file-pick-utils');
+const { countAddedVideosFromBrowserResult } = require('./src/file-browser-add-result');
 
 let webUtilsGetPath = null;
 try {
@@ -34,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFileBrowserRoots: () => ipcRenderer.invoke('get-file-browser-roots'),
   getFileMetadata: (filePath) => ipcRenderer.invoke('get-file-metadata', filePath),
   processDroppedPaths: (paths) => ipcRenderer.invoke('process-dropped-paths', paths),
+  countAddedVideosFromBrowserResult: (result) => countAddedVideosFromBrowserResult(result),
   onNativeFileDrop: (callback) => {
     ipcRenderer.on('native-file-drop', (_event, paths) => callback(paths));
   },

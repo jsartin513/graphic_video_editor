@@ -656,14 +656,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Handle output destination selection
   async function handleSelectOutputDestination() {
     try {
-      const pick = await openFileBrowser({
-        mode: 'folder',
-        title: 'Select Output Folder',
-        startPath: state.selectedOutputDestination || undefined
-      });
-      if (pick.canceled || !pick.folderPath) return;
-
-      const result = await window.electronAPI.selectOutputDestination(pick.folderPath);
+      const result = await window.electronAPI.selectOutputDestination();
       if (!result.canceled && result.path) {
         state.selectedOutputDestination = result.path;
         updateOutputDestinationDisplay();

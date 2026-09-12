@@ -91,7 +91,7 @@ exports.default = async function(context) {
         fs.mkdirSync(testVideosDest, { recursive: true });
       }
 
-      const testFiles = fs.readdirSync(testVideosSrc).filter(f => f.endsWith('.mp4'));
+      const testFiles = fs.readdirSync(testVideosSrc).filter((f) => /\.(mp4|MP4)$/i.test(f));
       for (const file of testFiles) {
         const src = path.join(testVideosSrc, file);
         const dest = path.join(testVideosDest, file);

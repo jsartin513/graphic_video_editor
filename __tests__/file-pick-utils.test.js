@@ -50,6 +50,12 @@ describe('file-pick-utils', () => {
       ])).toBe('/Users/me/Videos');
     });
 
+    it('returns root when webkitRelativePath includes the selected folder name', () => {
+      expect(getRootFolderFromFiles([
+        { path: '/Users/me/Videos/sub/a.mp4', webkitRelativePath: 'Videos/sub/a.mp4' }
+      ])).toBe('/Users/me/Videos');
+    });
+
     it('returns null for an empty list', () => {
       expect(getRootFolderFromFiles([])).toBeNull();
     });

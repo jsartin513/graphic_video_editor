@@ -179,8 +179,14 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     try {
       const result = await window.electronAPI.processDroppedPaths(valid);
       if (result.files.length > 0) {
-        await addFiles(result.files);
-        showPickStatus(`Dropped ${result.files.length} video${result.files.length === 1 ? '' : 's'}.`);
+        const { added, duplicates } = await addFiles(result.files);
+        if (added.length > 0) {
+          showPickStatus(`Dropped ${added.length} video${added.length === 1 ? '' : 's'}.`);
+        } else if (duplicates.length > 0) {
+          showPickStatus('Those filenames are already in Selected Videos.', true);
+        } else {
+          showPickStatus('No new videos were added from that drop.', true);
+        }
       } else {
         showPickStatus('Drop received, but no video files were found in those items.', true);
       }

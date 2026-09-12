@@ -103,10 +103,12 @@ if [[ "$SIGN_ONLY" != true ]] && [[ -n "$DMG" ]] && [[ -f "$DMG" ]]; then
 fi
 
 echo "Verifying signature..."
-if [[ -n "$DMG" ]]; then
-  npm run verify-signed-build -- "$APP" "$DMG" || true
+if [[ "$SIGN_ONLY" == true ]]; then
+  npm run verify-signed-build -- "$APP"
+elif [[ -n "$DMG" && -f "$DMG" ]]; then
+  npm run verify-signed-build -- "$APP" "$DMG"
 else
-  npm run verify-signed-build -- "$APP" || true
+  npm run verify-signed-build -- "$APP"
 fi
 
 if [[ "$INSTALL" == true ]]; then

@@ -1,9 +1,30 @@
 const path = require('path');
 const { BrowserWindow } = require('electron');
 const { logger } = require('../src/logger');
+const { getRootFolderFromFiles } = require('../src/file-pick-utils');
 
 const PICKER_HTML = `data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head><body></body></html>`)}`;
+
+const PICKER_FILE_PATH_HELPER = `
+function getPathFromFile(file) {
+  if (file && file.path) return file.path;
+  try {
+    const { webUtils } = require('electron');
+    if (webUtils && typeof webUtils.getPathForFile === 'function') {
+      return webUtils.getPathForFile(file);
+    }
+  } catch (error) {}
+  return '';
+}
+function describeFile(file) {
+  return {
+    path: getPathFromFile(file),
+    webkitRelativePath: file.webkitRelativePath || file.name || '',
+    name: file.name || ''
+  };
+}
+`;
 
 function createPickerWindow(getMainWindow) {
   const parent = getMainWindow?.();
@@ -28,13 +49,7 @@ function createPickerWindow(getMainWindow) {
 }
 
 function getRootFolderFromWebkitFiles(files) {
-  if (!files.length) return null;
-  const first = files[0];
-  const rel = first.webkitRelativePath || path.basename(first.path);
-  if (!rel.includes('/')) {
-    return path.dirname(first.path);
-  }
-  return first.path.slice(0, first.path.length - rel.length).replace(/[/\\]$/, '');
+  return getRootFolderFromFiles(files, (file) => file.path || '');
 }
 
 /**
@@ -65,7 +80,7 @@ function pickFilesWeb(getMainWindow) {
     win.webContents.once('did-finish-load', () => {
       win.webContents.executeJavaScript(`
         (function() {
-          const { webUtils } = require('electron');
+          ${PICKER_FILE_PATH_HELPER}
           return new Promise((resolve) => {
             const input = document.createElement('input');
             input.type = 'file';
@@ -78,7 +93,7 @@ function pickFilesWeb(getMainWindow) {
               resolve(paths);
             };
             input.addEventListener('change', () => {
-              const paths = Array.from(input.files || []).map((f) => webUtils.getPathForFile(f));
+              const paths = Array.from(input.files || []).map((f) => describeFile(f).path).filter(Boolean);
               done(paths);
             });
             input.addEventListener('cancel', () => done([]));
@@ -131,38 +146,28 @@ function pickFolderWeb(getMainWindow) {
     win.webContents.once('did-finish-load', () => {
       win.webContents.executeJavaScript(`
         (function() {
-          const { webUtils } = require('electron');
+          ${PICKER_FILE_PATH_HELPER}
           return new Promise((resolve) => {
             const input = document.createElement('input');
             input.type = 'file';
             input.webkitdirectory = true;
             input.style.display = 'none';
             document.body.appendChild(input);
-            const done = (folder) => {
+            const done = (files) => {
               input.remove();
-              resolve(folder);
+              resolve(files);
             };
             input.addEventListener('change', () => {
-              const files = Array.from(input.files || []);
-              if (!files.length) {
-                done(null);
-                return;
-              }
-              const first = files[0];
-              const rel = first.webkitRelativePath || first.name;
-              const fullPath = webUtils.getPathForFile(first);
-              if (!rel.includes('/')) {
-                done(fullPath.replace(/[/\\\\][^/\\\\]+$/, ''));
-                return;
-              }
-              done(fullPath.slice(0, fullPath.length - rel.length).replace(/[/\\\\]$/, ''));
+              const files = Array.from(input.files || []).map((f) => describeFile(f));
+              done(files);
             });
-            input.addEventListener('cancel', () => done(null));
+            input.addEventListener('cancel', () => done([]));
             input.click();
           });
         })()
-      `, true).then((folderPath) => {
+      `, true).then((files) => {
         clearTimeout(timeout);
+        const folderPath = getRootFolderFromWebkitFiles(files || []);
         logger.info('web-file-picker: folder selected', { folderPath });
         finish(folderPath);
       }).catch((error) => {

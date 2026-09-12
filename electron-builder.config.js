@@ -143,7 +143,7 @@ if (includeTestVideos && fs.existsSync(testVideosDir)) {
   extraResourcesList.push({
     from: "test-videos",
     to: "test-videos",
-    filter: ["**/*.mp4"]
+    filter: ["**/*.mp4", "**/*.MP4"]
   });
   console.log('✓ Electron Builder: Including test video files');
 }

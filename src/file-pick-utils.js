@@ -67,6 +67,30 @@ function pathsFromDataTransfer(dataTransfer, webUtilsGetPath) {
   return pathsFromUriList(uriList);
 }
 
+function getRootFolderFromRelativePath(fullPath, relativePath) {
+  if (!fullPath) return null;
+  const normalizedFull = fullPath.replace(/\\/g, '/');
+  let rel = (relativePath || '').replace(/\\/g, '/');
+  if (!rel) {
+    const sep = normalizedFull.lastIndexOf('/');
+    return sep >= 0 ? normalizedFull.slice(0, sep) : normalizedFull;
+  }
+  const parts = rel.split('/');
+  if (parts.length === 1) {
+    const sep = normalizedFull.lastIndexOf('/');
+    return sep >= 0 ? normalizedFull.slice(0, sep) : normalizedFull;
+  }
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const variant = parts.slice(i).join('/');
+    const suffix = `/${variant}`;
+    if (normalizedFull.endsWith(suffix)) {
+      return normalizedFull.slice(0, normalizedFull.length - suffix.length);
+    }
+  }
+  const sep = normalizedFull.lastIndexOf('/');
+  return sep >= 0 ? normalizedFull.slice(0, sep) : normalizedFull;
+}
+
 function getRootFolderFromFiles(files, webUtilsGetPath) {
   const list = Array.from(files || []);
   if (!list.length) return null;
@@ -74,15 +98,13 @@ function getRootFolderFromFiles(files, webUtilsGetPath) {
   const fullPath = getFilePath(first, webUtilsGetPath);
   if (!fullPath) return null;
   const rel = first.webkitRelativePath || first.name || '';
-  if (!rel.includes('/') && !rel.includes('\\')) {
-    return fullPath.replace(/[/\\][^/\\]+$/, '');
-  }
-  return fullPath.slice(0, fullPath.length - rel.length).replace(/[/\\]$/, '');
+  return getRootFolderFromRelativePath(fullPath, rel);
 }
 
 module.exports = {
   getFilePath,
   getPathsFromFileList,
+  getRootFolderFromRelativePath,
   getRootFolderFromFiles,
   fileUrlToPath,
   pathsFromUriList,

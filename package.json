@@ -14,7 +14,7 @@
     "build:mac": "electron-builder --config electron-builder.config.js --mac",
     "build:arm64": "electron-builder --config electron-builder.config.js --mac --arm64",
     "build:x64": "electron-builder --config electron-builder.config.js --mac --x64",
-    "build:fat": "BUNDLE_FFMPEG=true npm run prebuild && electron-builder --config electron-builder.config.js --mac --x64 --arm64",
+    "build:fat": "BUNDLE_FFMPEG=true npm run prebuild:x64 && electron-builder --config electron-builder.config.js --mac --x64 && BUNDLE_FFMPEG=true npm run prebuild:arm64 && electron-builder --config electron-builder.config.js --mac --arm64",
     "build:fat:arm64": "BUNDLE_FFMPEG=true npm run prebuild:arm64 && electron-builder --config electron-builder.config.js --mac --arm64",
     "build:fat:x64": "BUNDLE_FFMPEG=true npm run prebuild:x64 && electron-builder --config electron-builder.config.js --mac --x64",
     "build:lite": "BUNDLE_FFMPEG=false npm run build",

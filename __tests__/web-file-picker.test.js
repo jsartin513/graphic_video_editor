@@ -14,4 +14,11 @@ describe('web-file-picker helpers', () => {
     ]);
     expect(root).toBe('/Users/me/Videos');
   });
+
+  it('getRootFolderFromWebkitFiles handles root folder name in webkitRelativePath', () => {
+    const root = getRootFolderFromWebkitFiles([
+      { path: '/Users/me/Videos/sub/a.mp4', webkitRelativePath: 'Videos/sub/a.mp4' }
+    ]);
+    expect(root).toBe('/Users/me/Videos');
+  });
 });

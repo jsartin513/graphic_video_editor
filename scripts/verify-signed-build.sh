@@ -31,6 +31,14 @@ echo "=== App: $APP_PATH ==="
 codesign -dv --verbose=4 "$APP_PATH" 2>&1 | sed -n '1,25p' || true
 echo
 
+if codesign --verify --deep --strict "$APP_PATH" 2>&1; then
+  echo "✅ App passes codesign --verify --deep --strict"
+else
+  echo "❌ codesign --verify --deep --strict failed"
+  FAILED=1
+fi
+echo
+
 if codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -q "Authority=Developer ID Application"; then
   echo "✅ Signed with Developer ID Application"
 else
