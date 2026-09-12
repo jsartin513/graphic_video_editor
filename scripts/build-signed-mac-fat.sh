@@ -149,36 +149,33 @@ for candidate in "$ROOT"/dist/Video\ Merger-*-"${ARCH_LABEL}"-fat.dmg; do
   fi
 done
 
-DMG_STAPLED=false
-if [[ "$SIGN_ONLY" != true ]] && [[ -n "$DMG" ]] && [[ -f "$DMG" ]]; then
-  if xcrun stapler validate "$DMG" >/dev/null 2>&1; then
-    DMG_STAPLED=true
+# electron-builder notarizes Video Merger.app before the DMG is created. The ticket
+# is on the .app, not the DMG wrapper — stapling the DMG always fails with "Record not found".
+APP_STAPLED=false
+if [[ "$SIGN_ONLY" != true ]]; then
+  if xcrun stapler validate "$APP" >/dev/null 2>&1; then
+    APP_STAPLED=true
+    echo "✅ App notarization ticket already stapled"
   else
-    echo "Waiting for Apple notary ticket before stapling DMG..."
-    sleep 30
+    echo "Stapling notarized Video Merger.app (DMG staple is not used)..."
+    sleep 20
     for attempt in 1 2 3 4 5 6 7 8; do
-      echo "Stapling DMG (attempt ${attempt})..."
-      if xcrun stapler staple "$DMG" 2>/dev/null && xcrun stapler validate "$DMG" >/dev/null 2>&1; then
-        DMG_STAPLED=true
-        echo "DMG staple OK"
+      echo "Stapling .app (attempt ${attempt})..."
+      if xcrun stapler staple "$APP" 2>/dev/null && xcrun stapler validate "$APP" >/dev/null 2>&1; then
+        APP_STAPLED=true
+        echo "✅ App staple OK"
         break
       fi
-      sleep $((attempt * 20))
+      sleep $((attempt * 15))
     done
-    if [[ "$DMG_STAPLED" != true ]]; then
-      echo "⚠️  DMG not stapled yet; .app is still notarized. Re-run: xcrun stapler staple \"$DMG\""
+    if [[ "$APP_STAPLED" != true ]]; then
+      echo "⚠️  App not stapled yet. Try later: xcrun stapler staple \"$APP\""
     fi
   fi
 fi
 
 echo "Verifying signature..."
-if [[ "$SIGN_ONLY" == true ]]; then
-  npm run verify-signed-build -- "$APP"
-elif [[ -n "$DMG" && -f "$DMG" && "$DMG_STAPLED" == true ]]; then
-  npm run verify-signed-build -- "$APP" "$DMG"
-else
-  npm run verify-signed-build -- "$APP"
-fi
+npm run verify-signed-build -- "$APP"
 
 if [[ "$INSTALL" == true ]]; then
   if [[ "$ARCH" != arm64 ]]; then

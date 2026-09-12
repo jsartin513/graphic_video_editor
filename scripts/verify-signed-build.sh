@@ -76,9 +76,15 @@ if [[ -n "${DMG_PATH:-}" ]]; then
   if xcrun stapler validate "$DMG_PATH" 2>&1; then
     echo "✅ DMG notarization ticket is stapled"
   else
-    echo "❌ DMG is not stapled (set CSC_NAME + APPLE_ID / APPLE_TEAM_ID / APPLE_APP_SPECIFIC_PASSWORD and rebuild)"
-    FAILED=1
+    echo "ℹ️  DMG is not stapled (expected — notarization is on Video Merger.app inside the DMG)"
   fi
+fi
+
+if xcrun stapler validate "$APP_PATH" >/dev/null 2>&1; then
+  echo "✅ App notarization ticket is stapled"
+else
+  echo "❌ App is not stapled — friends may see Gatekeeper prompts on first open"
+  FAILED=1
 fi
 
 exit "$FAILED"
