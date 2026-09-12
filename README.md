@@ -2,6 +2,8 @@
 
 A Mac desktop application for selecting and reviewing GoPro video files before merging them.
 
+**Using the app (install, merge, updates):** see **[USER_GUIDE.md](USER_GUIDE.md)** — written for non-developers.
+
 ## Features
 
 - Select multiple video files via file picker dialog

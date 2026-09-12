@@ -117,10 +117,11 @@ const baseConfig = {
     buildResources: "build",
     output: "dist"
   },
-  // Match CI / friend-download names: Video Merger-1.0.0-arm64-fat.dmg
+  // No spaces: GitHub release uploads mangle "Video Merger" → "Video.Merger" but
+  // latest-mac.yml uses "Video-Merger-*", which breaks electron-updater downloads.
   artifactName: process.env.BUNDLE_FFMPEG === 'false'
-    ? "${productName}-${version}-${arch}-lite.${ext}"
-    : "${productName}-${version}-${arch}-fat.${ext}"
+    ? "Video-Merger-${version}-${arch}-lite.${ext}"
+    : "Video-Merger-${version}-${arch}-fat.${ext}"
 };
 
 // Conditionally include ffmpeg binaries if they exist

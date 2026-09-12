@@ -1,5 +1,7 @@
 # Distribution Guide for Friends
 
+Send friends **[USER_GUIDE.md](USER_GUIDE.md)** (or the [latest release](https://github.com/jsartin513/graphic_video_editor/releases/latest)) instead of this file when they only need install and usage help.
+
 Share **fat** DMGs only. Lite builds require Homebrew ffmpeg and are for developers.
 
 **Requirements:** macOS 10.15 Catalina or later.

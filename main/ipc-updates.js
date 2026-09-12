@@ -6,6 +6,14 @@ const fs = require('fs');
 const path = require('path');
 const { app, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const semver = require('semver');
+
+function isNewerRelease(remoteVersion, currentVersion) {
+  const remote = semver.coerce(remoteVersion);
+  const current = semver.coerce(currentVersion);
+  if (!remote || !current) return false;
+  return semver.gt(remote, current);
+}
 
 const RELEASES_LATEST_URL = 'https://github.com/jsartin513/graphic_video_editor/releases/latest';
 
@@ -39,7 +47,9 @@ function registerUpdatesIpcHandlers() {
     }
     try {
       const result = await autoUpdater.checkForUpdates();
-      return { available: Boolean(result?.updateInfo), updateInfo: result?.updateInfo ?? null };
+      const updateInfo = result?.updateInfo ?? null;
+      const available = isNewerRelease(updateInfo?.version, app.getVersion());
+      return { available, updateInfo, currentVersion: app.getVersion() };
     } catch (error) {
       const errorMessage = error.message || String(error);
       let userMessage = 'Failed to check for updates.';

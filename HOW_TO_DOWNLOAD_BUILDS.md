@@ -1,5 +1,7 @@
 # How to Download Builds from GitHub
 
+**End users:** use **[USER_GUIDE.md](USER_GUIDE.md)** (Releases page, fat DMG, install steps). This file is mainly for CI artifacts and developers.
+
 ## Finding Your Builds
 
 After the GitHub Actions workflow completes, you can find the built applications in two places:
