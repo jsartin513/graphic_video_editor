@@ -1,6 +1,7 @@
 // File selection and handling functionality
 
 import { getFileName, escapeHtml, escapeAttr, formatDate, formatDuration, formatBitrate, formatResolution, formatFrameRate, getDirectoryPath } from './utils.js';
+import { getAppPhase, setAppPhase } from './appPhase.js';
 
 // Thumbnail cache and queue management
 const thumbnailCache = new Map();
@@ -21,7 +22,6 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     fileListContainer
   } = domElements;
   const fileListEmpty = document.getElementById('fileListEmpty');
-  const fileBrowserPanel = document.getElementById('fileBrowserPanel');
 
   function showPickStatus(message, isError = false) {
     const el = document.getElementById('filePickStatus');
@@ -36,18 +36,9 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     el.classList.toggle('error', Boolean(isError));
   }
 
-  function revealFileBrowser(nextMode, message) {
-    showPickStatus(message);
-    if (typeof window.mountHomeFileBrowser === 'function') {
-      window.mountHomeFileBrowser(nextMode);
-    }
-    const panel = document.getElementById('fileBrowserPanel');
-    if (panel) {
-      panel.hidden = false;
-      panel.removeAttribute('hidden');
-      panel.style.display = 'block';
-      panel.scrollIntoView({ block: 'nearest' });
-    }
+  function returnToPick(message, isError = false) {
+    setAppPhase('pick', { addingMore: state.selectedFiles.length > 0 });
+    showPickStatus(message, isError);
   }
 
   async function applyPickedVideos(result, emptyMessage) {
@@ -72,29 +63,17 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     try {
       const ipc = await window.electronAPI.selectFiles();
       if (ipc.canceled) {
-        revealFileBrowser(
-          'files',
-          'Picker canceled — use Home / Desktop / Movies below, or try Select Files again.'
-        );
+        showPickStatus('');
         return;
       }
       const files = ipc.files || [];
-      const handled = await applyPickedVideos(
+      await applyPickedVideos(
         { canceled: false, files },
         'No video files in that selection.'
       );
-      if (!handled) {
-        revealFileBrowser(
-          'files',
-          'Picker canceled — use Home / Desktop / Movies below, or try Select Files again.'
-        );
-      }
     } catch (error) {
       console.error('selectFiles failed:', error);
-      revealFileBrowser(
-        'files',
-        'Could not open the file picker — browse in the folder list below.'
-      );
+      returnToPick('Could not open the file picker. Try again or drop files here.', true);
     }
   }
 
@@ -103,29 +82,17 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     try {
       const ipc = await window.electronAPI.selectFolder();
       if (ipc.canceled) {
-        revealFileBrowser(
-          'folder',
-          'Picker canceled — open a folder in the list below, then Use This Folder.'
-        );
+        showPickStatus('');
         return;
       }
       const files = ipc.files || [];
-      const handled = await applyPickedVideos(
+      await applyPickedVideos(
         { canceled: false, files },
         'No videos found in that folder.'
       );
-      if (!handled) {
-        revealFileBrowser(
-          'folder',
-          'Picker canceled — open a folder in the list below, then Use This Folder.'
-        );
-      }
     } catch (error) {
       console.error('selectFolder failed:', error);
-      revealFileBrowser(
-        'folder',
-        'Could not open the folder picker — browse in the list below.'
-      );
+      returnToPick('Could not open the folder picker. Try again or drop a folder here.', true);
     }
   }
 
@@ -135,7 +102,7 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     if (files.length > 0) {
       const { added, duplicates } = await addFiles(files);
       if (added.length > 0) {
-        showPickStatus(`Added ${added.length} video${added.length === 1 ? '' : 's'} — they are in Selected Videos at the top.`);
+        showPickStatus(`Added ${added.length} video${added.length === 1 ? '' : 's'}.`);
       } else if (duplicates.length > 0) {
         showPickStatus('Those filenames are already in Selected Videos.', true);
       }
@@ -263,6 +230,9 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     
     if (added.length > 0 || duplicates.length === 0) {
       await updateFileList();
+      if (added.length > 0 && typeof window.onVideosAddedForMerge === 'function') {
+        await window.onVideosAddedForMerge();
+      }
     }
     return { added, duplicates };
   }
@@ -297,10 +267,8 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
 
   async function updateFileList() {
     const hasFiles = state.selectedFiles.length > 0;
-    fileListContainer.style.display = 'block';
-    fileListContainer.hidden = false;
+    const phase = getAppPhase();
     if (fileListEmpty) fileListEmpty.hidden = hasFiles;
-    if (fileBrowserPanel) fileBrowserPanel.classList.toggle('is-compact', hasFiles);
 
     if (!hasFiles) {
       fileList.innerHTML = '';
@@ -309,10 +277,18 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
         compareVideosBtn.style.display = 'none';
       }
       fileCount.textContent = '0 files';
+      if (phase === 'selection-fallback') {
+        setAppPhase('pick');
+      }
       return;
     }
+
+    if (phase === 'selection-fallback') {
+      fileListContainer.hidden = false;
+      fileListContainer.style.display = 'block';
+    }
     
-    prepareMergeBtn.style.display = 'inline-flex';
+    prepareMergeBtn.style.display = phase === 'selection-fallback' ? 'inline-flex' : 'none';
     
     // Show compare button only when exactly 2 files are selected
     if (compareVideosBtn) {
@@ -765,12 +741,21 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
   }
 
   // Attach event listeners
-  selectFilesBtn.addEventListener('click', handleSelectFiles);
-  selectFolderBtn.addEventListener('click', handleSelectFolder);
+  selectFilesBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    handleSelectFiles();
+  });
+  selectFolderBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    handleSelectFolder();
+  });
   dropZone.addEventListener('dragover', handleDragOver);
   dropZone.addEventListener('dragleave', handleDragLeave);
   dropZone.addEventListener('drop', handleDrop);
-  dropZone.addEventListener('click', () => selectFilesBtn.click());
+  dropZone.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    selectFilesBtn.click();
+  });
   if (window.electronAPI?.onNativeFileDrop) {
     window.electronAPI.onNativeFileDrop(addDroppedPaths);
   }

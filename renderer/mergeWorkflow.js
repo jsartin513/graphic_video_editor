@@ -3,7 +3,7 @@
 import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
-import { openFileBrowser } from './fileBrowser.js';
+import { setAppPhase, resetToEmptyPick, isAddingMoreVideos } from './appPhase.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -102,19 +102,49 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   loadUserPreferences();
 
   let normalizeAudio = false; // Audio normalization option
+  function openPickForMoreVideos() {
+    state.currentScreen = 'fileList';
+    previewScreen.style.display = 'none';
+    setAppPhase('pick', { addingMore: true });
+  }
+
+  function returnToMergeSetup() {
+    if (state.videoGroups && state.videoGroups.length > 0) {
+      state.currentScreen = 'preview';
+      setAppPhase('merge');
+      previewScreen.style.display = 'flex';
+      renderPreviewList();
+      loadPreviewThumbnails();
+    } else {
+      setAppPhase('pick');
+    }
+  }
+
+  let prepareMergeRequestId = 0;
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
     if (state.selectedFiles.length === 0) return;
+    const requestId = ++prepareMergeRequestId;
     
     try {
       // Ensure preferences are loaded before applying export settings
       await loadUserPreferences();
+      if (requestId !== prepareMergeRequestId) return;
 
       // Analyze videos and group by session ID
-      state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
+      const videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
+      if (requestId !== prepareMergeRequestId) return;
       
-      if (state.videoGroups.length === 0) {
+      if (videoGroups.length === 0) {
+        state.videoGroups = [];
+        state.selectedGroups.clear();
+        setAppPhase('selection-fallback');
+        fileListContainer.style.display = 'block';
+        fileListContainer.hidden = false;
+        if (fileHandling?.updateFileList) {
+          await fileHandling.updateFileList();
+        }
         showError('No GoPro video files found', {
           operation: 'Analyze Videos',
           suggestions: [
@@ -131,7 +161,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       let hasDurations = false;
       
       // Create array of all files to fetch durations for
-      const allFiles = state.videoGroups.flatMap(group => 
+      const allFiles = videoGroups.flatMap(group =>
         group.files.map(filePath => ({ group, filePath }))
       );
       
@@ -145,10 +175,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       );
       
       const durations = await Promise.all(durationPromises);
+      if (requestId !== prepareMergeRequestId) return;
       
       // Aggregate durations by group
       let fileIndex = 0;
-      for (const group of state.videoGroups) {
+      for (const group of videoGroups) {
         let totalDuration = 0;
         for (let i = 0; i < group.files.length; i++) {
           const duration = durations[fileIndex++];
@@ -179,18 +210,22 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
       
       // Warn if no durations were found (likely ffprobe not installed)
-      if (!hasDurations && state.videoGroups.length > 0) {
+      if (!hasDurations && videoGroups.length > 0) {
         console.warn('Could not retrieve video durations. ffprobe may not be installed.');
       }
       
       // Derive patterns from selected filenames and save to recent suggestions
       try {
-        const allFiles = state.videoGroups.flatMap(g => g.files);
+        const allFiles = videoGroups.flatMap(g => g.files);
         await window.electronAPI.savePatternsFromSelectedFiles(allFiles);
         await loadUserPreferences();
+        if (requestId !== prepareMergeRequestId) return;
       } catch (err) {
         console.error('Error saving patterns from filenames:', err);
       }
+      if (requestId !== prepareMergeRequestId) return;
+
+      state.videoGroups = videoGroups;
       
       // Show preview screen
       showPreviewScreen();
@@ -213,7 +248,16 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
       }
     } catch (error) {
+      if (requestId !== prepareMergeRequestId) return;
       console.error('Error preparing merge:', error);
+      state.videoGroups = [];
+      state.selectedGroups.clear();
+      setAppPhase('selection-fallback');
+      fileListContainer.style.display = 'block';
+      fileListContainer.hidden = false;
+      if (fileHandling?.updateFileList) {
+        await fileHandling.updateFileList();
+      }
       showError(error, {
         operation: 'Analyze Videos',
         filePath: state.selectedFiles.length > 0 ? state.selectedFiles[0] : undefined
@@ -254,8 +298,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Show preview screen
   function showPreviewScreen() {
     state.currentScreen = 'preview';
-    fileListContainer.style.display = 'none';
-    previewScreen.style.display = 'block';
+    setAppPhase('merge');
+    previewScreen.style.display = 'flex';
     
     // Load saved output destination preference
     if (userPreferences && userPreferences.lastOutputDestination) {
@@ -484,16 +528,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           <div class="preview-item-info">
             <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
             <span class="preview-item-meta">
-              ${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}
-              ${group.totalInputSizeFormatted && group.totalInputSizeFormatted !== 'Unknown' ? ` • Input: ${group.totalInputSizeFormatted}` : ''}
-              ${group.estimatedOutputSizeFormatted && group.estimatedOutputSizeFormatted !== 'Unknown' ? ` • Est. Output: ${group.estimatedOutputSizeFormatted}` : ''}
+              ${group.files.length} clip${group.files.length !== 1 ? 's' : ''}${group.totalDuration ? ` • ${formatDuration(group.totalDuration)}` : ''}
             </span>
           </div>
         </label>
       </div>
       <div class="preview-item-body">
         <div class="filename-edit">
-          <label>Output Filename:</label>
+          <label>Output filename</label>
           <div class="filename-input-container">
             <input type="text" 
                    class="filename-input" 
@@ -504,14 +546,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
             ${patternsDatalist}
             <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
-          <div class="filename-help">
-            <small>💡 Tokens: {date}, {year}, {month}, {day}, {sessionId}, {eventName}, {leagueName}, {weekName}</small>
-          </div>
         </div>
-        <div class="input-files">
-          <label>Input Files:</label>
+        <details class="input-files-disclosure">
+          <summary>${group.files.length} input file${group.files.length !== 1 ? 's' : ''}</summary>
           <div class="input-files-list">${inputFilesList}</div>
-        </div>
+        </details>
       </div>
     `;
     
@@ -648,9 +687,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
   // Handle Back button
   function handleBack() {
-    state.currentScreen = 'fileList';
-    previewScreen.style.display = 'none';
-    fileListContainer.style.display = 'block';
+    openPickForMoreVideos();
   }
 
   // Handle output destination selection
@@ -698,16 +735,50 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       outputDestinationPath.classList.add('custom-path');
       useDefaultDestinationBtn.style.display = 'inline-block';
     } else {
-      outputDestinationPath.textContent = 'Using default location (merged_videos subfolder)';
+      outputDestinationPath.textContent = 'merged_videos (default)';
       outputDestinationPath.classList.remove('custom-path');
       useDefaultDestinationBtn.style.display = 'none';
     }
+    updateMergeSummary();
   }
 
-  // Handle Merge button (merge all groups)
+  function getDestinationSummaryLabel() {
+    if (state.selectedOutputDestination) {
+      const parts = state.selectedOutputDestination.split(/[/\\]/).filter(Boolean);
+      return parts.length > 0 ? parts[parts.length - 1] : state.selectedOutputDestination;
+    }
+    return 'merged_videos';
+  }
+
+  function updateMergeSummary() {
+    const summaryEl = document.getElementById('mergeSummaryText');
+    if (!summaryEl || !state.videoGroups) return;
+
+    const selectedIndices = Array.from(state.selectedGroups).sort((a, b) => a - b);
+    if (selectedIndices.length === 0) {
+      summaryEl.textContent = 'Select at least one session to merge';
+      return;
+    }
+
+    let totalDuration = 0;
+    for (const index of selectedIndices) {
+      const group = state.videoGroups[index];
+      if (group?.totalDuration) {
+        totalDuration += group.totalDuration;
+      }
+    }
+
+    const sessionLabel =
+      selectedIndices.length === 1 ? '1 session' : `${selectedIndices.length} sessions`;
+    const durationLabel = totalDuration > 0 ? ` · ${formatDuration(totalDuration)}` : '';
+    const destLabel = getDestinationSummaryLabel();
+
+    summaryEl.textContent = `${sessionLabel}${durationLabel} · Save to ${destLabel}`;
+  }
+
+  // Handle Merge button (respects session checkboxes)
   async function handleMerge() {
-    // Merge all groups
-    await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
+    await handleBatchMerge();
   }
 
   // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
@@ -790,7 +861,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     let currentGroup = null;
     const progressListener = (progressData) => {
       if (currentGroup) {
-        updateRealTimeProgress(currentGroupIndex, state.videoGroups.length, currentGroup, progressData);
+        updateRealTimeProgress(currentGroupIndex, indicesToMerge.length, currentGroup, progressData);
       }
     };
     window.electronAPI.onMergeProgress(progressListener);
@@ -813,13 +884,13 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       currentGroupIndex = i;
       currentGroup = group;
       
-      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
+      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       
       try {
         await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
-        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
 
@@ -827,7 +898,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         if (error.message && error.message.includes('cancelled')) {
           wasCancelled = true;
           results.push({ success: false, sessionId: group.sessionId, error: 'Cancelled', cancelled: true });
-          updateProgress(i + 1, state.videoGroups.length, 'Operation cancelled');
+          updateProgress(i + 1, indicesToMerge.length, 'Operation cancelled', indicesToMerge);
           break; // Stop processing remaining groups
         }
 
@@ -859,11 +930,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           console.error('Error saving failed operation:', err);
         }
         failed++;
-        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
 
         // Stop on error if configured
         if (state.stopOnError) {
-          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`);
+          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`, indicesToMerge);
           break;
         }
       }
@@ -883,7 +954,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       : failed > 0
         ? `Batch complete: ${completed} succeeded, ${failed} failed`
         : `All ${completed} videos processed successfully`;
-    updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
+    updateProgress(indicesToMerge.length, indicesToMerge.length, statusText, indicesToMerge);
 
     // Update failed operations button visibility
     if (failedOperations && failedOperations.updateFailedOperationsButton) {
@@ -899,32 +970,28 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     const selectedCount = state.selectedGroups.size;
     const totalCount = state.videoGroups.length;
     
-    // Update merge button text
-    const mergeBtn = document.getElementById('mergeBtn');
-    if (mergeBtn) {
-      if (selectedCount === totalCount) {
-        mergeBtn.textContent = 'Merge All Videos';
-      } else if (selectedCount > 0) {
-        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
+    const mergeBtnEl = document.getElementById('mergeBtn');
+    const mergeLabel = mergeBtnEl?.querySelector('.merge-btn-label');
+    if (mergeBtnEl && mergeLabel) {
+      if (selectedCount === 0) {
+        mergeLabel.textContent = 'Merge';
+        mergeBtnEl.disabled = true;
       } else {
-        mergeBtn.textContent = 'Merge Videos';
+        mergeBtnEl.disabled = false;
+        if (selectedCount === totalCount) {
+          mergeLabel.textContent = 'Merge all';
+        } else {
+          mergeLabel.textContent = `Merge (${selectedCount})`;
+        }
       }
     }
-    
-    // Show/hide merge selected button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      if (selectedCount > 0 && selectedCount < totalCount) {
-        mergeSelectedBtn.style.display = 'inline-flex';
-      } else {
-        mergeSelectedBtn.style.display = 'none';
-      }
-    }
+    updateMergeSummary();
   }
 
   // Show progress screen
   function showProgressScreen() {
     state.currentScreen = 'progress';
+    setAppPhase('progress');
     previewScreen.style.display = 'none';
     progressScreen.style.display = 'block';
     progressBar.style.width = '0%';
@@ -937,16 +1004,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
 
   // Update progress (group-level)
-  function updateProgress(current, total, message) {
+  function updateProgress(current, total, message, groupIndices = null) {
     // Base progress: percentage of groups completed
     const basePercentage = Math.min((current / total) * 100, 100);
     progressBar.style.width = `${basePercentage}%`;
     progressText.textContent = message;
     
+    const indices = Array.isArray(groupIndices)
+      ? groupIndices
+      : state.videoGroups.map((_, index) => index);
     const details = [];
-    for (let i = 0; i < current && i < state.videoGroups.length; i++) {
+    for (let i = 0; i < current && i < indices.length; i++) {
+      const group = state.videoGroups[indices[i]];
+      if (!group) continue;
       const status = i < current - 1 ? '✓' : '⏳';
-      details.push(`${status} Session ${state.videoGroups[i].sessionId}`);
+      details.push(`${status} Session ${group.sessionId}`);
     }
     if (details.length > 0) {
       progressDetails.innerHTML = details.join('<br>');
@@ -1178,9 +1250,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         state.videoGroups = [];
         state.currentScreen = 'fileList';
         progressScreen.style.display = 'none';
-        fileListContainer.style.display = 'none';
-        dropZone.style.display = 'block';
-        
+        resetToEmptyPick();
+
         // Reset progress screen
         progressBar.style.width = '0%';
         progressText.textContent = 'Preparing...';
@@ -1337,21 +1408,33 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
-    mergeBtn.addEventListener('click', handleMerge);
-    
-    // Batch merge button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      mergeSelectedBtn.addEventListener('click', () => handleBatchMerge());
-    }
-    
-    // Stop on error checkbox
-    const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
-    if (stopOnErrorCheckbox) {
-      stopOnErrorCheckbox.addEventListener('change', (e) => {
-        state.stopOnError = e.target.checked;
-      });
-    }
+
+  const addMoreVideosBtn = document.getElementById('addMoreVideosBtn');
+  if (addMoreVideosBtn) {
+    addMoreVideosBtn.addEventListener('click', openPickForMoreVideos);
+  }
+  const addMoreFromListBtn = document.getElementById('addMoreFromListBtn');
+  if (addMoreFromListBtn) {
+    addMoreFromListBtn.addEventListener('click', openPickForMoreVideos);
+  }
+  const backToMergeBtn = document.getElementById('backToMergeBtn');
+  if (backToMergeBtn) {
+    backToMergeBtn.addEventListener('click', returnToMergeSetup);
+  }
+
+  window.onVideosAddedForMerge = async () => {
+    if (state.currentScreen === 'progress') return;
+    if (!isAddingMoreVideos() && state.selectedFiles.length === 2) return;
+    await handlePrepareMerge();
+  };
+  mergeBtn.addEventListener('click', handleMerge);
+
+  const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
+  if (stopOnErrorCheckbox) {
+    stopOnErrorCheckbox.addEventListener('change', (e) => {
+      state.stopOnError = e.target.checked;
+    });
+  }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
 
@@ -1360,6 +1443,9 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
   // qualitySelect and formatSelect already have listeners attached above (getElementById blocks)
 
-  return { updateOutputDestinationDisplay };
+  return {
+    updateOutputDestinationDisplay,
+    handlePrepareMerge,
+    openPickForMoreVideos
+  };
 }
-
