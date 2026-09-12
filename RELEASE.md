@@ -18,6 +18,14 @@ npm run official-release -- patch     # bug fix
 npm run official-release -- minor     # features
 ```
 
+**From Cursor / agents:** background release jobs often die when the chat session ends. Use a real Terminal window instead:
+
+```bash
+npm run release:terminal -- 1.3.0
+```
+
+That opens Terminal and runs the full release; output also goes to `docs/local/release-1.3.0.log`.
+
 `official-release` checks branch, clean tree, `gh` auth, and `.env.local`, asks for confirmation, then runs the release pipeline.
 
 Lower-level (no preflight prompt):

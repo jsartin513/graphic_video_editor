@@ -3,6 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const zlib = require('zlib');
+const { execSync } = require('child_process');
+
+const MIN_BINARY_SIZE_BYTES = 10 * 1024 * 1024;
 
 // Check if bundling is enabled (default: true for backward compatibility)
 const BUNDLE_FFMPEG = process.env.BUNDLE_FFMPEG !== 'false';
@@ -39,6 +42,27 @@ console.log(`Host platform: ${process.platform} ${process.arch}, Target: ${targe
 // Create resources directory
 if (!fs.existsSync(resourcesDir)) {
   fs.mkdirSync(resourcesDir, { recursive: true });
+}
+
+function binaryLooksValidForArch(destPath, targetArch) {
+  try {
+    const stats = fs.statSync(destPath);
+    if (!stats.isFile() || stats.size < MIN_BINARY_SIZE_BYTES) {
+      return false;
+    }
+    if (process.platform === 'darwin') {
+      const out = execSync(`file "${destPath}"`, { encoding: 'utf8' });
+      if (targetArch === 'arm64' && !out.includes('arm64')) {
+        return false;
+      }
+      if (targetArch === 'x64' && !out.includes('x86_64')) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Helper function to download and decompress gzipped file from URL
@@ -185,14 +209,18 @@ async function copyBinaries() {
     const ffprobeDest = path.join(resourcesDir, 'ffprobe');
 
     // ffprobe-static npm package ships incorrect arm64 binaries (x86_64 labeled as arm64).
-    // Always download ffprobe from ffmpeg-static releases for the target architecture.
-    console.log(`Downloading ${targetArch} ffprobe binary from ffmpeg-static releases`);
-    const ffprobeUrl = getBinaryUrl('ffprobe', targetArch);
-    if (!ffprobeUrl) {
-      throw new Error(`No ffprobe binary URL for architecture: ${targetArch}`);
+    // Download from ffmpeg-static releases when missing or wrong arch.
+    if (binaryLooksValidForArch(ffprobeDest, targetArch)) {
+      console.log(`✓ Using existing ffprobe for ${targetArch} at ${ffprobeDest}`);
+    } else {
+      console.log(`Downloading ${targetArch} ffprobe binary from ffmpeg-static releases`);
+      const ffprobeUrl = getBinaryUrl('ffprobe', targetArch);
+      if (!ffprobeUrl) {
+        throw new Error(`No ffprobe binary URL for architecture: ${targetArch}`);
+      }
+      await downloadFile(ffprobeUrl, ffprobeDest);
+      console.log(`✓ Downloaded ffprobe for ${targetArch} to ${ffprobeDest}`);
     }
-    await downloadFile(ffprobeUrl, ffprobeDest);
-    console.log(`✓ Downloaded ffprobe for ${targetArch} to ${ffprobeDest}`);
   } catch (e) {
     console.error('✗ Error getting ffprobe:', e.message);
     success = false;

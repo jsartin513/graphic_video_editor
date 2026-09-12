@@ -10,6 +10,7 @@ resources/
 .env.local
 .env.*.local
 docs/local/release-*.pid
+docs/local/run-release-*.sh
 
 # Test coverage
 coverage/
