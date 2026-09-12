@@ -1,4 +1,4 @@
-# Video Editor
+# Video Merger
 
 A Mac desktop application for selecting and reviewing GoPro video files before merging them.
 
@@ -27,7 +27,7 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 ### Prerequisites
 
 **For Running the App:**
-- macOS 10.13 or later
+- macOS 10.15 Catalina or later (Intel or Apple Silicon)
 - **No Node.js needed** - the app is a standalone macOS application
 - **No ffmpeg installation needed** - included in fat builds (recommended)
 
@@ -230,9 +230,9 @@ npm run build              # Same as build:fat
 
 The app will automatically use bundled ffmpeg if included, or fall back to system-installed ffmpeg if not.
 
-### Important: "App is Damaged" Error
+### Code signing
 
-If users see "app is damaged" when opening the app, this is macOS Gatekeeper blocking unsigned apps. **Solution**: Right-click the app and select "Open", then click "Open" in the security dialog. See [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md) for details.
+Friend-ready builds must be signed with a **Developer ID Application** certificate and notarized. See [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md). Unsigned builds hit Gatekeeper; [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md) covers the workaround.
 
 ### Build Steps
 
@@ -247,22 +247,14 @@ npm run build
 ```
 
 This will create a distributable package in the `dist/` directory:
-- **DMG file**: For easy installation on macOS (Video Editor-1.0.0.dmg)
+- **DMG file**: For easy installation on macOS (`Video Merger-*-arm64-fat.dmg` or `*-x64-fat.dmg`)
 - **ZIP file**: Alternative distribution format
 
-### Installing ffmpeg
-
-Users will need ffmpeg installed on their system. On macOS, they can install it via Homebrew:
-
-```bash
-brew install ffmpeg
-```
+Fat builds include ffmpeg. Do not send lite builds to friends.
 
 ### Distribution
 
-The built DMG file can be distributed to users. When they open it, they can drag the app to their Applications folder.
-
-**Note**: The app requires ffmpeg to be installed on the user's system. Make sure to include this requirement in your distribution notes.
+See [DISTRIBUTION_GUIDE.md](DISTRIBUTION_GUIDE.md) for friend install steps. Paid sale / App Store work is listed in [FUTURE_RELEASE.md](FUTURE_RELEASE.md).
 
 ## Troubleshooting
 

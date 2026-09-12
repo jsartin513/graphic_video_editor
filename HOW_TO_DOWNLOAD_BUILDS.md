@@ -69,30 +69,13 @@ After the GitHub Actions workflow completes, you can find the built applications
 
 ## Installing the App
 
-⚠️ **IMPORTANT**: This app is not code-signed, so macOS will block it by default.
+Friends should only download **fat** DMGs. Lite builds need Homebrew ffmpeg.
 
-### Using the ZIP File (Recommended)
+1. Download the `.dmg` for your Mac (`arm64-fat` or `x64-fat`)
+2. Open it and drag Video Merger to Applications
+3. Open it from Applications
 
-1. Download the `.zip` file for your Mac type
-2. Extract the ZIP - you'll see:
-   - `Video Merger.app` - the application
-   - `fix_damaged_app.sh` - the fix script
-   - `README_FIRST.txt` - installation instructions
-3. **Run the fix script FIRST**: Double-click `fix_damaged_app.sh` (or run `bash fix_damaged_app.sh` in Terminal)
-4. Drag `Video Merger.app` to your Applications folder
-5. Open and enjoy!
-
-### Using the DMG File
-
-1. Download the `.dmg` file for your Mac type
-2. Open the DMG and drag the app to Applications
-3. If you get "App is Damaged" error, open Terminal and run:
-   ```bash
-   xattr -cr /Applications/Video\ Merger.app
-   ```
-4. Try opening the app again
-
-See `INSTALLATION_TROUBLESHOOTING.md` for more detailed help.
+Notarized builds should open without extra steps. If Gatekeeper still blocks the app, see [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md).
 
 ## Troubleshooting
 
@@ -120,5 +103,5 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-This will trigger the release job and create a GitHub Release with all four build variants attached (fat and lite for both architectures).
+This will trigger the release job. **Friends should only use the fat DMGs.** Lite artifacts may still appear in CI; do not send them.
 

@@ -1,13 +1,23 @@
 const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fsSync = require('fs');
 
 const { logger } = require('./src/logger');
+const { checkFFmpeg } = require('./src/ffmpeg-resolver');
+const { loadPreferences, savePreferences, addSDCardPath } = require('./src/preferences');
+const { registerFileIpcHandlers } = require('./main/ipc-file');
+const { registerPreferenceIpcHandlers } = require('./main/ipc-preferences');
+const { registerVideoIpcHandlers } = require('./main/ipc-video');
+const { registerMergeSplitIpcHandlers } = require('./main/ipc-merge-split');
+const { registerMiscIpcHandlers } = require('./main/ipc-misc');
+const { registerUpdatesIpcHandlers } = require('./main/ipc-updates');
+const { registerLoggerIpcHandlers } = require('./main/ipc-logger');
+const { registerSDCardIpcHandlers } = require('./main/ipc-sd-card');
+const { SDCardDetector } = require('./src/sd-card-detector');
 
 let mainWindow;
 let sdCardDetector = null;
-
-const { checkFFmpeg } = require('./src/ffmpeg-resolver');
 
 // Icon path constant (used in both development and production)
 const ICON_PATH = path.join(__dirname, 'build', 'icons', 'icon.icns');
@@ -52,14 +62,23 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Default sandbox strips File.path from Finder drops on recent Electron.
+      sandbox: false
     },
     backgroundColor: '#ffffff',
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'default',
     frame: true
   });
 
   mainWindow.loadFile('renderer/index.html');
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const current = mainWindow.webContents.getURL();
+    if (url !== current) {
+      event.preventDefault();
+    }
+  });
 
   // Open DevTools in development (remove in production)
   // mainWindow.webContents.openDevTools();
@@ -79,7 +98,14 @@ autoUpdater.on('update-not-available', (info) => {
   if (mainWindow) mainWindow.webContents.send('update-not-available', info);
 });
 autoUpdater.on('error', (err) => {
-  if (mainWindow) mainWindow.webContents.send('update-error', err.message);
+  const message = err && err.message ? err.message : String(err);
+  logger.error('Auto-updater error', { error: message });
+  // Missing publish metadata, network blips, and unsigned local builds should
+  // not surface a scary banner — friends still get a usable app.
+  if (isIgnorableUpdateError(message)) {
+    return;
+  }
+  if (mainWindow) mainWindow.webContents.send('update-error', message);
 });
 autoUpdater.on('download-progress', (progressObj) => {
   if (mainWindow) mainWindow.webContents.send('update-download-progress', progressObj);
@@ -93,8 +119,9 @@ autoUpdater.on('update-downloaded', (info) => {
 
 app.whenReady().then(async () => {
   await logger.initialize();
+  let prefs = {};
   try {
-    const prefs = await loadPreferences();
+    prefs = await loadPreferences();
     if (prefs.debugMode) logger.setDebugMode(true);
   } catch (error) {
     logger.error('Failed to load preferences for logger', { error: error.message });
@@ -121,12 +148,14 @@ app.whenReady().then(async () => {
     checkPrerequisites();
   }, 500);
 
-  if (app.isPackaged) {
+  if (app.isPackaged && hasUpdateFeed()) {
     setTimeout(() => {
       autoUpdater.checkForUpdates().catch(err => {
         logger.error('Failed to check for updates', { error: err.message });
       });
     }, 3000);
+  } else if (app.isPackaged) {
+    logger.info('Skipping auto-update check (no app-update.yml publish metadata)');
   }
   await initializeSDCardDetection();
 
@@ -140,6 +169,19 @@ app.whenReady().then(async () => {
     }
   });
 });
+
+function hasUpdateFeed() {
+  try {
+    const ymlPath = path.join(process.resourcesPath || '', 'app-update.yml');
+    return Boolean(process.resourcesPath && fsSync.existsSync(ymlPath));
+  } catch (error) {
+    return false;
+  }
+}
+
+function isIgnorableUpdateError(message) {
+  return /404|not found|latest-mac|app-update\.yml|Unable to find published|Cannot check for updates|ENOTFOUND|ECONNREFUSED|net::ERR_|code signature|not signed/i.test(message || '');
+}
 
 // Check if ffmpeg is installed
 async function checkPrerequisites() {
@@ -165,23 +207,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-// file IPC handlers moved to main/ipc-file.js
-
-const { loadPreferences, savePreferences, addSDCardPath } = require('./src/preferences');
-
-const { registerFileIpcHandlers } = require('./main/ipc-file');
-const { registerPreferenceIpcHandlers } = require('./main/ipc-preferences');
-const { registerVideoIpcHandlers } = require('./main/ipc-video');
-const { registerMergeSplitIpcHandlers } = require('./main/ipc-merge-split');
-const { registerMiscIpcHandlers } = require('./main/ipc-misc');
-const { registerUpdatesIpcHandlers } = require('./main/ipc-updates');
-const { registerLoggerIpcHandlers } = require('./main/ipc-logger');
-const { registerSDCardIpcHandlers } = require('./main/ipc-sd-card');
-
-// Import SD Card Detector
-const { SDCardDetector } = require('./src/sd-card-detector');
-
-// Misc, updates, logger, SD card IPC handlers moved to main/ipc-misc.js, ipc-updates.js, ipc-logger.js, ipc-sd-card.js
+// Misc, updates, logger, SD card IPC handlers live in main/ipc-*.js
 
 // SD Card Detection (lifecycle - stays in main)
 /**

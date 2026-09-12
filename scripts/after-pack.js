@@ -77,35 +77,34 @@ exports.default = async function(context) {
   }
   
   console.log('[afterPack] Resources copy completed');
-  
-  // Also copy test videos if they exist
-  const testVideosSrc = path.join(projectDir, 'test-videos');
-  const testVideosDest = path.join(appOutDir, appBundle, 'Contents', 'Resources', 'test-videos');
-  
-  if (fs.existsSync(testVideosSrc)) {
-    console.log(`[afterPack] Copying test videos from ${testVideosSrc} to ${testVideosDest}`);
-    
-    // Create destination directory
-    if (!fs.existsSync(testVideosDest)) {
-      fs.mkdirSync(testVideosDest, { recursive: true });
-    }
-    
-    // Copy all .mp4 files from test-videos
-    const testFiles = fs.readdirSync(testVideosSrc).filter(f => f.endsWith('.mp4'));
-    for (const file of testFiles) {
-      const src = path.join(testVideosSrc, file);
-      const dest = path.join(testVideosDest, file);
-      try {
-        fs.copyFileSync(src, dest);
-        const size = fs.statSync(src).size;
-        console.log(`[afterPack] ✓ Copied test video ${file} (${(size / 1024).toFixed(1)} KB)`);
-      } catch (error) {
-        console.error(`[afterPack] Error copying test video ${file}:`, error.message);
+
+  // Test videos are for local development only — never copy into friend/release builds
+  // unless INCLUDE_TEST_VIDEOS=true.
+  if (process.env.INCLUDE_TEST_VIDEOS === 'true') {
+    const testVideosSrc = path.join(projectDir, 'test-videos');
+    const testVideosDest = path.join(appOutDir, appBundle, 'Contents', 'Resources', 'test-videos');
+
+    if (fs.existsSync(testVideosSrc)) {
+      console.log(`[afterPack] Copying test videos from ${testVideosSrc} to ${testVideosDest}`);
+
+      if (!fs.existsSync(testVideosDest)) {
+        fs.mkdirSync(testVideosDest, { recursive: true });
       }
+
+      const testFiles = fs.readdirSync(testVideosSrc).filter((f) => /\.(mp4|MP4)$/i.test(f));
+      for (const file of testFiles) {
+        const src = path.join(testVideosSrc, file);
+        const dest = path.join(testVideosDest, file);
+        try {
+          fs.copyFileSync(src, dest);
+          const size = fs.statSync(src).size;
+          console.log(`[afterPack] ✓ Copied test video ${file} (${(size / 1024).toFixed(1)} KB)`);
+        } catch (error) {
+          console.error(`[afterPack] Error copying test video ${file}:`, error.message);
+        }
+      }
+      console.log('[afterPack] Test videos copy completed');
     }
-    console.log('[afterPack] Test videos copy completed');
-  } else {
-    console.log('[afterPack] No test-videos directory found, skipping');
   }
 };
 

@@ -3,9 +3,11 @@
  */
 
 const path = require('path');
-const { ipcMain, dialog } = require('electron');
+const { ipcMain } = require('electron');
 
-jest.mock('../src/logger', () => ({ logger: { error: jest.fn() } }));
+jest.mock('../src/logger', () => ({
+  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() }
+}));
 jest.mock('../src/main-utils', () => ({ formatFileSize: jest.fn((n) => `${n} bytes`) }));
 jest.mock('../src/video-scanner', () => ({
   scanDirectoryForVideos: jest.fn(),
@@ -30,7 +32,26 @@ jest.mock('fs', () => {
   };
 });
 
+jest.mock('../main/dialog-utils', () => ({
+  showOpenDialog: jest.fn()
+}));
+jest.mock('../main/web-file-picker', () => ({
+  pickFilesWeb: jest.fn().mockRejectedValue(new Error('web picker skipped in tests')),
+  pickFolderWeb: jest.fn().mockRejectedValue(new Error('web picker skipped in tests'))
+}));
+jest.mock('../main/mac-open-panel', () => ({
+  chooseFiles: jest.fn().mockRejectedValue(new Error('osascript skipped in tests')),
+  chooseFolder: jest.fn().mockRejectedValue(new Error('osascript skipped in tests'))
+}));
+jest.mock('../src/directory-lister', () => ({
+  listDirectory: jest.fn(),
+  listVolumes: jest.fn(),
+  getBrowserRoots: jest.fn(() => [])
+}));
+
 const { registerFileIpcHandlers } = require('../main/ipc-file');
+const { showOpenDialog } = require('../main/dialog-utils');
+const { listDirectory, listVolumes, getBrowserRoots } = require('../src/directory-lister');
 const { loadPreferences, savePreferences } = require('../src/preferences');
 const { scanDirectoryForVideos } = require('../src/video-scanner');
 
@@ -42,7 +63,10 @@ describe('ipc-file', () => {
     loadPreferences.mockResolvedValue({});
     savePreferences.mockResolvedValue(undefined);
     scanDirectoryForVideos.mockResolvedValue([]);
-    dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] });
+    showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [] });
+    listDirectory.mockResolvedValue({ path: '/tmp', parent: '/', entries: [] });
+    listVolumes.mockResolvedValue([]);
+    getBrowserRoots.mockReturnValue([]);
     fs.stat.mockRejectedValue(new Error('not found'));
     fs.access.mockResolvedValue(undefined);
     fs.readdir.mockResolvedValue([]);
@@ -50,14 +74,16 @@ describe('ipc-file', () => {
   });
 
   describe('registration', () => {
-    it('registers select-files, select-folder, get-file-metadata, process-dropped-paths, open-recent-directory', () => {
+    it('registers select-files, select-folder, list-directory, get-file-browser-roots, and related handlers', async () => {
       const channels = ipcMain.handle.mock.calls.map((c) => c[0]);
       expect(channels).toContain('select-files');
       expect(channels).toContain('select-folder');
       expect(channels).toContain('get-file-metadata');
       expect(channels).toContain('process-dropped-paths');
       expect(channels).toContain('open-recent-directory');
-      expect(ipcMain.handle).toHaveBeenCalledTimes(5);
+      expect(channels).toContain('list-directory');
+      expect(channels).toContain('get-file-browser-roots');
+      expect(ipcMain.handle).toHaveBeenCalledTimes(7);
     });
   });
 
@@ -68,7 +94,7 @@ describe('ipc-file', () => {
 
   describe('select-files', () => {
     it('returns canceled and empty files when dialog is canceled', async () => {
-      dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+      showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
       const handler = getHandler('select-files');
       const result = await handler();
       expect(result).toEqual({ canceled: true, files: [] });
@@ -76,7 +102,7 @@ describe('ipc-file', () => {
 
     it('returns files when dialog is not canceled', async () => {
       const paths = ['/a/v1.mp4', '/a/v2.mov'];
-      dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: paths });
+      showOpenDialog.mockResolvedValue({ canceled: false, filePaths: paths });
       const handler = getHandler('select-files');
       const result = await handler();
       expect(result).toEqual({ canceled: false, files: paths });
@@ -85,7 +111,7 @@ describe('ipc-file', () => {
 
   describe('select-folder', () => {
     it('returns canceled when dialog is canceled', async () => {
-      dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+      showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
       const handler = getHandler('select-folder');
       const result = await handler();
       expect(result).toEqual({ canceled: true, files: [] });
@@ -94,12 +120,39 @@ describe('ipc-file', () => {
     it('returns scanned video files when folder selected', async () => {
       const dir = '/path/to/folder';
       const files = ['/path/to/folder/a.mp4'];
-      dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [dir] });
+      showOpenDialog.mockResolvedValue({ canceled: false, filePaths: [dir] });
       scanDirectoryForVideos.mockResolvedValue(files);
       const handler = getHandler('select-folder');
       const result = await handler();
       expect(scanDirectoryForVideos).toHaveBeenCalledWith(dir);
       expect(result).toEqual({ canceled: false, files });
+    });
+  });
+
+  describe('list-directory', () => {
+    it('returns the directory listing', async () => {
+      const listing = { path: '/Videos', parent: '/', entries: [{ name: 'a.mp4', path: '/Videos/a.mp4', isDirectory: false, isVideo: true }] };
+      listDirectory.mockResolvedValue(listing);
+      const handler = getHandler('list-directory');
+      await expect(handler(null, '/Videos')).resolves.toEqual(listing);
+      expect(listDirectory).toHaveBeenCalledWith('/Videos');
+    });
+  });
+
+  describe('get-file-browser-roots', () => {
+    it('returns roots, recents, and volumes', async () => {
+      loadPreferences.mockResolvedValue({
+        pinnedDirectories: [{ path: '/pin' }],
+        recentDirectories: [{ path: '/recent' }]
+      });
+      getBrowserRoots.mockReturnValue([{ id: 'home', label: 'Home', path: '/Users/me' }]);
+      listVolumes.mockResolvedValue([{ name: 'GOPRO', path: '/Volumes/GOPRO' }]);
+      const handler = getHandler('get-file-browser-roots');
+      await expect(handler()).resolves.toEqual({
+        roots: [{ id: 'home', label: 'Home', path: '/Users/me' }],
+        recents: ['/pin', '/recent'],
+        volumes: [{ name: 'GOPRO', path: '/Volumes/GOPRO' }]
+      });
     });
   });
 
@@ -134,7 +187,7 @@ describe('ipc-file', () => {
       fs.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true });
       const handler = getHandler('process-dropped-paths');
       const result = await handler(null, [videoPath]);
-      expect(result).toEqual([videoPath]);
+      expect(result).toEqual({ files: [videoPath] });
     });
 
     it('includes dropped file when extension is uppercase (.MP4)', async () => {
@@ -142,7 +195,7 @@ describe('ipc-file', () => {
       fs.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true });
       const handler = getHandler('process-dropped-paths');
       const result = await handler(null, [videoPath]);
-      expect(result).toEqual([videoPath]);
+      expect(result).toEqual({ files: [videoPath] });
     });
 
     it('scans directory and returns video files', async () => {
@@ -153,28 +206,35 @@ describe('ipc-file', () => {
       const handler = getHandler('process-dropped-paths');
       const result = await handler(null, [dirPath]);
       expect(scanDirectoryForVideos).toHaveBeenCalledWith(dirPath);
-      expect(result).toEqual(files);
+      expect(result).toEqual({ files: files });
     });
 
     it('returns empty array when paths is null', async () => {
       const handler = getHandler('process-dropped-paths');
       const result = await handler(null, null);
-      expect(result).toEqual([]);
+      expect(result).toEqual({ files: [] });
       expect(fs.stat).not.toHaveBeenCalled();
     });
 
     it('returns empty array when paths is undefined', async () => {
       const handler = getHandler('process-dropped-paths');
       const result = await handler(null, undefined);
-      expect(result).toEqual([]);
+      expect(result).toEqual({ files: [] });
       expect(fs.stat).not.toHaveBeenCalled();
     });
 
     it('returns empty array when paths is not an array', async () => {
       const handler = getHandler('process-dropped-paths');
-      expect(await handler(null, 'string')).toEqual([]);
-      expect(await handler(null, 123)).toEqual([]);
-      expect(await handler(null, {})).toEqual([]);
+      expect(await handler(null, 'string')).toEqual({ files: [] });
+      expect(await handler(null, 123)).toEqual({ files: [] });
+      expect(await handler(null, {})).toEqual({ files: [] });
+      expect(fs.stat).not.toHaveBeenCalled();
+    });
+
+    it('skips empty or non-string dropped paths', async () => {
+      const handler = getHandler('process-dropped-paths');
+      const result = await handler(null, [null, '', 123, undefined]);
+      expect(result).toEqual({ files: [] });
       expect(fs.stat).not.toHaveBeenCalled();
     });
   });

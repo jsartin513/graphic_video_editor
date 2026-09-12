@@ -1,40 +1,33 @@
 # Installation Troubleshooting
 
-## "App is Damaged" or "Can't be Opened" Error
+## Signed builds (the happy path)
 
-If you see an error message saying the app is "damaged" or macOS tells you to move it to the trash, this is **not actually a problem with the app**. It's macOS Gatekeeper blocking unsigned applications.
+A notarized Video Merger DMG should open after you drag it to Applications. No Terminal commands.
 
-### Quick Fix (Recommended)
+If that is not what you downloaded, you have an unsigned or ad-hoc build.
 
-1. **Right-click** (or Control-click) on "Video Merger.app" in your Applications folder
-2. Select **"Open"** from the context menu
-3. Click **"Open"** in the security warning dialog
-4. The app will now launch and be trusted for future use
+## "App is Damaged" or "Can't be Opened"
 
-### Alternative: Remove Quarantine Attribute
+macOS Gatekeeper blocks **unsigned** apps. This is not corruption.
 
-If right-click doesn't work, open Terminal and run:
+### Quick fix (unsigned builds only)
+
+1. Right-click (Control-click) **Video Merger.app** in Applications
+2. Choose **Open**
+3. Click **Open** in the warning dialog
+
+### Alternative: remove quarantine
 
 ```bash
 xattr -cr /Applications/Video\ Merger.app
 ```
 
-Then try opening the app normally.
+Then open the app normally.
 
-### Why This Happens
+### Permanent fix (developers)
 
-- The app is not code-signed with an Apple Developer certificate
-- This is normal for apps distributed outside the Mac App Store
-- macOS Gatekeeper blocks unsigned apps by default for security
-- The app is safe - you just need to give explicit permission the first time
+1. Developer ID Application certificate ($99/year Apple Developer Program)
+2. Sign with that certificate (`CSC_NAME=...`)
+3. Notarize (`APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`)
 
-### Permanent Solution (For Developers)
-
-To avoid this issue for users, you would need to:
-1. Get an Apple Developer account ($99/year)
-2. Code-sign the app with a Developer ID certificate
-3. Notarize the app with Apple
-
-For now, the right-click method works perfectly and only needs to be done once per user.
-
-
+See [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md) and [docs/local/GET_CERTIFICATE_STEPS.md](docs/local/GET_CERTIFICATE_STEPS.md).

@@ -1,5 +1,7 @@
 // Prerequisites modal functionality
 
+import { showErrorDialog } from './errorDialog.js';
+
 export function initializePrerequisites(domElements) {
   const {
     prerequisitesModal,

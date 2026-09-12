@@ -3,9 +3,7 @@
  * Manages state history for undo/redo functionality
  */
 
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { UndoRedoManager } = require('../src/undo-redo-manager');
+import { UndoRedoManager } from './undo-redo-manager-browser.js';
 export { UndoRedoManager };
 
 /**
@@ -42,7 +40,7 @@ export function initializeUndoRedo(state, updateStateCallback, domElements) {
    */
   function restoreState(savedState) {
     if (!savedState) return;
-    
+
     // Update state
     state.selectedFiles = [...savedState.selectedFiles];
     state.videoGroups = JSON.parse(JSON.stringify(savedState.videoGroups || []));

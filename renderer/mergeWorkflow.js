@@ -3,6 +3,7 @@
 import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
+import { openFileBrowser } from './fileBrowser.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -1232,7 +1233,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
 
   // Quality selector change handler
-  const qualitySelect = document.getElementById('qualitySelect');
   if (qualitySelect) {
     qualitySelect.addEventListener('change', async (e) => {
       selectedQuality = e.target.value;
@@ -1246,7 +1246,6 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
 
   // Format selector change handler
-  const formatSelect = document.getElementById('formatSelect');
   if (formatSelect) {
     formatSelect.addEventListener('change', async (e) => {
       selectedFormat = e.target.value;

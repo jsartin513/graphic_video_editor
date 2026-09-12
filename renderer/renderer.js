@@ -6,6 +6,7 @@ import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeTrimVideo } from './trimVideo.js';
 import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
+import { openFileBrowser } from './fileBrowser.js';
 import { initializeFailedOperations } from './failedOperations.js';
 import { initializeRecentDirectories } from './recentDirectories.js';
 import { initializeUndoRedo } from './undoRedo.js';
@@ -22,6 +23,8 @@ const state = {
   stopOnError: true, // Stop batch processing on error by default
   importedSchedule: null // Parsed CSV rows [{ event, league, week, ... }] for naming
 };
+
+window.appState = state;
 
 // DOM element references
 const domElements = {
@@ -170,9 +173,9 @@ const splitVideoBtn = document.getElementById('splitVideoBtn');
 if (splitVideoBtn) {
   splitVideoBtn.addEventListener('click', async () => {
     try {
-      const result = await window.electronAPI.selectFiles();
-      if (result.canceled || !result.files?.length) return;
-      const videoPath = result.files[0];
+      const pick = await openFileBrowser({ mode: 'single-file', title: 'Select a Video to Split' });
+      if (pick.canceled || !pick.files?.length) return;
+      const videoPath = pick.files[0];
       const videoName = getFileName(videoPath);
       const outputDir = getDirectoryPath(videoPath);
       const splitVideo = await loadSplitVideoModule();
@@ -205,9 +208,6 @@ updateShortcutHints();
 
 // Initialize update notifications
 initUpdateNotifications();
-
-// Make state accessible for debugging
-window.appState = state;
 
 // SD Card Detection
 let currentSDCard = null;

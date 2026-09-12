@@ -183,31 +183,16 @@ async function copyBinaries() {
   // Copy or download ffprobe
   try {
     const ffprobeDest = path.join(resourcesDir, 'ffprobe');
-    
-    if (isCrossCompiling) {
-      // When cross-compiling, download the correct binary for target architecture
-      // Note: ffprobe-static v3.1.0 has incorrect arm64 binary, so we download from ffmpeg-static releases
-      const reason = process.platform !== 'darwin' 
-        ? `non-macOS platform (${process.platform})`
-        : `cross-architecture build (host: ${process.arch}, target: ${targetArch})`;
-      console.log(`Downloading ${targetArch} ffprobe binary (${reason})`);
-      const ffprobeUrl = getBinaryUrl('ffprobe', targetArch);
-      if (!ffprobeUrl) {
-        throw new Error(`No ffprobe binary URL for architecture: ${targetArch}`);
-      }
-      await downloadFile(ffprobeUrl, ffprobeDest);
-      console.log(`✓ Downloaded ffprobe for ${targetArch} to ${ffprobeDest}`);
-    } else {
-      // Use the locally installed binary
-      const ffprobeStatic = require('ffprobe-static');
-      const ffprobePath = ffprobeStatic.path || ffprobeStatic;
-      if (!ffprobePath) {
-        throw new Error('ffprobe-static returned null path');
-      }
-      fs.copyFileSync(ffprobePath, ffprobeDest);
-      fs.chmodSync(ffprobeDest, 0o755);
-      console.log(`✓ Copied ffprobe to ${ffprobeDest}`);
+
+    // ffprobe-static npm package ships incorrect arm64 binaries (x86_64 labeled as arm64).
+    // Always download ffprobe from ffmpeg-static releases for the target architecture.
+    console.log(`Downloading ${targetArch} ffprobe binary from ffmpeg-static releases`);
+    const ffprobeUrl = getBinaryUrl('ffprobe', targetArch);
+    if (!ffprobeUrl) {
+      throw new Error(`No ffprobe binary URL for architecture: ${targetArch}`);
     }
+    await downloadFile(ffprobeUrl, ffprobeDest);
+    console.log(`✓ Downloaded ffprobe for ${targetArch} to ${ffprobeDest}`);
   } catch (e) {
     console.error('✗ Error getting ffprobe:', e.message);
     success = false;
