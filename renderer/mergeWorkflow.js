@@ -3,7 +3,7 @@
 import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
-import { setAppPhase, resetToEmptyPick } from './appPhase.js';
+import { setAppPhase, resetToEmptyPick, isAddingMoreVideos } from './appPhase.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -120,18 +120,25 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   }
 
+  let prepareMergeRequestId = 0;
+
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
     if (state.selectedFiles.length === 0) return;
+    const requestId = ++prepareMergeRequestId;
     
     try {
       // Ensure preferences are loaded before applying export settings
       await loadUserPreferences();
+      if (requestId !== prepareMergeRequestId) return;
 
       // Analyze videos and group by session ID
-      state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
+      const videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
+      if (requestId !== prepareMergeRequestId) return;
       
-      if (state.videoGroups.length === 0) {
+      if (videoGroups.length === 0) {
+        state.videoGroups = [];
+        state.selectedGroups.clear();
         setAppPhase('selection-fallback');
         fileListContainer.style.display = 'block';
         fileListContainer.hidden = false;
@@ -154,7 +161,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       let hasDurations = false;
       
       // Create array of all files to fetch durations for
-      const allFiles = state.videoGroups.flatMap(group => 
+      const allFiles = videoGroups.flatMap(group =>
         group.files.map(filePath => ({ group, filePath }))
       );
       
@@ -168,10 +175,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       );
       
       const durations = await Promise.all(durationPromises);
+      if (requestId !== prepareMergeRequestId) return;
       
       // Aggregate durations by group
       let fileIndex = 0;
-      for (const group of state.videoGroups) {
+      for (const group of videoGroups) {
         let totalDuration = 0;
         for (let i = 0; i < group.files.length; i++) {
           const duration = durations[fileIndex++];
@@ -202,18 +210,22 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
       
       // Warn if no durations were found (likely ffprobe not installed)
-      if (!hasDurations && state.videoGroups.length > 0) {
+      if (!hasDurations && videoGroups.length > 0) {
         console.warn('Could not retrieve video durations. ffprobe may not be installed.');
       }
       
       // Derive patterns from selected filenames and save to recent suggestions
       try {
-        const allFiles = state.videoGroups.flatMap(g => g.files);
+        const allFiles = videoGroups.flatMap(g => g.files);
         await window.electronAPI.savePatternsFromSelectedFiles(allFiles);
         await loadUserPreferences();
+        if (requestId !== prepareMergeRequestId) return;
       } catch (err) {
         console.error('Error saving patterns from filenames:', err);
       }
+      if (requestId !== prepareMergeRequestId) return;
+
+      state.videoGroups = videoGroups;
       
       // Show preview screen
       showPreviewScreen();
@@ -236,7 +248,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         }
       }
     } catch (error) {
+      if (requestId !== prepareMergeRequestId) return;
       console.error('Error preparing merge:', error);
+      state.videoGroups = [];
+      state.selectedGroups.clear();
       setAppPhase('selection-fallback');
       fileListContainer.style.display = 'block';
       fileListContainer.hidden = false;
@@ -1409,6 +1424,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
   window.onVideosAddedForMerge = async () => {
     if (state.currentScreen === 'progress') return;
+    if (!isAddingMoreVideos() && state.selectedFiles.length === 2) return;
     await handlePrepareMerge();
   };
   mergeBtn.addEventListener('click', handleMerge);

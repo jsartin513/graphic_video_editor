@@ -50,11 +50,19 @@ export function initializeSplitVideo(domElements, appState = null) {
     // Get video duration
     try {
       const duration = await window.electronAPI.getVideoDuration(videoPath);
-      videoDurationEl.textContent = formatDuration(duration);
+      const normalizedDuration = Number(duration);
+      if (!Number.isFinite(normalizedDuration) || normalizedDuration <= 0) {
+        videoDurationEl.textContent = 'Unable to determine duration';
+        splitPreviewEl.textContent = 'Unable to calculate preview';
+        executeBtn.disabled = true;
+        modal.style.display = 'flex';
+        return;
+      }
+      videoDurationEl.textContent = formatDuration(normalizedDuration);
       
       // Store for use in split handler
       modal.dataset.videoPath = videoPath;
-      modal.dataset.videoDuration = duration;
+      modal.dataset.videoDuration = normalizedDuration;
       modal.dataset.outputDir = outputDir;
       executeBtn.disabled = false;
       
@@ -66,7 +74,7 @@ export function initializeSplitVideo(domElements, appState = null) {
           return;
         }
         const segmentSeconds = minutes * 60;
-        const totalSeconds = duration;
+        const totalSeconds = normalizedDuration;
         const numSegments = Math.ceil(totalSeconds / segmentSeconds);
         splitPreviewEl.textContent = `Will create ${numSegments} segment${numSegments !== 1 ? 's' : ''} of ${minutes} minute${minutes !== 1 ? 's' : ''} each`;
       };
@@ -92,6 +100,9 @@ export function initializeSplitVideo(domElements, appState = null) {
     const videoPath = modal.dataset.videoPath;
     const totalDuration = parseFloat(modal.dataset.videoDuration);
     const outputDir = modal.dataset.outputDir;
+    if (!videoPath || !Number.isFinite(totalDuration) || totalDuration <= 0 || !outputDir) {
+      return;
+    }
     const segmentMinutes = parseInt(document.getElementById('segmentMinutes').value) || 20;
     const segmentSeconds = segmentMinutes * 60;
     const customPattern = (document.getElementById('splitFilenamePattern')?.value || '').trim();
@@ -270,4 +281,3 @@ export function initializeSplitVideo(domElements, appState = null) {
 
   return { showSplitVideoModal };
 }
-

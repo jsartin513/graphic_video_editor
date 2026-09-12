@@ -185,6 +185,10 @@ if (splitVideoBtn) {
     try {
       const pick = await window.electronAPI.selectFiles();
       if (pick.canceled || !pick.files?.length) return;
+      if (pick.files.length !== 1) {
+        alert('Please select exactly one video file to split.');
+        return;
+      }
       const videoPath = pick.files[0];
       if (!isSupportedSplitVideoPath(videoPath)) {
         alert('Please choose a supported video file (.mp4, .mov, .avi, .mkv, or .m4v).');

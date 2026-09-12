@@ -100,6 +100,16 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
       return;
     }
 
+    // Cmd+Z / Ctrl+Z and Cmd+Shift+Z / Ctrl+Shift+Z - Undo/Redo
+    if (e[modifierKey] && !e.altKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      const actionBtn = e.shiftKey ? domElements.redoBtn : domElements.undoBtn;
+      if (actionBtn && !actionBtn.disabled) {
+        actionBtn.click();
+      }
+      return;
+    }
+
     // Cmd+M / Ctrl+M - Prepare merge
     if (hasModifier(e) && e.key.toLowerCase() === 'm') {
       e.preventDefault();
