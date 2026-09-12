@@ -296,6 +296,13 @@ export async function checkForUpdates() {
       showUpdateError(result.message || 'Failed to check for updates');
       return;
     }
+    if (result?.available && result.updateInfo) {
+      showUpdateNotification({
+        ...result.updateInfo,
+        currentVersion: result.currentVersion
+      });
+      return;
+    }
     if (result && !result.available) {
       showUpToDateMessage();
     }

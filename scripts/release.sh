@@ -118,18 +118,8 @@ node "$ROOT/scripts/merge-latest-mac-yml.js" "$ARM_YML" "$X64_YML" "$MERGED_YML"
 
 RELEASE_DIR="$ROOT/dist/release-${NEW_VERSION}"
 rm -rf "$RELEASE_DIR"
-mkdir -p "$RELEASE_DIR"
-
-shopt -s nullglob
-for f in "$ROOT/dist"/Video\ Merger-*-arm64-fat.dmg \
-         "$ROOT/dist"/Video\ Merger-*-x64-fat.dmg \
-         "$ROOT/dist"/Video\ Merger-*-arm64-fat.zip \
-         "$ROOT/dist"/Video\ Merger-*-x64-fat.zip \
-         "$ROOT/dist"/Video\ Merger-*-arm64-fat.zip.blockmap \
-         "$ROOT/dist"/Video\ Merger-*-x64-fat.zip.blockmap; do
-  cp "$f" "$RELEASE_DIR/"
-done
-cp "$MERGED_YML" "$RELEASE_DIR/"
+echo "Staging release assets (names must match latest-mac.yml for auto-update)..."
+node "$ROOT/scripts/stage-release-assets.js" "$NEW_VERSION" "$MERGED_YML" "$RELEASE_DIR"
 
 if [[ $(ls -1 "$RELEASE_DIR" | wc -l | tr -d ' ') -lt 3 ]]; then
   echo "Release directory is missing expected artifacts:"
@@ -138,9 +128,17 @@ if [[ $(ls -1 "$RELEASE_DIR" | wc -l | tr -d ' ') -lt 3 ]]; then
 fi
 
 git add package.json package-lock.json
-git commit -m "Release ${NEW_VERSION}"
+if git diff --cached --quiet; then
+  echo "No package.json changes to commit; tagging current HEAD for ${NEW_VERSION}."
+else
+  git commit -m "Release ${NEW_VERSION}"
+fi
 
-git tag -a "$TAG" -m "Release ${NEW_VERSION}"
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+  echo "Tag ${TAG} already exists on HEAD $(git rev-parse --short "$TAG")"
+else
+  git tag -a "$TAG" -m "Release ${NEW_VERSION}"
+fi
 
 RELEASE_NOTES="Video Merger ${NEW_VERSION} — signed fat builds for Apple Silicon and Intel.
 

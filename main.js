@@ -169,7 +169,7 @@ app.whenReady().then(async () => {
 });
 
 function isIgnorableUpdateError(message) {
-  return /404|not found|latest-mac|app-update\.yml|Unable to find published|Cannot check for updates|ENOTFOUND|ECONNREFUSED|net::ERR_|code signature|not signed/i.test(message || '');
+  return /404|not found|app-update\.yml|Unable to find published|Cannot check for updates|ENOTFOUND|ECONNREFUSED|net::ERR_|code signature|not signed/i.test(message || '');
 }
 
 // Check if ffmpeg is installed
