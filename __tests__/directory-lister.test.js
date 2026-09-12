@@ -104,9 +104,9 @@ describe('directory-lister', () => {
       const listing = await listDirectory('/Users/me/Videos');
       expect(listing.path).toBe('/Users/me/Videos');
       expect(listing.parent).toBe('/Users/me');
-      expect(listing.entries.map((e) => e.name)).toEqual(['clips', 'b.mov', 'game.MP4']);
-      expect(listing.entries[0].isDirectory).toBe(true);
-      expect(listing.entries[1].isVideo).toBe(true);
+      expect(listing.entries.map((e) => e.name)).toEqual(['b.mov', 'game.MP4', 'clips']);
+      expect(listing.entries[0].isVideo).toBe(true);
+      expect(listing.entries[2].isDirectory).toBe(true);
     });
   });
 });

@@ -10,10 +10,9 @@
 </head>
 <body>
   <a href="#main-content" class="skip-to-main">Skip to main content</a>
-  <div class="app-container">
+  <div class="app-container phase-pick">
     <header class="app-header" role="banner">
       <h1>Video Merger</h1>
-      <p class="subtitle">Selected Videos is at the top — add from the folder list below</p>
     </header>
 
 
@@ -42,223 +41,187 @@
     </div>
 
     <main id="main-content" class="main-content" role="main">
-      <div class="selection-controls">
-        <button id="selectFilesBtn" class="btn btn-primary" aria-label="Select video files">
-          <span class="btn-icon" aria-hidden="true">📁</span>
-          Select Files
-          <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘O</span>
-        </button>
-        <button id="selectFolderBtn" class="btn btn-secondary" aria-label="Select folder containing videos">
-          <span class="btn-icon" aria-hidden="true">📂</span>
-          Select Folder
-          <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘D</span>
-        </button>
-        <button id="splitVideoBtn" class="btn btn-secondary" aria-label="Split a video file">
-          <span class="btn-icon" aria-hidden="true">✂️</span>
-          Split Video
-          <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘⇧S</span>
-        </button>
-        <button id="viewFailedBtn" class="btn btn-text" style="display: none;" aria-label="View failed operations">
-          <span class="btn-icon" aria-hidden="true">⚠️</span>
-          <span id="failedBadge">View Failed Operations</span>
-        </button>
+      <div id="pickSection" class="pick-section">
+        <div id="addingMoreBar" class="adding-more-bar" hidden>
+          <button type="button" id="backToMergeBtn" class="btn btn-secondary btn-small" aria-label="Return to merge setup">
+            Back to merge
+          </button>
+        </div>
+
+        <div id="dropZone" class="add-videos-card drop-zone" role="button" tabindex="0" aria-label="Add videos by choosing files, a folder, or dropping here">
+          <h2 class="add-videos-title">Add videos</h2>
+          <div class="selection-controls">
+            <button id="selectFilesBtn" class="btn btn-primary" type="button" aria-label="Choose video files">
+              Choose Files
+            </button>
+            <button id="selectFolderBtn" class="btn btn-secondary" type="button" aria-label="Choose folder containing videos">
+              Choose Folder
+            </button>
+            <button id="viewFailedBtn" class="btn btn-text" type="button" style="display: none;" aria-label="View failed operations">
+              <span id="failedBadge">View Failed Operations</span>
+            </button>
+          </div>
+          <p class="drop-zone-hint">or drop files or a folder here</p>
+        </div>
+
+        <div id="filePickStatus" class="file-pick-status" role="status" aria-live="polite" hidden></div>
+
+        <div id="recentDirectoriesSection" class="recent-directories-section" style="display: none;">
+          <div class="recent-directories-header">
+            <h3>Recent Folders</h3>
+            <button id="clearRecentBtn" class="btn btn-text btn-small" type="button" aria-label="Clear recent folders">
+              Clear
+            </button>
+          </div>
+          <div id="recentDirectoriesList" class="recent-directories-list" role="list" aria-label="Recent folders"></div>
+        </div>
+
+        <div class="pick-overflow-tools">
+          <button id="splitVideoBtn" class="btn btn-text btn-small" type="button" aria-label="Split a video file">
+            Split video…
+          </button>
+        </div>
       </div>
 
-      <div id="filePickStatus" class="file-pick-status" role="status" aria-live="polite">Folder list is below. If it stays empty, the app failed to load folders.</div>
-
-      <div id="fileListContainer" class="file-list-container">
+      <div id="fileListContainer" class="file-list-container" hidden>
         <div class="file-list-header">
           <h2>Selected Videos</h2>
           <span id="fileCount" class="file-count" aria-live="polite">0 files</span>
-          <div class="undo-redo-controls">
+          <div class="undo-redo-controls file-list-fallback-only">
             <button id="undoBtn" class="btn btn-icon" aria-label="Undo last action" disabled title="Nothing to undo">
-              <span class="btn-icon" aria-hidden="true">↶</span>
               Undo
-              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘Z</span>
             </button>
             <button id="redoBtn" class="btn btn-icon" aria-label="Redo last action" disabled title="Nothing to redo">
-              <span class="btn-icon" aria-hidden="true">↷</span>
               Redo
-              <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘⇧Z</span>
             </button>
           </div>
         </div>
-        <p id="fileListEmpty" class="file-list-empty">No videos selected yet. Click videos in the folder list below, then Add Videos. They will show up here.</p>
+        <p id="fileListEmpty" class="file-list-empty">No videos selected yet.</p>
         <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">
-          <button id="compareVideosBtn" class="btn btn-secondary" style="display: none;" aria-label="Compare selected videos side-by-side">
-            <span class="btn-icon" aria-hidden="true">⚖️</span>
-            Compare Videos
+          <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Continue to merge setup">
+            Continue to Merge
           </button>
-          <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Prepare merge of selected videos">
-            <span class="btn-icon" aria-hidden="true">▶</span>
-            Prepare Merge
-            <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘M or Enter</span>
+          <button type="button" id="addMoreFromListBtn" class="btn btn-secondary" aria-label="Add more videos">
+            Add more videos
           </button>
-        </div>
-      </div>
-
-      <!-- Always visible — do not use a macOS open panel -->
-      <div id="fileBrowserPanel" class="file-browser-panel">
-        <div class="file-browser-panel-header">
-          <h2 id="fileBrowserTitle">Browse videos on this Mac</h2>
-          <button type="button" id="fileBrowserCloseBtn" class="btn btn-text btn-small" aria-label="Hide folder browser">Hide</button>
-        </div>
-        <p class="file-browser-help">This list is inside Video Merger. Click Home / Desktop / Movies, or paste a folder path and press Go.</p>
-        <div id="fileBrowserShortcuts" class="file-browser-shortcuts"></div>
-        <div class="file-browser-path-row">
-          <button type="button" id="fileBrowserUpBtn" class="btn btn-secondary btn-small" aria-label="Go up one folder">Up</button>
-          <input id="fileBrowserPath" class="file-browser-path" type="text" spellcheck="false" placeholder="/Users/you/Movies" aria-label="Folder path">
-          <button type="button" id="fileBrowserGoBtn" class="btn btn-secondary btn-small">Go</button>
-        </div>
-        <div id="fileBrowserList" class="file-browser-list" role="listbox" aria-label="Folders and videos">
-          <div class="file-browser-empty">Loading folders…</div>
-        </div>
-        <p id="fileBrowserStatus" class="file-browser-status" aria-live="polite"></p>
-        <div class="file-browser-actions">
-          <button type="button" id="fileBrowserCancelBtn" class="btn btn-secondary">Cancel</button>
-          <button type="button" id="fileBrowserConfirmBtn" class="btn btn-primary">Add Videos</button>
-        </div>
-      </div>
-
-      <!-- Recent Directories Section -->
-      <div id="recentDirectoriesSection" class="recent-directories-section" style="display: none;">
-        <div class="recent-directories-header">
-          <h3>Recent Folders</h3>
-          <button id="clearRecentBtn" class="btn btn-text btn-small" aria-label="Clear recent folders">
-            Clear
-          </button>
-        </div>
-        <div id="recentDirectoriesList" class="recent-directories-list" role="list" aria-label="Recent folders"></div>
-      </div>
-
-      <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drop zone for video files and folders">
-        <div class="drop-zone-content">
-          <div class="drop-zone-icon" aria-hidden="true">📤</div>
-          <p class="drop-zone-text">Drag and drop video files or folders here</p>
-          <p class="drop-zone-hint">or click Select Files / Select Folder to browse inside the app</p>
         </div>
       </div>
 
       <!-- Preview Screen -->
       <div id="previewScreen" class="preview-screen" style="display: none;">
         <div class="preview-header">
-          <h2>Preview Merge</h2>
-          <p class="preview-subtitle">Review and edit output filenames before merging</p>
+          <div class="preview-header-row">
+            <h2 class="preview-heading">Merge</h2>
+            <button type="button" id="addMoreVideosBtn" class="btn btn-secondary btn-small" aria-label="Add more videos">
+              Add more
+            </button>
+          </div>
         </div>
 
-        <div id="eventNamingSection" class="event-nning-section" aria-label="Optional event naming for filenames">
-          <h3 class="event-naming-label">Event naming <span class="optional">(optional)</span></h3>
-          <p class="event-naming-hint">Use these in filenames: {eventName}, {leagueName}, {weekName}. Apply to filenames by tabbing out or clicking Merge.</p>
-          <div class="event-naming-inputs">
-            <div class="event-naming-field">
-              <label for="eventNameInput">Event name</label>
-              <input type="text" id="eventNameInput" placeholder="e.g. BDL Open Gym" aria-label="Event name for filename tokens">
-            </div>
-            <div class="event-naming-field">
-              <label for="leagueNameInput">League</label>
-              <input type="text" id="leagueNameInput" placeholder="e.g. Rec League" aria-label="League name for filename tokens">
-            </div>
-            <div class="event-naming-field">
-              <label for="weekNameInput">Week</label>
-              <input type="text" id="weekNameInput" placeholder="e.g. Week 3" aria-label="Week name for filename tokens">
-            </div>
-          </div>
-          <div class="event-template-controls">
-            <div class="event-template-row">
-              <label for="eventTemplateSelect">Template</label>
-              <select id="eventTemplateSelect" aria-label="Select event template">
-                <option value="">— Select template —</option>
-              </select>
-              <button type="button" id="applyTemplateBtn" class="btn btn-secondary btn-small" aria-label="Apply template to all selected">Apply to all</button>
-            </div>
-            <div class="event-template-row">
-              <button type="button" id="saveAsTemplateBtn" class="btn btn-text btn-small" aria-label="Save current pattern as template">Save pattern as template</button>
-            </div>
-            <div class="event-template-row">
-              <input type="file" id="scheduleFileInput" accept=".csv" style="display: none" aria-label="Import schedule CSV">
-              <button type="button" id="importScheduleBtn" class="btn btn-text btn-small" aria-label="Import schedule from CSV">Import schedule (CSV)</button>
-              <span id="scheduleImportStatus" class="schedule-import-status"></span>
-            </div>
-          </div>
-        </div>
-        
         <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
         
         <div class="output-destination-section">
-          <label class="output-destination-label">Output Destination:</label>
-          <div class="output-destination-controls">
+          <div class="output-destination-controls output-destination-row">
+            <span class="output-destination-label">Save to</span>
             <div id="outputDestinationDisplay" class="output-destination-display">
-              <span id="outputDestinationPath" class="output-destination-path">Using default location (merged_videos subfolder)</span>
+              <span id="outputDestinationPath" class="output-destination-path">merged_videos (default)</span>
             </div>
-            <button id="selectOutputDestinationBtn" class="btn btn-secondary btn-small" aria-label="Choose output folder">
-              <span class="btn-icon" aria-hidden="true">📁</span>
-              Choose Folder
+            <button id="selectOutputDestinationBtn" class="btn btn-secondary btn-small" type="button" aria-label="Choose output folder">
+              Change
             </button>
-            <button id="useDefaultDestinationBtn" class="btn btn-text btn-small" style="display: none;" aria-label="Use default output destination">
-              Use Default
+            <button id="useDefaultDestinationBtn" class="btn btn-text btn-small" type="button" style="display: none;" aria-label="Use default output destination">
+              Use default
             </button>
           </div>
         </div>
-        
-        <div class="quality-section">
-          <label class="quality-label">Video Quality:</label>
-          <div class="quality-controls">
-            <select id="qualitySelect" class="quality-select" aria-label="Select video quality">
-              <option value="copy">Copy (Fastest, No Re-encoding)</option>
-              <option value="high">High Quality (CRF 18, Slower)</option>
-              <option value="medium">Medium Quality (CRF 23, Balanced)</option>
-              <option value="low">Low Quality (CRF 28, Smaller File)</option>
-            </select>
-            <small class="quality-hint">Higher quality = larger file size, longer processing time</small>
-          </div>
-          <div class="audio-controls">
-            <label class="audio-option">
-              <input type="checkbox" id="normalizeAudioCheckbox">
-              <span>Normalize Audio Levels (EBU R128)</span>
-            </label>
-            <small class="audio-hint">Normalizes audio to consistent levels across all videos</small>
-          </div>
-        </div>
-        
-        <div class="format-section">
-          <label class="format-label">Export Format:</label>
-          <div class="format-controls">
-            <select id="formatSelect" class="format-select" aria-label="Select export format">
-              <option value="mp4">MP4 (H.264, Most Compatible)</option>
-              <option value="mov">MOV (QuickTime, macOS/iOS)</option>
-              <option value="mkv">MKV (Matroska, Open Format)</option>
-              <option value="avi">AVI (Legacy Windows)</option>
-              <option value="m4v">M4V (iTunes/Apple)</option>
-            </select>
-            <small class="format-hint">MP4 recommended for best compatibility</small>
-          </div>
-        </div>
-        
-        <div class="preview-actions">
-          <div class="batch-controls">
+
+        <details id="mergeMoreOptions" class="merge-more-options">
+          <summary>More options</summary>
+          <p class="filename-tokens-hint">Filename tokens: {date}, {year}, {month}, {day}, {sessionId}, {eventName}, {leagueName}, {weekName}</p>
+          <div class="batch-controls merge-more-batch">
             <label class="batch-option">
               <input type="checkbox" id="stopOnErrorCheckbox" checked>
               <span>Stop on error</span>
             </label>
           </div>
+          <div id="eventNamingSection" class="event-nning-section" aria-label="Optional event naming for filenames">
+            <h3 class="event-naming-label">Event naming <span class="optional">(optional)</span></h3>
+            <p class="event-naming-hint">Event tokens: {eventName}, {leagueName}, {weekName}</p>
+            <div class="event-naming-inputs">
+              <div class="event-naming-field">
+                <label for="eventNameInput">Event name</label>
+                <input type="text" id="eventNameInput" placeholder="e.g. BDL Open Gym" aria-label="Event name for filename tokens">
+              </div>
+              <div class="event-naming-field">
+                <label for="leagueNameInput">League</label>
+                <input type="text" id="leagueNameInput" placeholder="e.g. Rec League" aria-label="League name for filename tokens">
+              </div>
+              <div class="event-naming-field">
+                <label for="weekNameInput">Week</label>
+                <input type="text" id="weekNameInput" placeholder="e.g. Week 3" aria-label="Week name for filename tokens">
+              </div>
+            </div>
+            <div class="event-template-controls">
+              <div class="event-template-row">
+                <label for="eventTemplateSelect">Template</label>
+                <select id="eventTemplateSelect" aria-label="Select event template">
+                  <option value="">— Select template —</option>
+                </select>
+                <button type="button" id="applyTemplateBtn" class="btn btn-secondary btn-small" aria-label="Apply template to all selected">Apply to all</button>
+              </div>
+              <div class="event-template-row">
+                <button type="button" id="saveAsTemplateBtn" class="btn btn-text btn-small" aria-label="Save current pattern as template">Save pattern as template</button>
+              </div>
+              <div class="event-template-row">
+                <input type="file" id="scheduleFileInput" accept=".csv" style="display: none" aria-label="Import schedule CSV">
+                <button type="button" id="importScheduleBtn" class="btn btn-text btn-small" aria-label="Import schedule from CSV">Import schedule (CSV)</button>
+                <span id="scheduleImportStatus" class="schedule-import-status"></span>
+              </div>
+            </div>
+          </div>
+          <div class="quality-section">
+            <label class="quality-label">Video Quality:</label>
+            <div class="quality-controls">
+              <select id="qualitySelect" class="quality-select" aria-label="Select video quality">
+                <option value="copy">Copy (Fastest, No Re-encoding)</option>
+                <option value="high">High Quality (CRF 18, Slower)</option>
+                <option value="medium">Medium Quality (CRF 23, Balanced)</option>
+                <option value="low">Low Quality (CRF 28, Smaller File)</option>
+              </select>
+              <small class="quality-hint">Higher quality = larger file size, longer processing time</small>
+            </div>
+            <div class="audio-controls">
+              <label class="audio-option">
+                <input type="checkbox" id="normalizeAudioCheckbox">
+                <span>Normalize Audio Levels (EBU R128)</span>
+              </label>
+              <small class="audio-hint">Normalizes audio to consistent levels across all videos</small>
+            </div>
+          </div>
+          <div class="format-section">
+            <label class="format-label">Export Format:</label>
+            <div class="format-controls">
+              <select id="formatSelect" class="format-select" aria-label="Select export format">
+                <option value="mp4">MP4 (H.264, Most Compatible)</option>
+                <option value="mov">MOV (QuickTime, macOS/iOS)</option>
+                <option value="mkv">MKV (Matroska, Open Format)</option>
+                <option value="avi">AVI (Legacy Windows)</option>
+                <option value="m4v">M4V (iTunes/Apple)</option>
+              </select>
+              <small class="format-hint">MP4 recommended for best compatibility</small>
+            </div>
+          </div>
+        </details>
+        
+        <div class="preview-actions">
           <div class="preview-action-buttons">
-            <button id="backBtn" class="btn btn-secondary" aria-label="Go back to file selection">
-              <span class="btn-icon" aria-hidden="true">←</span>
-              Back
-              <span class="btn-shortcut" aria-label="Keyboard shortcut">Esc</span>
-            </button>
-            <button id="mergeSelectedBtn" class="btn btn-secondary" style="display: none;" aria-label="Merge selected videos">
-              <span class="btn-icon" aria-hidden="true">🎬</span>
-              Merge Selected
-            </button>
-            <button id="mergeBtn" class="btn btn-primary" aria-label="Start merging videos">
-              <span class="btn-icon" aria-hidden="true">🎬</span>
-              Merge All Videos
-              <span class="btn-shortcut" aria-label="Keyboard shortcut">Enter</span>
+            <button id="mergeBtn" class="btn btn-primary" type="button" aria-label="Start merging videos">
+              Merge
             </button>
           </div>
         </div>
+        <button id="backBtn" type="button" class="sr-only" aria-hidden="true" tabindex="-1">Add more</button>
       </div>
 
       <!-- Progress Screen -->
@@ -508,7 +471,6 @@
     </div>
   </div>
 
-  <script src="file-browser-boot.js"></script>
   <script type="module" src="renderer.js"></script>
 </body>
 </html>

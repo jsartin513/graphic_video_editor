@@ -6,12 +6,12 @@ import { initializeMergeWorkflow } from './mergeWorkflow.js';
 import { initializeTrimVideo } from './trimVideo.js';
 import { initializeKeyboardShortcuts, updateShortcutHints } from './keyboardShortcuts.js';
 import { getFileName, getDirectoryPath } from './utils.js';
-import { openFileBrowser } from './fileBrowser.js';
 import { initializeFailedOperations } from './failedOperations.js';
 import { initializeRecentDirectories } from './recentDirectories.js';
 import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
 import { initUpdateNotifications } from './updateNotification.js';
+import { setAppPhase } from './appPhase.js';
 
 // Shared application state
 const state = {
@@ -159,6 +159,7 @@ const trimVideo = initializeTrimVideo(domElements, state);
 fileHandling = initializeFileHandling(state, domElements, trimVideo, undoRedo);
 const failedOperations = initializeFailedOperations(domElements);
 mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSplitVideoModule, trimVideo, failedOperations, undoRedo);
+setAppPhase('pick');
 const recentDirectories = initializeRecentDirectories(state, domElements, fileHandling);
 initializeVideoComparison(state, domElements);
 
@@ -173,7 +174,7 @@ const splitVideoBtn = document.getElementById('splitVideoBtn');
 if (splitVideoBtn) {
   splitVideoBtn.addEventListener('click', async () => {
     try {
-      const pick = await openFileBrowser({ mode: 'single-file', title: 'Select a Video to Split' });
+      const pick = await window.electronAPI.selectFiles();
       if (pick.canceled || !pick.files?.length) return;
       const videoPath = pick.files[0];
       const videoName = getFileName(videoPath);
@@ -258,7 +259,10 @@ domElements.loadSDCardBtn.addEventListener('click', async () => {
             state.selectedFiles.push(file);
           }
         }
-        fileHandling.updateFileList();
+        await fileHandling.updateFileList();
+        if (typeof window.onVideosAddedForMerge === 'function') {
+          await window.onVideosAddedForMerge();
+        }
         hideSDCardNotification();
       } else {
         console.log('No video files found on SD card');

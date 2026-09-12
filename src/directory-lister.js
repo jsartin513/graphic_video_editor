@@ -81,7 +81,7 @@ async function listDirectory(dirPath) {
 
   entries.sort((a, b) => {
     if (a.isDirectory !== b.isDirectory) {
-      return a.isDirectory ? -1 : 1;
+      return a.isDirectory ? 1 : -1;
     }
     return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   });

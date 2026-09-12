@@ -3,7 +3,7 @@
 import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName } from './utils.js';
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
-import { openFileBrowser } from './fileBrowser.js';
+import { setAppPhase, resetToEmptyPick } from './appPhase.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -102,6 +102,19 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   loadUserPreferences();
 
   let normalizeAudio = false; // Audio normalization option
+  function openPickForMoreVideos() {
+    state.currentScreen = 'fileList';
+    previewScreen.style.display = 'none';
+    setAppPhase('pick', { addingMore: true });
+  }
+
+  function returnToMergeSetup() {
+    if (state.videoGroups && state.videoGroups.length > 0) {
+      showPreviewScreen();
+    } else {
+      setAppPhase('pick');
+    }
+  }
 
   // Handle Prepare Merge button
   async function handlePrepareMerge() {
@@ -115,6 +128,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       state.videoGroups = await window.electronAPI.analyzeVideos(state.selectedFiles);
       
       if (state.videoGroups.length === 0) {
+        setAppPhase('selection-fallback');
+        fileListContainer.style.display = 'block';
+        fileListContainer.hidden = false;
+        if (fileHandling?.updateFileList) {
+          await fileHandling.updateFileList();
+        }
         showError('No GoPro video files found', {
           operation: 'Analyze Videos',
           suggestions: [
@@ -214,6 +233,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     } catch (error) {
       console.error('Error preparing merge:', error);
+      setAppPhase('selection-fallback');
+      fileListContainer.style.display = 'block';
+      fileListContainer.hidden = false;
+      if (fileHandling?.updateFileList) {
+        await fileHandling.updateFileList();
+      }
       showError(error, {
         operation: 'Analyze Videos',
         filePath: state.selectedFiles.length > 0 ? state.selectedFiles[0] : undefined
@@ -254,7 +279,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Show preview screen
   function showPreviewScreen() {
     state.currentScreen = 'preview';
-    fileListContainer.style.display = 'none';
+    setAppPhase('merge');
     previewScreen.style.display = 'block';
     
     // Load saved output destination preference
@@ -484,16 +509,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           <div class="preview-item-info">
             <h3>Session ${group.sessionId} ${directoryDisplay}</h3>
             <span class="preview-item-meta">
-              ${group.files.length} file${group.files.length !== 1 ? 's' : ''} • ${formatDuration(group.totalDuration)}
-              ${group.totalInputSizeFormatted && group.totalInputSizeFormatted !== 'Unknown' ? ` • Input: ${group.totalInputSizeFormatted}` : ''}
-              ${group.estimatedOutputSizeFormatted && group.estimatedOutputSizeFormatted !== 'Unknown' ? ` • Est. Output: ${group.estimatedOutputSizeFormatted}` : ''}
+              ${group.files.length} clip${group.files.length !== 1 ? 's' : ''}${group.totalDuration ? ` • ${formatDuration(group.totalDuration)}` : ''}
             </span>
           </div>
         </label>
       </div>
       <div class="preview-item-body">
         <div class="filename-edit">
-          <label>Output Filename:</label>
+          <label>Output filename</label>
           <div class="filename-input-container">
             <input type="text" 
                    class="filename-input" 
@@ -504,14 +527,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
             ${patternsDatalist}
             <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
-          <div class="filename-help">
-            <small>💡 Tokens: {date}, {year}, {month}, {day}, {sessionId}, {eventName}, {leagueName}, {weekName}</small>
-          </div>
         </div>
-        <div class="input-files">
-          <label>Input Files:</label>
+        <details class="input-files-disclosure">
+          <summary>${group.files.length} input file${group.files.length !== 1 ? 's' : ''}</summary>
           <div class="input-files-list">${inputFilesList}</div>
-        </div>
+        </details>
       </div>
     `;
     
@@ -648,9 +668,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
   // Handle Back button
   function handleBack() {
-    state.currentScreen = 'fileList';
-    previewScreen.style.display = 'none';
-    fileListContainer.style.display = 'block';
+    openPickForMoreVideos();
   }
 
   // Handle output destination selection
@@ -698,16 +716,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       outputDestinationPath.classList.add('custom-path');
       useDefaultDestinationBtn.style.display = 'inline-block';
     } else {
-      outputDestinationPath.textContent = 'Using default location (merged_videos subfolder)';
+      outputDestinationPath.textContent = 'merged_videos (default)';
       outputDestinationPath.classList.remove('custom-path');
       useDefaultDestinationBtn.style.display = 'none';
     }
   }
 
-  // Handle Merge button (merge all groups)
+  // Handle Merge button (respects session checkboxes)
   async function handleMerge() {
-    // Merge all groups
-    await handleBatchMerge(Array.from({ length: state.videoGroups.length }, (_, i) => i));
+    await handleBatchMerge();
   }
 
   // Apply date tokens and update state from DOM (ensures tokens are resolved even if Merge clicked while cursor still in input)
@@ -899,25 +916,18 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     const selectedCount = state.selectedGroups.size;
     const totalCount = state.videoGroups.length;
     
-    // Update merge button text
-    const mergeBtn = document.getElementById('mergeBtn');
-    if (mergeBtn) {
-      if (selectedCount === totalCount) {
-        mergeBtn.textContent = 'Merge All Videos';
-      } else if (selectedCount > 0) {
-        mergeBtn.textContent = `Merge Selected (${selectedCount})`;
+    const mergeBtnEl = document.getElementById('mergeBtn');
+    if (mergeBtnEl) {
+      if (selectedCount === 0) {
+        mergeBtnEl.textContent = 'Merge';
+        mergeBtnEl.disabled = true;
       } else {
-        mergeBtn.textContent = 'Merge Videos';
-      }
-    }
-    
-    // Show/hide merge selected button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      if (selectedCount > 0 && selectedCount < totalCount) {
-        mergeSelectedBtn.style.display = 'inline-flex';
-      } else {
-        mergeSelectedBtn.style.display = 'none';
+        mergeBtnEl.disabled = false;
+        if (selectedCount === totalCount) {
+          mergeBtnEl.textContent = 'Merge all';
+        } else {
+          mergeBtnEl.textContent = `Merge (${selectedCount})`;
+        }
       }
     }
   }
@@ -925,6 +935,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Show progress screen
   function showProgressScreen() {
     state.currentScreen = 'progress';
+    setAppPhase('progress');
     previewScreen.style.display = 'none';
     progressScreen.style.display = 'block';
     progressBar.style.width = '0%';
@@ -1178,9 +1189,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         state.videoGroups = [];
         state.currentScreen = 'fileList';
         progressScreen.style.display = 'none';
-        fileListContainer.style.display = 'none';
-        dropZone.style.display = 'block';
-        
+        resetToEmptyPick();
+
         // Reset progress screen
         progressBar.style.width = '0%';
         progressText.textContent = 'Preparing...';
@@ -1337,21 +1347,32 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Attach event listeners
   prepareMergeBtn.addEventListener('click', handlePrepareMerge);
   backBtn.addEventListener('click', handleBack);
-    mergeBtn.addEventListener('click', handleMerge);
-    
-    // Batch merge button
-    const mergeSelectedBtn = document.getElementById('mergeSelectedBtn');
-    if (mergeSelectedBtn) {
-      mergeSelectedBtn.addEventListener('click', () => handleBatchMerge());
-    }
-    
-    // Stop on error checkbox
-    const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
-    if (stopOnErrorCheckbox) {
-      stopOnErrorCheckbox.addEventListener('change', (e) => {
-        state.stopOnError = e.target.checked;
-      });
-    }
+
+  const addMoreVideosBtn = document.getElementById('addMoreVideosBtn');
+  if (addMoreVideosBtn) {
+    addMoreVideosBtn.addEventListener('click', openPickForMoreVideos);
+  }
+  const addMoreFromListBtn = document.getElementById('addMoreFromListBtn');
+  if (addMoreFromListBtn) {
+    addMoreFromListBtn.addEventListener('click', openPickForMoreVideos);
+  }
+  const backToMergeBtn = document.getElementById('backToMergeBtn');
+  if (backToMergeBtn) {
+    backToMergeBtn.addEventListener('click', returnToMergeSetup);
+  }
+
+  window.onVideosAddedForMerge = async () => {
+    if (state.currentScreen === 'progress') return;
+    await handlePrepareMerge();
+  };
+  mergeBtn.addEventListener('click', handleMerge);
+
+  const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
+  if (stopOnErrorCheckbox) {
+    stopOnErrorCheckbox.addEventListener('change', (e) => {
+      state.stopOnError = e.target.checked;
+    });
+  }
   selectOutputDestinationBtn.addEventListener('click', handleSelectOutputDestination);
   useDefaultDestinationBtn.addEventListener('click', handleUseDefaultDestination);
 
@@ -1360,6 +1381,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
   // qualitySelect and formatSelect already have listeners attached above (getElementById blocks)
 
-  return { updateOutputDestinationDisplay };
+  return {
+    updateOutputDestinationDisplay,
+    handlePrepareMerge,
+    openPickForMoreVideos
+  };
 }
 
