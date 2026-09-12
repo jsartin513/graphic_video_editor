@@ -2,13 +2,40 @@
  * Auto-update IPC handlers
  */
 
+const fs = require('fs');
+const path = require('path');
 const { app, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
+const RELEASES_LATEST_URL = 'https://github.com/jsartin513/graphic_video_editor/releases/latest';
+
+function hasUpdateFeed() {
+  try {
+    const ymlPath = path.join(process.resourcesPath || '', 'app-update.yml');
+    return Boolean(process.resourcesPath && fs.existsSync(ymlPath));
+  } catch (error) {
+    return false;
+  }
+}
+
 function registerUpdatesIpcHandlers() {
+  ipcMain.handle('get-app-info', async () => ({
+    version: app.getVersion(),
+    isPackaged: app.isPackaged,
+    hasUpdateFeed: app.isPackaged && hasUpdateFeed(),
+    releasesLatestUrl: RELEASES_LATEST_URL
+  }));
+
   ipcMain.handle('check-for-updates', async () => {
     if (!app.isPackaged) {
       return { available: false, message: 'Updates are only available in production builds' };
+    }
+    if (!hasUpdateFeed()) {
+      return {
+        available: false,
+        noUpdateFeed: true,
+        message: `This install cannot check for updates in the app. Download the latest fat DMG from ${RELEASES_LATEST_URL}, then replace Video Merger in Applications.`
+      };
     }
     try {
       const result = await autoUpdater.checkForUpdates();
@@ -29,6 +56,12 @@ function registerUpdatesIpcHandlers() {
     if (!app.isPackaged) {
       return { success: false, error: 'Updates can only be downloaded in production builds' };
     }
+    if (!hasUpdateFeed()) {
+      return {
+        success: false,
+        error: `Download the latest fat DMG from ${RELEASES_LATEST_URL} and replace the app in Applications.`
+      };
+    }
     try {
       await autoUpdater.downloadUpdate();
       return { success: true };
@@ -47,4 +80,4 @@ function registerUpdatesIpcHandlers() {
   });
 }
 
-module.exports = { registerUpdatesIpcHandlers };
+module.exports = { registerUpdatesIpcHandlers, hasUpdateFeed };

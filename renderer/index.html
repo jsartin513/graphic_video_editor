@@ -478,6 +478,12 @@
           <p class="form-hint">Used for the {date} token in merged filenames.</p>
           <select id="settingsDateFormatSelect" class="quality-select" aria-label="Preferred date format"></select>
         </section>
+        <section class="settings-section" aria-labelledby="settingsUpdatesHeading">
+          <h3 id="settingsUpdatesHeading">Updates</h3>
+          <p id="settingsAppVersion" class="form-hint" aria-live="polite">Version …</p>
+          <p id="settingsUpdateHint" class="form-hint settings-update-hint" hidden></p>
+          <button type="button" id="settingsCheckUpdatesBtn" class="btn btn-secondary btn-small">Check for updates</button>
+        </section>
         <section class="settings-section" aria-labelledby="settingsTemplatesHeading">
           <h3 id="settingsTemplatesHeading">Naming templates</h3>
           <p class="form-hint">Tokens: {date}, {count}, {year}, {month}, {day}, {sessionId}, {eventName}, {leagueName}, {weekName}</p>

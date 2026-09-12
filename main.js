@@ -11,7 +11,7 @@ const { registerPreferenceIpcHandlers } = require('./main/ipc-preferences');
 const { registerVideoIpcHandlers } = require('./main/ipc-video');
 const { registerMergeSplitIpcHandlers } = require('./main/ipc-merge-split');
 const { registerMiscIpcHandlers } = require('./main/ipc-misc');
-const { registerUpdatesIpcHandlers } = require('./main/ipc-updates');
+const { registerUpdatesIpcHandlers, hasUpdateFeed } = require('./main/ipc-updates');
 const { registerLoggerIpcHandlers } = require('./main/ipc-logger');
 const { registerSDCardIpcHandlers } = require('./main/ipc-sd-card');
 const { SDCardDetector } = require('./src/sd-card-detector');
@@ -90,8 +90,7 @@ autoUpdater.on('checking-for-update', () => {
 });
 autoUpdater.on('update-available', (info) => {
   if (mainWindow) {
-    const packageJson = require('./package.json');
-    mainWindow.webContents.send('update-available', { ...info, currentVersion: packageJson.version || '1.0.0' });
+    mainWindow.webContents.send('update-available', { ...info, currentVersion: app.getVersion() });
   }
 });
 autoUpdater.on('update-not-available', (info) => {
@@ -112,8 +111,7 @@ autoUpdater.on('download-progress', (progressObj) => {
 });
 autoUpdater.on('update-downloaded', (info) => {
   if (mainWindow) {
-    const packageJson = require('./package.json');
-    mainWindow.webContents.send('update-downloaded', { ...info, currentVersion: packageJson.version || '1.0.0' });
+    mainWindow.webContents.send('update-downloaded', { ...info, currentVersion: app.getVersion() });
   }
 });
 
@@ -169,15 +167,6 @@ app.whenReady().then(async () => {
     }
   });
 });
-
-function hasUpdateFeed() {
-  try {
-    const ymlPath = path.join(process.resourcesPath || '', 'app-update.yml');
-    return Boolean(process.resourcesPath && fsSync.existsSync(ymlPath));
-  } catch (error) {
-    return false;
-  }
-}
 
 function isIgnorableUpdateError(message) {
   return /404|not found|latest-mac|app-update\.yml|Unable to find published|Cannot check for updates|ENOTFOUND|ECONNREFUSED|net::ERR_|code signature|not signed/i.test(message || '');

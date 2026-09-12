@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('prerequisites-missing');
   },
   // Auto-update APIs
+  getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),

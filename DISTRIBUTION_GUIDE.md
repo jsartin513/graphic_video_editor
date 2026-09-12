@@ -34,23 +34,20 @@ If macOS still says the app is damaged, the build was not notarized. See [INSTAL
 
 ## Create a release
 
+Use the release script on `main` with a clean tree and `.env.local` signing vars configured:
+
 ```bash
-# 1. Confirm Developer ID Application is in the keychain
 npm run check-signing
+npm run release -- patch   # or minor, or an explicit X.Y.Z
+```
 
-# 2. Notarize locally (do this before the first friend drop)
-export CSC_NAME="JESSICA L SARTIN (LKF2468HZ2)"
-export APPLE_ID="your-email@example.com"
-export APPLE_TEAM_ID="TEAM_ID"
-export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
-npm run build:fat:arm64
-npm run build:fat:x64
-bash scripts/verify-signed-build.sh
+See [RELEASE.md](RELEASE.md) for the full flow (signed DMGs, `latest-mac.yml`, GitHub release, git tag).
 
-# 3. After the signed DMGs look good, tag a version
-#    (CI currently ships unsigned artifacts — attach local DMGs or wait for CI signing)
-git tag v1.0.0
-git push origin v1.0.0
+One-off signed builds without shipping a version:
+
+```bash
+npm run build:signed:arm64
+npm run build:signed:x64
 ```
 
 Latest GitHub release: https://github.com/jsartin513/graphic_video_editor/releases/latest
@@ -68,7 +65,7 @@ Needs macOS 10.15 or later. ffmpeg is already inside the app.
 
 ## Auto-updates
 
-In-app updates need signed GitHub Release artifacts plus `latest-mac.yml`. Until CI signing is wired up, send friends a new DMG when you ship a fix.
+Releases created with `npm run release` include signed artifacts and `latest-mac.yml`. Installs from older DMGs without update metadata still need a one-time DMG replace; after that, in-app updates work. See [RELEASE.md](RELEASE.md).
 
 ## Versioning
 

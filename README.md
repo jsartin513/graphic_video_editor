@@ -73,12 +73,12 @@ npm start
 
 The app includes automatic update checking and installation:
 
-- **Automatic Check**: On startup, the app checks for new versions from the GitHub releases
-- **Update Notification**: When an update is available, a notification appears at the top of the window
-- **Easy Installation**: Download and install updates with a single click
-- **Flexible Options**: Choose to install immediately or on next app quit
+- **Automatic Check**: On startup, packaged builds with update metadata check GitHub Releases
+- **Update Notification**: When a newer version is available, a banner offers download and install
+- **Settings**: Open Settings → **Check for updates** (shows your installed version)
+- **Older installs**: If the app was installed from an early DMG without update metadata, Settings explains how to download the latest fat DMG once; later updates can install in-app
 
-Updates are only checked in production builds (installed apps). Development builds skip the update check.
+Shipping a new version: [RELEASE.md](RELEASE.md). Development builds (`npm start`) do not check for updates.
 
 ## Project Structure
 

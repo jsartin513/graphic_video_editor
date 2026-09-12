@@ -27,6 +27,10 @@
     "verify-build": "node scripts/verify-fat-build.js",
     "verify-signed-build": "bash scripts/verify-signed-build.sh",
     "build:signed:arm64": "bash scripts/build-signed-mac-arm64.sh",
+    "build:signed:x64": "bash scripts/build-signed-mac-x64.sh",
+    "release": "bash scripts/release.sh",
+    "official-release": "bash scripts/official-release.sh",
+    "release:message": "bash scripts/print-friend-release-message.sh",
     "check-signing": "node docs/local/check-signing-setup.js",
     "generate-icon": "node scripts/generate-icon.js && bash scripts/create-icns.sh"
   },

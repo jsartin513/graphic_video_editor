@@ -275,11 +275,12 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  # Signed friend releases are created locally via `npm run release` (see RELEASE.md).
+  # Re-enable when CI has Apple signing secrets (FUTURE_RELEASE.md).
   release:
     needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
     runs-on: ubuntu-latest
-    # Run on tag pushes OR pushes to main/master
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || (github.event_name == 'workflow_dispatch')
+    if: false
     permissions:
       contents: write  # Required to create releases
       id-token: write  # Required for OIDC token

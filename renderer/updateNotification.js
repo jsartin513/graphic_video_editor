@@ -70,7 +70,7 @@ function showUpdateNotification(info) {
   const message = document.createElement('p');
   message.className = 'update-message';
   const newVersion = info?.version || 'a new version';
-  const currentVersion = info?.currentVersion || '1.0.0';
+  const currentVersion = info?.currentVersion || 'unknown';
   message.textContent = `Version ${newVersion} is now available. You're currently using version ${currentVersion}.`;
   
   // Actions
@@ -288,13 +288,15 @@ export async function checkForUpdates() {
   
   try {
     const result = await window.electronAPI.checkForUpdates();
+    if (result && result.noUpdateFeed) {
+      showManualUpdateMessage(result.message);
+      return;
+    }
     if (result && result.error) {
-      // Show error message
       showUpdateError(result.message || 'Failed to check for updates');
       return;
     }
     if (result && !result.available) {
-      // Show a brief message that app is up to date
       showUpToDateMessage();
     }
   } catch (error) {
@@ -307,6 +309,52 @@ export async function checkForUpdates() {
       userInitiatedCheck = false;
     }, 5000);
   }
+}
+
+function showManualUpdateMessage(message) {
+  const existingNotification = document.getElementById('updateNotification');
+  if (existingNotification) {
+    existingNotification.remove();
+  }
+
+  const notification = document.createElement('div');
+  notification.id = 'updateNotification';
+  notification.className = 'update-notification';
+
+  const content = document.createElement('div');
+  content.className = 'update-notification-content';
+
+  const header = document.createElement('div');
+  header.className = 'update-notification-header';
+  header.innerHTML = '<span class="update-icon">⬇️</span><h3>Install the latest build</h3>';
+
+  const messageEl = document.createElement('p');
+  messageEl.className = 'update-message';
+  messageEl.textContent = message || 'Download the latest fat DMG from GitHub Releases and replace Video Merger in Applications.';
+
+  const actions = document.createElement('div');
+  actions.className = 'update-actions';
+
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'btn btn-primary btn-small';
+  openBtn.textContent = 'Open downloads';
+  openBtn.addEventListener('click', () => {
+    window.electronAPI.openExternal('https://github.com/jsartin513/graphic_video_editor/releases/latest');
+    dismissUpdateNotification();
+  });
+
+  const dismissBtn = document.createElement('button');
+  dismissBtn.type = 'button';
+  dismissBtn.className = 'btn btn-text btn-small';
+  dismissBtn.textContent = 'Dismiss';
+  dismissBtn.addEventListener('click', () => dismissUpdateNotification());
+
+  actions.append(openBtn, dismissBtn);
+  content.append(header, messageEl, actions);
+  notification.appendChild(content);
+  document.body.appendChild(notification);
+  setTimeout(() => notification.classList.add('show'), 100);
 }
 
 // Show "up to date" message

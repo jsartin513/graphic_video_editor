@@ -1,4 +1,5 @@
 import { escapeHtml, escapeAttr } from './utils.js';
+import { checkForUpdates } from './updateNotification.js';
 
 function dispatchPreferencesUpdated(preferences) {
   window.dispatchEvent(new CustomEvent('preferences-updated', { detail: preferences }));
@@ -17,8 +18,12 @@ export function initializeSettings() {
   const templatePatternInput = document.getElementById('settingsTemplatePatternInput');
   const saveTemplateBtn = document.getElementById('settingsSaveTemplateBtn');
   const addTemplateBtn = document.getElementById('settingsAddTemplateBtn');
+  const appVersionEl = document.getElementById('settingsAppVersion');
+  const updateHintEl = document.getElementById('settingsUpdateHint');
+  const checkUpdatesBtn = document.getElementById('settingsCheckUpdatesBtn');
 
   let editingTemplateName = null;
+  let appInfo = null;
   let currentPreferences = null;
   let previousFocus = null;
   let settingsOpenInProgress = false;
@@ -81,8 +86,38 @@ export function initializeSettings() {
     (focusable[0] || closeBtn)?.focus();
   }
 
+  async function loadAppInfo() {
+    if (!window.electronAPI.getAppInfo) {
+      if (appVersionEl) appVersionEl.textContent = 'Version (development build)';
+      return;
+    }
+    try {
+      appInfo = await window.electronAPI.getAppInfo();
+      if (appVersionEl) {
+        const label = appInfo?.isPackaged
+          ? `Version ${appInfo.version}`
+          : `Version ${appInfo?.version || 'dev'} (development build)`;
+        appVersionEl.textContent = label;
+      }
+      if (updateHintEl) {
+        if (appInfo?.isPackaged && !appInfo?.hasUpdateFeed) {
+          updateHintEl.hidden = false;
+          updateHintEl.textContent =
+            'This install cannot update inside the app. Download the latest fat DMG from GitHub Releases and replace Video Merger in Applications.';
+        } else {
+          updateHintEl.hidden = true;
+          updateHintEl.textContent = '';
+        }
+      }
+    } catch (error) {
+      console.error('Error loading app info:', error);
+      if (appVersionEl) appVersionEl.textContent = 'Version unknown';
+    }
+  }
+
   async function loadAndRender() {
     try {
+      await loadAppInfo();
       currentPreferences = await window.electronAPI.loadPreferences();
       renderDateFormats(currentPreferences);
       renderTemplateList(currentPreferences);
@@ -234,6 +269,18 @@ export function initializeSettings() {
 
   if (dateFormatSelect) {
     dateFormatSelect.addEventListener('change', () => handleDateFormatChange());
+  }
+
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener('click', async () => {
+      if (appInfo?.isPackaged && !appInfo?.hasUpdateFeed) {
+        await window.electronAPI.openExternal(
+          appInfo.releasesLatestUrl || 'https://github.com/jsartin513/graphic_video_editor/releases/latest'
+        );
+        return;
+      }
+      await checkForUpdates();
+    });
   }
 
   if (modal) {
