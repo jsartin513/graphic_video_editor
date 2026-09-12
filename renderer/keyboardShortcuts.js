@@ -159,15 +159,16 @@ export function formatShortcut(key, useModifier = true, useShift = false) {
  * Call this on page load to set platform-specific shortcuts
  */
 export function updateShortcutHints() {
-  // Update button shortcuts with platform-specific modifiers
   const shortcuts = {
-    'selectFilesBtn': formatShortcut('O'),
-    'selectFolderBtn': formatShortcut('D'),
-    'splitVideoBtn': formatShortcut('S', true, true),
-    'prepareMergeBtn': `${formatShortcut('M')} or Enter`
+    selectFilesBtn: formatShortcut('O'),
+    selectFolderBtn: formatShortcut('D'),
+    splitVideoBtn: formatShortcut('S', true, true),
+    prepareMergeBtn: `${formatShortcut('M')} or Enter`,
+    undoBtn: formatShortcut('Z'),
+    redoBtn: formatShortcut('Z', true, true)
   };
 
-  Object.keys(shortcuts).forEach(btnId => {
+  Object.keys(shortcuts).forEach((btnId) => {
     const btn = document.getElementById(btnId);
     if (btn) {
       const shortcutSpan = btn.querySelector('.btn-shortcut');
@@ -176,5 +177,11 @@ export function updateShortcutHints() {
       }
     }
   });
+
+  const mergeBtn = document.getElementById('mergeBtn');
+  const mergeShortcut = mergeBtn?.querySelector('.btn-shortcut');
+  if (mergeShortcut) {
+    mergeShortcut.textContent = 'Enter';
+  }
 }
 

@@ -53,9 +53,11 @@
           <div class="selection-controls">
             <button id="selectFilesBtn" class="btn btn-primary" type="button" aria-label="Choose video files">
               Choose Files
+              <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
             </button>
             <button id="selectFolderBtn" class="btn btn-secondary" type="button" aria-label="Choose folder containing videos">
               Choose Folder
+              <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
             </button>
             <button id="viewFailedBtn" class="btn btn-text" type="button" style="display: none;" aria-label="View failed operations">
               <span id="failedBadge">View Failed Operations</span>
@@ -79,6 +81,7 @@
         <div class="pick-overflow-tools">
           <button id="splitVideoBtn" class="btn btn-text btn-small" type="button" aria-label="Split a video file">
             Split video…
+            <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
           </button>
         </div>
       </div>
@@ -90,9 +93,11 @@
           <div class="undo-redo-controls file-list-fallback-only">
             <button id="undoBtn" class="btn btn-icon" aria-label="Undo last action" disabled title="Nothing to undo">
               Undo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
             </button>
             <button id="redoBtn" class="btn btn-icon" aria-label="Redo last action" disabled title="Nothing to redo">
               Redo
+              <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
             </button>
           </div>
         </div>
@@ -101,6 +106,7 @@
         <div class="file-list-actions">
           <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Continue to merge setup">
             Continue to Merge
+            <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
           </button>
           <button type="button" id="addMoreFromListBtn" class="btn btn-secondary" aria-label="Add more videos">
             Add more videos
@@ -110,31 +116,18 @@
 
       <!-- Preview Screen -->
       <div id="previewScreen" class="preview-screen" style="display: none;">
+        <div class="preview-screen-scroll">
         <div class="preview-header">
           <div class="preview-header-row">
             <h2 class="preview-heading">Merge</h2>
             <button type="button" id="addMoreVideosBtn" class="btn btn-secondary btn-small" aria-label="Add more videos">
               Add more
+              <span class="btn-shortcut" aria-label="Keyboard shortcut">Esc</span>
             </button>
           </div>
         </div>
 
         <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
-        
-        <div class="output-destination-section">
-          <div class="output-destination-controls output-destination-row">
-            <span class="output-destination-label">Save to</span>
-            <div id="outputDestinationDisplay" class="output-destination-display">
-              <span id="outputDestinationPath" class="output-destination-path">merged_videos (default)</span>
-            </div>
-            <button id="selectOutputDestinationBtn" class="btn btn-secondary btn-small" type="button" aria-label="Choose output folder">
-              Change
-            </button>
-            <button id="useDefaultDestinationBtn" class="btn btn-text btn-small" type="button" style="display: none;" aria-label="Use default output destination">
-              Use default
-            </button>
-          </div>
-        </div>
 
         <details id="mergeMoreOptions" class="merge-more-options">
           <summary>More options</summary>
@@ -213,13 +206,25 @@
             </div>
           </div>
         </details>
-        
-        <div class="preview-actions">
-          <div class="preview-action-buttons">
-            <button id="mergeBtn" class="btn btn-primary" type="button" aria-label="Start merging videos">
-              Merge
-            </button>
+        </div>
+
+        <div class="merge-sticky-bar" role="region" aria-label="Merge actions">
+          <div class="merge-sticky-info">
+            <p id="mergeSummaryText" class="merge-summary" aria-live="polite">Ready to merge</p>
+            <span id="outputDestinationPath" class="sr-only">merged_videos (default)</span>
+            <div class="merge-sticky-destination">
+              <button id="selectOutputDestinationBtn" class="btn btn-text btn-small" type="button" aria-label="Choose output folder">
+                Change folder
+              </button>
+              <button id="useDefaultDestinationBtn" class="btn btn-text btn-small" type="button" style="display: none;" aria-label="Use default output destination">
+                Use default
+              </button>
+            </div>
           </div>
+          <button id="mergeBtn" class="btn btn-primary merge-sticky-merge" type="button" aria-label="Start merging videos">
+            <span class="merge-btn-label">Merge</span>
+            <span class="btn-shortcut" aria-label="Keyboard shortcut">Enter</span>
+          </button>
         </div>
         <button id="backBtn" type="button" class="sr-only" aria-hidden="true" tabindex="-1">Add more</button>
       </div>

@@ -280,7 +280,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   function showPreviewScreen() {
     state.currentScreen = 'preview';
     setAppPhase('merge');
-    previewScreen.style.display = 'block';
+    previewScreen.style.display = 'flex';
     
     // Load saved output destination preference
     if (userPreferences && userPreferences.lastOutputDestination) {
@@ -720,6 +720,41 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       outputDestinationPath.classList.remove('custom-path');
       useDefaultDestinationBtn.style.display = 'none';
     }
+    updateMergeSummary();
+  }
+
+  function getDestinationSummaryLabel() {
+    if (state.selectedOutputDestination) {
+      const parts = state.selectedOutputDestination.split(/[/\\]/).filter(Boolean);
+      return parts.length > 0 ? parts[parts.length - 1] : state.selectedOutputDestination;
+    }
+    return 'merged_videos';
+  }
+
+  function updateMergeSummary() {
+    const summaryEl = document.getElementById('mergeSummaryText');
+    if (!summaryEl || !state.videoGroups) return;
+
+    const selectedIndices = Array.from(state.selectedGroups).sort((a, b) => a - b);
+    if (selectedIndices.length === 0) {
+      summaryEl.textContent = 'Select at least one session to merge';
+      return;
+    }
+
+    let totalDuration = 0;
+    for (const index of selectedIndices) {
+      const group = state.videoGroups[index];
+      if (group?.totalDuration) {
+        totalDuration += group.totalDuration;
+      }
+    }
+
+    const sessionLabel =
+      selectedIndices.length === 1 ? '1 session' : `${selectedIndices.length} sessions`;
+    const durationLabel = totalDuration > 0 ? ` · ${formatDuration(totalDuration)}` : '';
+    const destLabel = getDestinationSummaryLabel();
+
+    summaryEl.textContent = `${sessionLabel}${durationLabel} · Save to ${destLabel}`;
   }
 
   // Handle Merge button (respects session checkboxes)
@@ -917,19 +952,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     const totalCount = state.videoGroups.length;
     
     const mergeBtnEl = document.getElementById('mergeBtn');
-    if (mergeBtnEl) {
+    const mergeLabel = mergeBtnEl?.querySelector('.merge-btn-label');
+    if (mergeBtnEl && mergeLabel) {
       if (selectedCount === 0) {
-        mergeBtnEl.textContent = 'Merge';
+        mergeLabel.textContent = 'Merge';
         mergeBtnEl.disabled = true;
       } else {
         mergeBtnEl.disabled = false;
         if (selectedCount === totalCount) {
-          mergeBtnEl.textContent = 'Merge all';
+          mergeLabel.textContent = 'Merge all';
         } else {
-          mergeBtnEl.textContent = `Merge (${selectedCount})`;
+          mergeLabel.textContent = `Merge (${selectedCount})`;
         }
       }
     }
+    updateMergeSummary();
   }
 
   // Show progress screen

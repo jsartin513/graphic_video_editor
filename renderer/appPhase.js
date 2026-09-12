@@ -50,7 +50,7 @@ export function setAppPhase(phase, options = {}) {
   const preview = document.getElementById('previewScreen');
   const progress = document.getElementById('progressScreen');
   if (preview) {
-    preview.style.display = phase === 'merge' ? 'block' : 'none';
+    preview.style.display = phase === 'merge' ? 'flex' : 'none';
   }
   if (progress) {
     progress.style.display = phase === 'progress' ? 'block' : 'none';
