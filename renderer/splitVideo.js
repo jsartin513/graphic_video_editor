@@ -29,11 +29,14 @@ export function initializeSplitVideo(domElements, appState = null) {
     const cancelBtn = document.getElementById('cancelSplitBtn');
     
     // Reset modal state
+    delete modal.dataset.videoPath;
+    delete modal.dataset.videoDuration;
+    delete modal.dataset.outputDir;
     segmentMinutesEl.value = '20';
     const splitPatternEl = document.getElementById('splitFilenamePattern');
     if (splitPatternEl) splitPatternEl.value = '';
     splitPreviewEl.textContent = 'Calculating...';
-    executeBtn.disabled = false;
+    executeBtn.disabled = true;
     executeBtn.style.display = 'inline-flex';
     cancelBtn.disabled = false;
     cancelBtn.textContent = 'Cancel';
@@ -53,6 +56,7 @@ export function initializeSplitVideo(domElements, appState = null) {
       modal.dataset.videoPath = videoPath;
       modal.dataset.videoDuration = duration;
       modal.dataset.outputDir = outputDir;
+      executeBtn.disabled = false;
       
       // Update preview function
       const updatePreview = () => {
@@ -77,6 +81,7 @@ export function initializeSplitVideo(domElements, appState = null) {
       videoDurationEl.textContent = 'Unable to determine duration';
       console.error('Error getting video duration:', error);
       splitPreviewEl.textContent = 'Unable to calculate preview';
+      executeBtn.disabled = true;
     }
     
     modal.style.display = 'flex';
@@ -265,5 +270,4 @@ export function initializeSplitVideo(domElements, appState = null) {
 
   return { showSplitVideoModal };
 }
-
 

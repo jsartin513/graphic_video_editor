@@ -44,13 +44,24 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
 
   // Handle keyboard events
   function handleKeyDown(e) {
-    // Don't trigger shortcuts when typing in inputs
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-      // Allow Escape to work in inputs to close dialogs
-      if (e.key === 'Escape') {
-        // Let it bubble up
+    // Escape - Go back or cancel
+    if (e.key === 'Escape') {
+      if (state.currentScreen === 'preview' && backBtn && !backBtn.disabled) {
+        e.preventDefault();
+        backBtn.click();
         return;
       }
+      if (state.currentScreen === 'progress') {
+        e.preventDefault();
+        if (callbacks && callbacks.cancelMerge) {
+          callbacks.cancelMerge();
+        }
+        return;
+      }
+    }
+
+    // Don't trigger shortcuts when typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
       // Allow Enter to work in inputs for filename editing
       if (e.key === 'Enter' && e.target.closest('.filename-input-container')) {
         // Let it bubble up to submit filename
@@ -106,19 +117,6 @@ export function initializeKeyboardShortcuts(state, domElements, callbacks) {
       return;
     }
 
-    // Escape - Go back or cancel
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (state.currentScreen === 'preview' && backBtn && !backBtn.disabled) {
-        backBtn.click();
-      } else if (state.currentScreen === 'progress') {
-        // Cancel merge if in progress
-        if (callbacks && callbacks.cancelMerge) {
-          callbacks.cancelMerge();
-        }
-      }
-      return;
-    }
   }
 
   // Add event listener
@@ -184,4 +182,3 @@ export function updateShortcutHints() {
     mergeShortcut.textContent = 'Enter';
   }
 }
-

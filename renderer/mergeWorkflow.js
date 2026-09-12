@@ -110,7 +110,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
   function returnToMergeSetup() {
     if (state.videoGroups && state.videoGroups.length > 0) {
-      showPreviewScreen();
+      state.currentScreen = 'preview';
+      setAppPhase('merge');
+      previewScreen.style.display = 'flex';
+      renderPreviewList();
+      loadPreviewThumbnails();
     } else {
       setAppPhase('pick');
     }
@@ -842,7 +846,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     let currentGroup = null;
     const progressListener = (progressData) => {
       if (currentGroup) {
-        updateRealTimeProgress(currentGroupIndex, state.videoGroups.length, currentGroup, progressData);
+        updateRealTimeProgress(currentGroupIndex, indicesToMerge.length, currentGroup, progressData);
       }
     };
     window.electronAPI.onMergeProgress(progressListener);
@@ -865,13 +869,13 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       currentGroupIndex = i;
       currentGroup = group;
       
-      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`);
+      updateProgress(i, indicesToMerge.length, `Merging Session ${group.sessionId}... (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       
       try {
         await window.electronAPI.mergeVideos(group.files, outputPath, selectedQuality, selectedFormat, normalizeAudio);
         results.push({ success: true, sessionId: group.sessionId, outputPath });
         completed++;
-        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        updateProgress(i + 1, indicesToMerge.length, `Completed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
       } catch (error) {
         console.error(`Error merging session ${group.sessionId}:`, error);
 
@@ -879,7 +883,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         if (error.message && error.message.includes('cancelled')) {
           wasCancelled = true;
           results.push({ success: false, sessionId: group.sessionId, error: 'Cancelled', cancelled: true });
-          updateProgress(i + 1, state.videoGroups.length, 'Operation cancelled');
+          updateProgress(i + 1, indicesToMerge.length, 'Operation cancelled', indicesToMerge);
           break; // Stop processing remaining groups
         }
 
@@ -911,11 +915,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           console.error('Error saving failed operation:', err);
         }
         failed++;
-        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`);
+        updateProgress(i + 1, indicesToMerge.length, `Failed Session ${group.sessionId} (${i + 1}/${indicesToMerge.length})`, indicesToMerge);
 
         // Stop on error if configured
         if (state.stopOnError) {
-          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`);
+          updateProgress(indicesToMerge.length, indicesToMerge.length, `Batch stopped due to error in Session ${group.sessionId}`, indicesToMerge);
           break;
         }
       }
@@ -935,7 +939,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       : failed > 0
         ? `Batch complete: ${completed} succeeded, ${failed} failed`
         : `All ${completed} videos processed successfully`;
-    updateProgress(state.videoGroups.length, state.videoGroups.length, statusText);
+    updateProgress(indicesToMerge.length, indicesToMerge.length, statusText, indicesToMerge);
 
     // Update failed operations button visibility
     if (failedOperations && failedOperations.updateFailedOperationsButton) {
@@ -985,16 +989,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
 
   // Update progress (group-level)
-  function updateProgress(current, total, message) {
+  function updateProgress(current, total, message, groupIndices = null) {
     // Base progress: percentage of groups completed
     const basePercentage = Math.min((current / total) * 100, 100);
     progressBar.style.width = `${basePercentage}%`;
     progressText.textContent = message;
     
+    const indices = Array.isArray(groupIndices)
+      ? groupIndices
+      : state.videoGroups.map((_, index) => index);
     const details = [];
-    for (let i = 0; i < current && i < state.videoGroups.length; i++) {
+    for (let i = 0; i < current && i < indices.length; i++) {
+      const group = state.videoGroups[indices[i]];
+      if (!group) continue;
       const status = i < current - 1 ? '✓' : '⏳';
-      details.push(`${status} Session ${state.videoGroups[i].sessionId}`);
+      details.push(`${status} Session ${group.sessionId}`);
     }
     if (details.length > 0) {
       progressDetails.innerHTML = details.join('<br>');
@@ -1424,4 +1433,3 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     openPickForMoreVideos
   };
 }
-

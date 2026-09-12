@@ -13,6 +13,15 @@ import { initializeVideoComparison } from './videoComparison.js';
 import { initUpdateNotifications } from './updateNotification.js';
 import { setAppPhase } from './appPhase.js';
 
+const SPLIT_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v']);
+
+function isSupportedSplitVideoPath(filePath) {
+  if (typeof filePath !== 'string') return false;
+  const extensionIndex = filePath.lastIndexOf('.');
+  if (extensionIndex < 0) return false;
+  return SPLIT_VIDEO_EXTENSIONS.has(filePath.slice(extensionIndex).toLowerCase());
+}
+
 // Shared application state
 const state = {
   selectedFiles: [],
@@ -177,6 +186,10 @@ if (splitVideoBtn) {
       const pick = await window.electronAPI.selectFiles();
       if (pick.canceled || !pick.files?.length) return;
       const videoPath = pick.files[0];
+      if (!isSupportedSplitVideoPath(videoPath)) {
+        alert('Please choose a supported video file (.mp4, .mov, .avi, .mkv, or .m4v).');
+        return;
+      }
       const videoName = getFileName(videoPath);
       const outputDir = getDirectoryPath(videoPath);
       const splitVideo = await loadSplitVideoModule();

@@ -48,8 +48,8 @@
           </button>
         </div>
 
-        <div id="dropZone" class="add-videos-card drop-zone" role="button" tabindex="0" aria-label="Add videos by choosing files, a folder, or dropping here">
-          <h2 class="add-videos-title">Add videos</h2>
+        <div id="dropZone" class="add-videos-card drop-zone" role="group" aria-labelledby="addVideosTitle" aria-describedby="dropZoneHint">
+          <h2 id="addVideosTitle" class="add-videos-title">Add videos</h2>
           <div class="selection-controls">
             <button id="selectFilesBtn" class="btn btn-primary" type="button" aria-label="Choose video files">
               Choose Files
@@ -63,7 +63,7 @@
               <span id="failedBadge">View Failed Operations</span>
             </button>
           </div>
-          <p class="drop-zone-hint">or drop files or a folder here</p>
+          <p id="dropZoneHint" class="drop-zone-hint">or drop files or a folder here</p>
         </div>
 
         <div id="filePickStatus" class="file-pick-status" role="status" aria-live="polite" hidden></div>
@@ -107,6 +107,9 @@
           <button id="prepareMergeBtn" class="btn btn-primary" style="display: none;" aria-label="Continue to merge setup">
             Continue to Merge
             <span class="btn-shortcut" aria-label="Keyboard shortcut"></span>
+          </button>
+          <button id="compareVideosBtn" class="btn btn-secondary" type="button" style="display: none;" aria-label="Compare the two selected videos">
+            Compare Videos
           </button>
           <button type="button" id="addMoreFromListBtn" class="btn btn-secondary" aria-label="Add more videos">
             Add more videos
@@ -479,4 +482,3 @@
   <script type="module" src="renderer.js"></script>
 </body>
 </html>
-
