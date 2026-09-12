@@ -138,6 +138,126 @@ body {
   gap: 16px;
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.form-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+
+.form-hint code {
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.field-with-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-secondary);
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.help-icon:hover,
+.help-icon:focus-visible {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.help-popover {
+  margin-top: 4px;
+}
+
+.add-videos-formats-hint {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.pick-split-hint {
+  margin-top: 4px;
+  margin-left: 4px;
+}
+
+.sd-card-help {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+}
+
+.merge-sessions-hint {
+  margin-bottom: 12px;
+}
+
+.recent-directories-hint {
+  margin-bottom: 8px;
+}
+
+.merge-template-hint {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.merge-quality-overview-hint {
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.merge-more-batch.field-with-hint .batch-option {
+  margin-bottom: 0;
+}
+
+.schedule-import-row .schedule-import-status {
+  margin-left: 8px;
+}
+
+.merge-output-hint {
+  margin-top: 4px;
+  margin-bottom: 0;
+  max-width: 36rem;
+}
+
+.compatibility-summary .compatibility-help {
+  margin-top: 10px;
+  color: var(--text-primary);
+}
+
 .app-settings-btn .btn-shortcut {
   margin-left: 6px;
   opacity: 0.75;
