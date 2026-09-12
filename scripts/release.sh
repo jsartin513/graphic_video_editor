@@ -78,9 +78,14 @@ echo "Checking signing setup..."
 npm run check-signing
 
 OLD_VERSION="$(node -p "require('./package.json').version")"
-echo "Bumping version from ${OLD_VERSION} (${BUMP})..."
-npm version "$BUMP" --no-git-tag-version
-NEW_VERSION="$(node -p "require('./package.json').version")"
+if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]] && [[ "$OLD_VERSION" == "$BUMP" ]]; then
+  echo "package.json already at ${OLD_VERSION}; skipping version bump."
+  NEW_VERSION="$OLD_VERSION"
+else
+  echo "Bumping version from ${OLD_VERSION} (${BUMP})..."
+  npm version "$BUMP" --no-git-tag-version
+  NEW_VERSION="$(node -p "require('./package.json').version")"
+fi
 TAG="v${NEW_VERSION}"
 
 if git rev-parse "$TAG" >/dev/null 2>&1; then

@@ -149,17 +149,32 @@ for candidate in "$ROOT"/dist/Video\ Merger-*-"${ARCH_LABEL}"-fat.dmg; do
   fi
 done
 
+DMG_STAPLED=false
 if [[ "$SIGN_ONLY" != true ]] && [[ -n "$DMG" ]] && [[ -f "$DMG" ]]; then
-  if ! xcrun stapler validate "$DMG" >/dev/null 2>&1; then
-    echo "Stapling notarization ticket to DMG..."
-    xcrun stapler staple "$DMG"
+  if xcrun stapler validate "$DMG" >/dev/null 2>&1; then
+    DMG_STAPLED=true
+  else
+    echo "Waiting for Apple notary ticket before stapling DMG..."
+    sleep 30
+    for attempt in 1 2 3 4 5 6 7 8; do
+      echo "Stapling DMG (attempt ${attempt})..."
+      if xcrun stapler staple "$DMG" 2>/dev/null && xcrun stapler validate "$DMG" >/dev/null 2>&1; then
+        DMG_STAPLED=true
+        echo "DMG staple OK"
+        break
+      fi
+      sleep $((attempt * 20))
+    done
+    if [[ "$DMG_STAPLED" != true ]]; then
+      echo "⚠️  DMG not stapled yet; .app is still notarized. Re-run: xcrun stapler staple \"$DMG\""
+    fi
   fi
 fi
 
 echo "Verifying signature..."
 if [[ "$SIGN_ONLY" == true ]]; then
   npm run verify-signed-build -- "$APP"
-elif [[ -n "$DMG" && -f "$DMG" ]]; then
+elif [[ -n "$DMG" && -f "$DMG" && "$DMG_STAPLED" == true ]]; then
   npm run verify-signed-build -- "$APP" "$DMG"
 else
   npm run verify-signed-build -- "$APP"
