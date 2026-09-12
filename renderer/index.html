@@ -93,6 +93,7 @@
               Clear
             </button>
           </div>
+          <p class="form-hint recent-directories-hint">Click a folder to load it again. Use the pin control to keep favorites at the top.</p>
           <div id="recentDirectoriesList" class="recent-directories-list" role="list" aria-label="Recent folders"></div>
         </div>
 
@@ -165,6 +166,9 @@
               </select>
               <button type="button" id="applyTemplateBtn" class="btn btn-secondary btn-small" aria-label="Apply template to all selected">Apply to all</button>
             </div>
+            <p class="form-hint merge-template-hint">
+              Templates are managed in Settings. <strong>Apply to all</strong> updates filenames for checked sessions only; you can still edit each name below.
+            </p>
             <div class="event-template-row field-with-hint">
               <label for="weekCountInput">Week number</label>
               <input type="text" id="weekCountInput" inputmode="numeric" placeholder="e.g. 3" aria-label="Week number for count token in filename" aria-describedby="weekCountHelp">
@@ -178,12 +182,19 @@
 
         <details id="mergeMoreOptions" class="merge-more-options">
           <summary>More options</summary>
+          <p class="form-hint merge-quality-overview-hint">
+            For video quality, use <strong>Copy</strong> when clips match. If you saw compatibility warnings, try <strong>High</strong> or <strong>Medium</strong> re-encoding instead.
+          </p>
           <p class="filename-tokens-hint">Filename tokens: {date}, {count}, {year}, {month}, {day}, {sessionId}, {eventName}, {leagueName}, {weekName}</p>
-          <div class="batch-controls merge-more-batch">
+          <div class="batch-controls merge-more-batch field-with-hint">
             <label class="batch-option">
-              <input type="checkbox" id="stopOnErrorCheckbox" checked>
+              <input type="checkbox" id="stopOnErrorCheckbox" checked aria-describedby="stopOnErrorHelp">
               <span>Stop on error</span>
             </label>
+            <p id="stopOnErrorHelp" class="form-hint">
+              When enabled, the batch stops after the first failed session. When off, other checked sessions still merge.
+              Use <strong>View Failed Operations</strong> on the home screen to retry.
+            </p>
           </div>
           <div id="eventNamingSection" class="event-nning-section" aria-label="Optional event naming for filenames">
             <h3 class="event-naming-label">Event naming <span class="optional">(optional)</span></h3>
@@ -202,10 +213,17 @@
                 <input type="text" id="weekNameInput" placeholder="e.g. Week 3" aria-label="Week name for filename tokens">
               </div>
             </div>
-            <div class="event-template-row">
+            <div class="event-template-row field-with-hint schedule-import-row">
               <input type="file" id="scheduleFileInput" accept=".csv" style="display: none" aria-label="Import schedule CSV">
               <button type="button" id="importScheduleBtn" class="btn btn-text btn-small" aria-label="Import schedule from CSV">Import schedule (CSV)</button>
               <span id="scheduleImportStatus" class="schedule-import-status"></span>
+              <p id="scheduleImportHelp" class="form-hint">
+                CSV needs a header row plus at least one data row. Columns (names flexible):
+                <strong>event</strong> (or game / slot),
+                <strong>league</strong>,
+                <strong>week</strong>.
+                The first row fills the event fields above.
+              </p>
             </div>
           </div>
           <div class="quality-section">
@@ -543,7 +561,10 @@
         <button id="closeFailedOpsModalBtn" class="modal-close-btn" aria-label="Close failed operations dialog">×</button>
       </div>
       <div class="modal-body">
-        <p class="modal-description">Review and retry failed merge operations.</p>
+        <p class="modal-description">
+          These are merge attempts that did not finish. <strong>Retry</strong> runs that session again with the same clips and output name.
+          <strong>Clear All</strong> or ✕ removes entries from this list only — it does not delete video files on disk.
+        </p>
         
         <div id="failedOpsList" class="failed-ops-list" role="list" aria-label="List of failed operations">
           <!-- Failed operations will be populated here -->

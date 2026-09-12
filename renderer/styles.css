@@ -225,6 +225,28 @@ body {
   margin-bottom: 12px;
 }
 
+.recent-directories-hint {
+  margin-bottom: 8px;
+}
+
+.merge-template-hint {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.merge-quality-overview-hint {
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.merge-more-batch.field-with-hint .batch-option {
+  margin-bottom: 0;
+}
+
+.schedule-import-row .schedule-import-status {
+  margin-left: 8px;
+}
+
 .merge-output-hint {
   margin-top: 4px;
   margin-bottom: 0;
