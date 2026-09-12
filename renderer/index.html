@@ -13,7 +13,7 @@
   <div class="app-container">
     <header class="app-header" role="banner">
       <h1>Video Merger</h1>
-      <p class="subtitle">Select GoPro video files to merge</p>
+      <p class="subtitle">Selected Videos is at the top — add from the folder list below</p>
     </header>
 
 
@@ -64,26 +64,9 @@
         </button>
       </div>
 
-      <!-- Recent Directories Section -->
-      <div id="recentDirectoriesSection" class="recent-directories-section" style="display: none;">
-        <div class="recent-directories-header">
-          <h3>Recent Folders</h3>
-          <button id="clearRecentBtn" class="btn btn-text btn-small" aria-label="Clear recent folders">
-            Clear
-          </button>
-        </div>
-        <div id="recentDirectoriesList" class="recent-directories-list" role="list" aria-label="Recent folders"></div>
-      </div>
+      <div id="filePickStatus" class="file-pick-status" role="status" aria-live="polite">Folder list is below. If it stays empty, the app failed to load folders.</div>
 
-      <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drop zone for video files and folders">
-        <div class="drop-zone-content">
-          <div class="drop-zone-icon" aria-hidden="true">📤</div>
-          <p class="drop-zone-text">Drag and drop video files or folders here</p>
-          <p class="drop-zone-hint">or use the buttons above</p>
-        </div>
-      </div>
-
-      <div id="fileListContainer" class="file-list-container" style="display: none;">
+      <div id="fileListContainer" class="file-list-container">
         <div class="file-list-header">
           <h2>Selected Videos</h2>
           <span id="fileCount" class="file-count" aria-live="polite">0 files</span>
@@ -100,6 +83,7 @@
             </button>
           </div>
         </div>
+        <p id="fileListEmpty" class="file-list-empty">No videos selected yet. Click videos in the folder list below, then Add Videos. They will show up here.</p>
         <div id="fileList" class="file-list" role="list" aria-label="Selected video files"></div>
         <div class="file-list-actions">
           <button id="compareVideosBtn" class="btn btn-secondary" style="display: none;" aria-label="Compare selected videos side-by-side">
@@ -111,6 +95,48 @@
             Prepare Merge
             <span class="btn-shortcut" aria-label="Keyboard shortcut">⌘M or Enter</span>
           </button>
+        </div>
+      </div>
+
+      <!-- Always visible — do not use a macOS open panel -->
+      <div id="fileBrowserPanel" class="file-browser-panel">
+        <div class="file-browser-panel-header">
+          <h2 id="fileBrowserTitle">Browse videos on this Mac</h2>
+          <button type="button" id="fileBrowserCloseBtn" class="btn btn-text btn-small" aria-label="Hide folder browser">Hide</button>
+        </div>
+        <p class="file-browser-help">This list is inside Video Merger. Click Home / Desktop / Movies, or paste a folder path and press Go.</p>
+        <div id="fileBrowserShortcuts" class="file-browser-shortcuts"></div>
+        <div class="file-browser-path-row">
+          <button type="button" id="fileBrowserUpBtn" class="btn btn-secondary btn-small" aria-label="Go up one folder">Up</button>
+          <input id="fileBrowserPath" class="file-browser-path" type="text" spellcheck="false" placeholder="/Users/you/Movies" aria-label="Folder path">
+          <button type="button" id="fileBrowserGoBtn" class="btn btn-secondary btn-small">Go</button>
+        </div>
+        <div id="fileBrowserList" class="file-browser-list" role="listbox" aria-label="Folders and videos">
+          <div class="file-browser-empty">Loading folders…</div>
+        </div>
+        <p id="fileBrowserStatus" class="file-browser-status" aria-live="polite"></p>
+        <div class="file-browser-actions">
+          <button type="button" id="fileBrowserCancelBtn" class="btn btn-secondary">Cancel</button>
+          <button type="button" id="fileBrowserConfirmBtn" class="btn btn-primary">Add Videos</button>
+        </div>
+      </div>
+
+      <!-- Recent Directories Section -->
+      <div id="recentDirectoriesSection" class="recent-directories-section" style="display: none;">
+        <div class="recent-directories-header">
+          <h3>Recent Folders</h3>
+          <button id="clearRecentBtn" class="btn btn-text btn-small" aria-label="Clear recent folders">
+            Clear
+          </button>
+        </div>
+        <div id="recentDirectoriesList" class="recent-directories-list" role="list" aria-label="Recent folders"></div>
+      </div>
+
+      <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Drop zone for video files and folders">
+        <div class="drop-zone-content">
+          <div class="drop-zone-icon" aria-hidden="true">📤</div>
+          <p class="drop-zone-text">Drag and drop video files or folders here</p>
+          <p class="drop-zone-hint">or click Select Files / Select Folder to browse inside the app</p>
         </div>
       </div>
 
@@ -453,7 +479,6 @@
     </div>
   </div>
 
-  <script src="errorDialog.js"></script>
   <!-- Failed Operations Modal -->
   <div id="failedOpsModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="failedOpsModalTitle">
     <div class="modal-content modal-large">
@@ -483,6 +508,7 @@
     </div>
   </div>
 
+  <script src="file-browser-boot.js"></script>
   <script type="module" src="renderer.js"></script>
 </body>
 </html>

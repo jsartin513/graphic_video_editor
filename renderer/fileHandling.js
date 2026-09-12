@@ -20,55 +20,185 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     compareVideosBtn,
     fileListContainer
   } = domElements;
+  const fileListEmpty = document.getElementById('fileListEmpty');
+  const fileBrowserPanel = document.getElementById('fileBrowserPanel');
 
-  // File selection handlers
+  function showPickStatus(message, isError = false) {
+    const el = document.getElementById('filePickStatus');
+    if (!el) return;
+    if (!message) {
+      el.hidden = true;
+      el.textContent = '';
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.classList.toggle('error', Boolean(isError));
+  }
+
+  function revealFileBrowser(nextMode, message) {
+    showPickStatus(message);
+    if (typeof window.mountHomeFileBrowser === 'function') {
+      window.mountHomeFileBrowser(nextMode);
+    }
+    const panel = document.getElementById('fileBrowserPanel');
+    if (panel) {
+      panel.hidden = false;
+      panel.removeAttribute('hidden');
+      panel.style.display = 'block';
+      panel.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  async function applyPickedVideos(result, emptyMessage) {
+    if (!result.canceled && result.files?.length) {
+      const { added } = await addFiles(result.files);
+      if (added.length) {
+        showPickStatus(`Added ${added.length} video${added.length === 1 ? '' : 's'}.`);
+      } else {
+        showPickStatus('Those files are already in Selected Videos.', true);
+      }
+      return true;
+    }
+    if (!result.canceled) {
+      showPickStatus(emptyMessage, true);
+      return true;
+    }
+    return false;
+  }
+
   async function handleSelectFiles() {
+    showPickStatus('Opening file picker…');
     try {
-      const result = await window.electronAPI.selectFiles();
-      if (!result.canceled && result.files.length > 0) {
-        addFiles(result.files);
+      const ipc = await window.electronAPI.selectFiles();
+      if (ipc.canceled) {
+        revealFileBrowser(
+          'files',
+          'Picker canceled — use Home / Desktop / Movies below, or try Select Files again.'
+        );
+        return;
+      }
+      const files = ipc.files || [];
+      const handled = await applyPickedVideos(
+        { canceled: false, files },
+        'No video files in that selection.'
+      );
+      if (!handled) {
+        revealFileBrowser(
+          'files',
+          'Picker canceled — use Home / Desktop / Movies below, or try Select Files again.'
+        );
       }
     } catch (error) {
-      console.error('Error selecting files:', error);
+      console.error('selectFiles failed:', error);
+      revealFileBrowser(
+        'files',
+        'Could not open the file picker — browse in the folder list below.'
+      );
     }
   }
 
   async function handleSelectFolder() {
+    showPickStatus('Opening folder picker…');
     try {
-      const result = await window.electronAPI.selectFolder();
-      if (!result.canceled && result.files.length > 0) {
-        addFiles(result.files);
+      const ipc = await window.electronAPI.selectFolder();
+      if (ipc.canceled) {
+        revealFileBrowser(
+          'folder',
+          'Picker canceled — open a folder in the list below, then Use This Folder.'
+        );
+        return;
+      }
+      const files = ipc.files || [];
+      const handled = await applyPickedVideos(
+        { canceled: false, files },
+        'No videos found in that folder.'
+      );
+      if (!handled) {
+        revealFileBrowser(
+          'folder',
+          'Picker canceled — open a folder in the list below, then Use This Folder.'
+        );
       }
     } catch (error) {
-      console.error('Error selecting folder:', error);
+      console.error('selectFolder failed:', error);
+      revealFileBrowser(
+        'folder',
+        'Could not open the folder picker — browse in the list below.'
+      );
     }
   }
 
-  // Drag and drop handlers
+  window.videoMergerAddFiles = async (paths) => {
+    const result = await window.electronAPI.processDroppedPaths(paths);
+    const files = result?.files || [];
+    if (files.length > 0) {
+      const { added, duplicates } = await addFiles(files);
+      if (added.length > 0) {
+        showPickStatus(`Added ${added.length} video${added.length === 1 ? '' : 's'} — they are in Selected Videos at the top.`);
+      } else if (duplicates.length > 0) {
+        showPickStatus('Those filenames are already in Selected Videos.', true);
+      }
+      return { files, added, duplicates };
+    }
+    showPickStatus('No video files in that selection.', true);
+    return { files: [], added: [], duplicates: [] };
+  };
+
+  // Drag and drop handlers — OS file drops are captured in preload
+  // (File.path is often empty in this isolated renderer).
   function handleDragOver(e) {
     e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     dropZone.classList.add('drag-over');
   }
 
   function handleDragLeave(e) {
     e.preventDefault();
+    if (e.currentTarget.contains(e.relatedTarget)) return;
     dropZone.classList.remove('drag-over');
+  }
+
+  let lastDropAt = 0;
+  let lastDropKey = '';
+
+  async function addDroppedPaths(paths) {
+    dropZone.classList.remove('drag-over');
+    const valid = (paths || []).filter((p) => typeof p === 'string' && p.trim());
+    const key = valid.join('\n');
+    const now = Date.now();
+    if (key === lastDropKey && now - lastDropAt < 500) {
+      return;
+    }
+    lastDropKey = key;
+    lastDropAt = now;
+    if (!valid.length) {
+      showPickStatus('Drop received, but no file paths were readable. Use Select Files and browse in the list below.', true);
+      return;
+    }
+    try {
+      const result = await window.electronAPI.processDroppedPaths(valid);
+      if (result.files.length > 0) {
+        await addFiles(result.files);
+        showPickStatus(`Dropped ${result.files.length} video${result.files.length === 1 ? '' : 's'}.`);
+      } else {
+        showPickStatus('Drop received, but no video files were found in those items.', true);
+      }
+    } catch (error) {
+      console.error('Error processing dropped files:', error);
+      showPickStatus(`Could not add dropped files: ${error.message || error}`, true);
+    }
   }
 
   async function handleDrop(e) {
     e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    
-    const paths = Array.from(e.dataTransfer.files).map(f => f.path);
-    if (paths.length > 0) {
-      const result = await window.electronAPI.processDroppedPaths(paths);
-      if (result.files.length > 0) {
-        addFiles(result.files);
-      }
+    const paths = Array.from(e.dataTransfer?.files || []).map((f) => f.path).filter(Boolean);
+    if (paths.length) {
+      await addDroppedPaths(paths);
     }
   }
 
-  function addFiles(newFiles) {
+  async function addFiles(newFiles) {
     const duplicates = [];
     const added = [];
     const fileNameMap = new Map(); // filename -> full path
@@ -118,9 +248,6 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
         : `Files with duplicate names detected: ${duplicateNames}. Each file must have a unique name.`;
       
       alert(message);
-      
-      // Optionally still add files with a suffix to make them unique
-      // For now, we'll just show the error and not add duplicates
     }
     
     // Save state for undo/redo if files were added
@@ -128,10 +255,10 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
       undoRedo.saveState(`Added ${added.length} file${added.length > 1 ? 's' : ''}`);
     }
     
-    // Update UI only if files were added
     if (added.length > 0 || duplicates.length === 0) {
-      updateFileList();
+      await updateFileList();
     }
+    return { added, duplicates };
   }
 
   function removeFile(filePath) {
@@ -146,19 +273,39 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     updateFileList();
   }
 
+  function fileItemShell(filePath) {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    const fileName = getFileName(filePath);
+    item.innerHTML = `
+        <div class="file-thumbnail-container">
+          <div class="file-thumbnail-placeholder">🎬</div>
+        </div>
+        <div class="file-info">
+          <div class="file-name">${escapeHtml(fileName)}</div>
+          <div class="file-meta"><span>Loading details…</span></div>
+        </div>
+      `;
+    return item;
+  }
+
   async function updateFileList() {
-    fileList.innerHTML = '';
-    
-    if (state.selectedFiles.length === 0) {
-      fileListContainer.style.display = 'none';
+    const hasFiles = state.selectedFiles.length > 0;
+    fileListContainer.style.display = 'block';
+    fileListContainer.hidden = false;
+    if (fileListEmpty) fileListEmpty.hidden = hasFiles;
+    if (fileBrowserPanel) fileBrowserPanel.classList.toggle('is-compact', hasFiles);
+
+    if (!hasFiles) {
+      fileList.innerHTML = '';
       prepareMergeBtn.style.display = 'none';
       if (compareVideosBtn) {
         compareVideosBtn.style.display = 'none';
       }
+      fileCount.textContent = '0 files';
       return;
     }
     
-    fileListContainer.style.display = 'block';
     prepareMergeBtn.style.display = 'inline-flex';
     
     // Show compare button only when exactly 2 files are selected
@@ -171,17 +318,18 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
     }
     
     fileCount.textContent = `${state.selectedFiles.length} file${state.selectedFiles.length !== 1 ? 's' : ''}`;
-    
-    // Create all file items in parallel
+    fileList.replaceChildren(...state.selectedFiles.map(fileItemShell));
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      fileListContainer.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+
     const items = await Promise.all(
       state.selectedFiles.map(filePath => createFileItem(filePath))
     );
-    // Performance optimization: Use DocumentFragment for batch DOM updates
-    const fragment = document.createDocumentFragment();
-    for (const item of items) {
-      fragment.appendChild(item);
-    }
-    fileList.appendChild(fragment);
+    fileList.replaceChildren(...items);
 
     // Perform compatibility check if we have multiple files
     if (state.selectedFiles.length > 1) {
@@ -617,7 +765,10 @@ export function initializeFileHandling(state, domElements, trimVideo = null, und
   dropZone.addEventListener('dragleave', handleDragLeave);
   dropZone.addEventListener('drop', handleDrop);
   dropZone.addEventListener('click', () => selectFilesBtn.click());
+  if (window.electronAPI?.onNativeFileDrop) {
+    window.electronAPI.onNativeFileDrop(addDroppedPaths);
+  }
 
   // Export updateFileList so it can be called from other modules
-  return { updateFileList, addFiles, removeFile, updateFileCount };
+  return { updateFileList, addFiles, removeFile };
 }

@@ -1,6 +1,7 @@
 // Video splitting functionality
 
 import { getFileName, escapeHtml, formatDuration } from './utils.js';
+import { showErrorDialog } from './errorDialog.js';
 
 export function initializeSplitVideo(domElements, appState = null) {
   let closeSplitModalBtn = null;

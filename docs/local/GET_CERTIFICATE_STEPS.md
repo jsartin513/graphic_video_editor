@@ -1,5 +1,8 @@
 # Step-by-Step: Get Your Developer ID Certificate
 
+Developer ID Application is installed: **JESSICA L SARTIN (LKF2468HZ2)**. Next: set the env vars below and notarize (an app-specific password is still required).
+
+
 Follow these steps to get your Developer ID certificate without needing Xcode.
 
 ## Step 1: Create a Certificate Signing Request (CSR)

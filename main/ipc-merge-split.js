@@ -3,13 +3,14 @@
  */
 
 const path = require('path');
-const { ipcMain, dialog } = require('electron');
+const { ipcMain } = require('electron');
+const { showOpenDialog } = require('./dialog-utils');
+const { logger } = require('../src/logger');
 const { spawn } = require('child_process');
 const fs = require('fs').promises;
 
 const { getFFmpegPath, getFFprobePath } = require('../src/ffmpeg-resolver');
 const { mapError } = require('../src/error-mapper');
-const { logger } = require('../src/logger');
 const {
   QUALITY_COPY,
   QUALITY_SETTINGS,
@@ -443,14 +444,18 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
     });
   });
 
-  ipcMain.handle('select-output-destination', async () => {
-    const mainWindow = getMainWindow();
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory', 'createDirectory'],
-      title: 'Select Output Destination Folder'
-    });
-    if (result.canceled) return { canceled: true, path: null };
-    const selectedPath = result.filePaths[0];
+  ipcMain.handle('select-output-destination', async (event, dirPath) => {
+    let selectedPath = typeof dirPath === 'string' ? dirPath.trim() : '';
+    if (!selectedPath) {
+      const result = await showOpenDialog(getMainWindow(), {
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Select Output Destination Folder'
+      });
+      if (result.canceled || !result.filePaths?.length) {
+        return { canceled: true, path: null };
+      }
+      selectedPath = result.filePaths[0];
+    }
     try {
       await fs.mkdir(selectedPath, { recursive: true });
       return { canceled: false, path: selectedPath };

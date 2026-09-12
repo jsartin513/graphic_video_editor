@@ -26,7 +26,7 @@ There are **two different scenarios** with different requirements:
 - The bundled ffmpeg binaries are **standalone executables** that work without Node.js
 
 **Requirements:**
-- macOS 10.13+
+- macOS 10.15+
 - **No Node.js needed!**
 - **No npm needed!**
 - **No command-line tools needed!**

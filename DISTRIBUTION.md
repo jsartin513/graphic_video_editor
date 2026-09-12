@@ -4,112 +4,48 @@
 
 ### System Requirements
 
-**For Fat Build (Recommended):**
-- macOS 10.13 or later
-- **No additional software needed** - ffmpeg is bundled with the app
+**Fat build (what friends should install):**
+- macOS 10.15 Catalina or later
+- Intel or Apple Silicon (M1/M2/M3/M4)
+- No extra software — ffmpeg is bundled
 
-**For Lite Build:**
-- macOS 10.13 or later
-- ffmpeg installed on the system (via Homebrew: `brew install ffmpeg`)
+**Lite build (developers only):**
+- macOS 10.15 Catalina or later
+- ffmpeg on the system (`brew install ffmpeg`)
 
-### Note: Node.js NOT Required
-
-**End users do NOT need Node.js!** The app is a standalone macOS application. Node.js is only needed during the **build process** (which happens on the developer's machine or CI server), not when installing or running the app.
-
-### Installing Prerequisites (For Lite Builds Only)
-
-**If you're distributing a lite build** (without bundled ffmpeg), users will need to install ffmpeg. This is **NOT needed for fat builds**.
-
-**Easy Method**: Run the installation script:
-
-```bash
-# Download or navigate to the Video Editor directory
-cd /path/to/video-editor
-
-# Run the prerequisites installer
-./install_prerequisites.sh
-```
-
-This script will:
-- Check if Homebrew is installed (and install it if needed)
-- Install ffmpeg if it's not already installed
-- Verify that everything is working correctly
-
-**Manual Method**: If you prefer to install manually:
-
-```bash
-# Install Homebrew if you don't have it
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install ffmpeg
-brew install ffmpeg
-```
-
-**Quick Check**: To verify prerequisites without installing:
-
-```bash
-./check_prerequisites.sh
-```
+End users do **not** need Node.js.
 
 ### Installing the App
 
-1. Download the DMG file
-2. Open the DMG file
-3. Drag "Video Editor" to your Applications folder
-4. Open the app from Applications
+1. Download the fat DMG for your Mac (`arm64-fat` for Apple Silicon, `x64-fat` for Intel).
+2. Open the DMG.
+3. Drag **Video Merger** to Applications.
+4. Open it from Applications.
 
-### First Launch - "App is Damaged" Error
+Signed and notarized builds open without Gatekeeper workarounds. If you still see "app is damaged", see [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md).
 
-**Important**: If you see an error saying the app is "damaged" or "can't be opened", this is macOS Gatekeeper blocking unsigned apps. Here's how to fix it:
-
-**Method 1: Right-click to Open (Easiest)**
-1. Right-click (or Control-click) on "Video Merger.app"
-2. Select "Open" from the context menu
-3. Click "Open" in the security dialog that appears
-4. The app will now open normally
-
-**Method 2: Remove Quarantine Attribute (Automated)**
-1. Download the `fix_damaged_app.sh` script from the repository
-2. Open Terminal and run:
-   ```bash
-   bash fix_damaged_app.sh
-   ```
-3. Then try opening the app normally
-
-**Method 2b: Remove Quarantine Attribute (Manual)**
-1. Open Terminal
-2. Run this command:
-   ```bash
-   xattr -cr /Applications/Video\ Merger.app
-   ```
-3. Then try opening the app normally
-
-**Method 3: System Settings**
-1. Go to System Settings > Privacy & Security
-2. Scroll down to find the message about Video Merger being blocked
-3. Click "Open Anyway"
-4. Confirm by clicking "Open" in the dialog
-
-**Why this happens**: The app is not code-signed with an Apple Developer certificate. This is normal for apps distributed outside the App Store. The app is safe to use - macOS just needs your explicit permission the first time.
+Lite builds and the Homebrew installer scripts (`install_prerequisites.sh`) are not the friend install path.
 
 ## For Developers
 
-### Building the App
-
 ```bash
 npm install
-npm run build
+npm run build:fat:arm64   # or build:fat:x64
 ```
 
-The built files will be in the `dist/` directory.
+Output is in `dist/`.
 
-### Code Signing (Optional)
+### Code Signing and Notarization
 
-To code-sign the app for distribution without security warnings, you'll need:
+Friend-ready builds need a **Developer ID Application** certificate and notarization. Config lives in `electron-builder.config.js` and `build/entitlements.mac.plist`.
 
-1. An Apple Developer account
-2. Code signing certificates
-3. Update the `build.mac.identity` in `package.json`
+```bash
+npm run check-signing
+export CSC_NAME="JESSICA L SARTIN (LKF2468HZ2)"
+export APPLE_ID="..."
+export APPLE_TEAM_ID="..."
+export APPLE_APP_SPECIFIC_PASSWORD="..."
+npm run build:fat:arm64
+```
 
-See [electron-builder documentation](https://www.electron.build/code-signing) for details.
-
+Full walkthrough: [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md).

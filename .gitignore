@@ -6,7 +6,6 @@ resources/
 *.dmg
 *.zip
 *.app
-build/icon.icns
 .env
 .env.local
 .env.*.local
@@ -14,3 +13,6 @@ build/icon.icns
 # Test coverage
 coverage/
 .nyc_output/
+
+# Local merge output from manual testing
+test-videos/merged_videos/

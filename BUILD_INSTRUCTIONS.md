@@ -1,4 +1,4 @@
-# Building Video Editor
+# Building Video Merger
 
 ## Local Building
 
@@ -64,20 +64,22 @@ The repository includes a GitHub Actions workflow that automatically builds both
 
 After building, you'll find in the `dist/` directory:
 
-- **Apple Silicon**: `Video Editor-1.0.0-arm64.dmg` and `.zip`
-- **Intel**: `Video Editor-1.0.0-x64.dmg` and `.zip`
+- **Apple Silicon**: `Video Merger-*-arm64-fat.dmg` and `.zip`
+- **Intel**: `Video Merger-*-x64-fat.dmg` and `.zip`
+
+Friends should only receive **fat** DMGs. Lite builds need system ffmpeg.
 
 ## Manual Distribution
 
-If building locally:
+If building locally (signed + notarized):
 
-1. **For Apple Silicon users**: Send `Video Editor-1.0.0-arm64.dmg`
-2. **For Intel users**: Send `Video Editor-1.0.0-x64.dmg`
+1. **For Apple Silicon users**: Send `Video Merger-*-arm64-fat.dmg`
+2. **For Intel users**: Send `Video Merger-*-x64-fat.dmg`
 3. **For both**: Send both files and let users choose
 
 Users can check their Mac type:
 - Apple menu → About This Mac
 - Look for "Chip" or "Processor"
-- Apple M1/M2/M3 = arm64
+- Apple M1/M2/M3/M4 = arm64
 - Intel = x64
 

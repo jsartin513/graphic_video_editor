@@ -159,9 +159,12 @@ test('handles undefined', () => {
 
 ### GoPro Filenames
 Tests use realistic GoPro filename patterns:
-- `GX010001.MP4` - GoPro Hero 7+ format
+- `GX010001.MP4` - GoPro Hero 7+ format (`GX` + 2-char chapter + 4-digit session → session `0001`)
+- `GX020001.MP4` - Second chapter of the same session (`0001`)
 - `GP020001.MP4` - Alternative GoPro format
 - `GOPR0001.MP4` - GoPro initial file format
+
+The bundled `test-videos/` folder uses `GX010001`, `GX020001`, and `GX030001` so **Prepare Merge** groups them into one output. See `test-videos/README.md`.
 
 ### File Paths
 Tests include cross-platform path handling:

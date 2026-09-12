@@ -1,17 +1,19 @@
 # Build Resources
 
-This directory contains resources needed for building the app.
+`electron-builder` reads this folder when packaging Video Merger.
 
 ## Icon
 
-To create a proper macOS icon:
+- `icon.icns` — macOS app icon (committed; generated from `icons/icon.svg`)
+- `icons/` — SVG source, PNG sizes, and iconset used by `scripts/create-icns.sh`
 
-1. Create an icon file (1024x1024 PNG) named `icon.png`
-2. Convert it to .icns format:
-   ```bash
-   iconutil -c icns icon.icns -o build/icon.icns
-   ```
-   Or use an online converter or tool like `iconutil` on macOS.
+Regenerate:
 
-For now, the app will use the default Electron icon if no icon is provided.
+```bash
+npm run generate-icon
+cp build/icons/icon.icns build/icon.icns
+```
 
+## Entitlements
+
+`entitlements.mac.plist` — hardened runtime entitlements for Developer ID signing (not App Sandbox).

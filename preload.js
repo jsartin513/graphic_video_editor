@@ -1,10 +1,42 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const {
+  isOsFileDrop,
+  pathsFromDataTransfer
+} = require('./src/file-pick-utils');
+
+let webUtilsGetPath = null;
+try {
+  const { webUtils } = require('electron');
+  if (webUtils && typeof webUtils.getPathForFile === 'function') {
+    webUtilsGetPath = (file) => webUtils.getPathForFile(file);
+  }
+} catch (error) {
+  // Electron 28 does not export webUtils
+}
+
+window.addEventListener('dragover', (event) => {
+  if (!isOsFileDrop(event.dataTransfer)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+}, true);
+
+window.addEventListener('drop', (event) => {
+  if (!isOsFileDrop(event.dataTransfer)) return;
+  event.preventDefault();
+  const paths = pathsFromDataTransfer(event.dataTransfer, webUtilsGetPath);
+  ipcRenderer.send('native-file-drop', paths);
+}, true);
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFiles: () => ipcRenderer.invoke('select-files'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  listDirectory: (dirPath) => ipcRenderer.invoke('list-directory', dirPath),
+  getFileBrowserRoots: () => ipcRenderer.invoke('get-file-browser-roots'),
   getFileMetadata: (filePath) => ipcRenderer.invoke('get-file-metadata', filePath),
   processDroppedPaths: (paths) => ipcRenderer.invoke('process-dropped-paths', paths),
+  onNativeFileDrop: (callback) => {
+    ipcRenderer.on('native-file-drop', (_event, paths) => callback(paths));
+  },
   analyzeVideos: (filePaths) => ipcRenderer.invoke('analyze-videos', filePaths),
   getVideoDuration: (filePath) => ipcRenderer.invoke('get-video-duration', filePath),
   getVideoMetadata: (videoPath) => ipcRenderer.invoke('get-video-metadata', videoPath),
@@ -17,7 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelSplit: () => ipcRenderer.invoke('cancel-split'),
   trimVideo: (options) => ipcRenderer.invoke('trim-video', options),
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
-  selectOutputDestination: () => ipcRenderer.invoke('select-output-destination'),
+  selectOutputDestination: (dirPath) => ipcRenderer.invoke('select-output-destination', dirPath),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getTestVideosPath: () => ipcRenderer.invoke('get-test-videos-path'),

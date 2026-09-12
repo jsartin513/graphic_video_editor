@@ -4,9 +4,7 @@ This guide walks you through signing your Electron app with an Apple Developer I
 
 ## Prerequisites
 
-- ✅ Apple Developer account ($99/year)
-- ✅ macOS machine for signing
-- ✅ Xcode installed (for certificate management)
+**Important**: You need a **Developer ID Application** certificate, not "Apple Development" or "Mac App Distribution". Apple Development certs cannot be notarized and will not satisfy Gatekeeper for friends.
 
 ## Step 1: Generate Your Developer ID Certificate
 
@@ -51,15 +49,16 @@ You should see output like:
 
 ## Step 3: Configure electron-builder
 
-The `electron-builder.config.js` file has been updated to support code signing. You have two options:
+The `electron-builder.config.js` file already has hardened runtime, entitlements, and optional notarization. You have two options:
 
 ### Option A: Use Environment Variables (Recommended for CI/CD)
 
 Set these environment variables before building:
 
 ```bash
-export APPLE_ID="your-email@example.com"
-export APPLE_TEAM_ID="TEAM_ID"  # From Step 2
+export CSC_NAME="JESSICA L SARTIN (LKF2468HZ2)"
+export APPLE_TEAM_ID="LKF2468HZ2"
+export APPLE_ID="your-apple-id@email.com"
 export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"  # Only for notarization
 ```
 

@@ -2,8 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 
-// Minimum expected size for ffmpeg/ffprobe binaries (50MB)
-const MIN_BINARY_SIZE_BYTES = 50 * 1024 * 1024;
+// Minimum expected size for ffmpeg/ffprobe binaries (arm64 ffmpeg-static is ~45MB)
+const MIN_BINARY_SIZE_BYTES = 10 * 1024 * 1024;
 
 // Validate that a binary exists and is executable
 function isValidExecutable(filePath) {
@@ -71,32 +71,56 @@ if (!iconPath) {
   console.warn('⚠️  Warning: Custom icon not found, using default Electron icon');
 }
 
+// electron-builder wants the identity name only — not the "Developer ID Application:" prefix
+function normalizeSigningIdentity(name) {
+  if (!name) return null;
+  return name.replace(/^Developer ID Application:\s*/i, '').trim() || null;
+}
+
+const signingIdentity = normalizeSigningIdentity(process.env.CSC_NAME);
+
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
   publish: publishConfig,
   mac: {
     category: "public.app-category.video",
-    ...(iconPath && { icon: iconPath }), // Only set icon property if iconPath exists
+    ...(iconPath && { icon: iconPath }),
     target: [
       "dmg",
       "zip"
     ],
-    // Ensure app name is shown correctly in Finder/Dock
-    name: "Video Merger"
+    minimumSystemVersion: "10.15.0",
+    hardenedRuntime: true,
+    gatekeeperAssess: false,
+    entitlements: "build/entitlements.mac.plist",
+    entitlementsInherit: "build/entitlements.mac.plist",
+    // Only sign when CSC_NAME is set (e.g. "JESSICA L SARTIN (LKF2468HZ2)").
+    // null disables auto-discovery so a local "Apple Development" cert is not used by mistake.
+    identity: signingIdentity,
+    // Notarize only when Apple credentials are present; skip quietly otherwise.
+    notarize: process.env.APPLE_TEAM_ID
+      ? { teamId: process.env.APPLE_TEAM_ID }
+      : false
   },
   files: [
     "main.js",
     "preload.js",
+    "main/**/*",
     "renderer/**/*",
     "src/**/*",
     "package.json",
+    "LICENSE",
     "node_modules/electron-updater/**/*"
   ],
   directories: {
     buildResources: "build",
     output: "dist"
-  }
+  },
+  // Match CI / friend-download names: Video Merger-1.0.0-arm64-fat.dmg
+  artifactName: process.env.BUNDLE_FFMPEG === 'false'
+    ? "${productName}-${version}-${arch}-lite.${ext}"
+    : "${productName}-${version}-${arch}-fat.${ext}"
 };
 
 // Conditionally include ffmpeg binaries if they exist
@@ -112,9 +136,10 @@ if (resourcesExist) {
   console.log('✓ Electron Builder: Excluding bundled ffmpeg binaries (using system ffmpeg)');
 }
 
-// Include test videos if the directory exists
+// Include test videos only when explicitly requested (never in friend/release builds)
+const includeTestVideos = process.env.INCLUDE_TEST_VIDEOS === 'true';
 const testVideosDir = path.join(__dirname, 'test-videos');
-if (fs.existsSync(testVideosDir)) {
+if (includeTestVideos && fs.existsSync(testVideosDir)) {
   extraResourcesList.push({
     from: "test-videos",
     to: "test-videos",

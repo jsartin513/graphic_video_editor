@@ -1,127 +1,79 @@
-# Distribution Guide for Non-Technical Users
+# Distribution Guide for Friends
 
-## Best Way to Share with Friends
+Share **fat** DMGs only. Lite builds require Homebrew ffmpeg and are for developers.
 
-### Option 1: GitHub Releases (Recommended) ⭐
+**Requirements:** macOS 10.15 Catalina or later.
 
-**This is the easiest option!** Create a GitHub Release and share a simple link.
+## Current drop (local)
 
-#### Step 1: Create a Release
+Fat DMGs from this repo (unsigned until a Developer ID Application cert exists):
 
-After merging your PR and when ready to release:
+- Apple Silicon: `dist/Video Merger-1.0.0-arm64-fat.dmg`
+- Intel: `dist/Video Merger-1.0.0-x64-fat.dmg`
+
+Do **not** send these to friends until `npm run verify-signed-build` reports Developer ID + a stapled ticket. An unsigned DMG still needs the Gatekeeper workaround in [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md).
+
+
+## Which file
+
+1. Apple menu → **About This Mac**
+2. **Chip: Apple M1/M2/M3/M4** → `Video-Merger-*-arm64-fat.dmg`
+3. **Processor: Intel** → `Video-Merger-*-x64-fat.dmg`
+
+Prefer the `.dmg` over the `.zip`.
+
+## Install (signed / notarized builds)
+
+1. Open the DMG.
+2. Drag **Video Merger** to Applications.
+3. Open it from Applications.
+
+That is the whole flow. No Terminal, no `xattr`, no right-click workaround.
+
+If macOS still says the app is damaged, the build was not notarized. See [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md) and [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md).
+
+## Create a release
 
 ```bash
-# Make sure you're on main branch and up to date
-git checkout main
-git pull origin main
+# 1. Confirm Developer ID Application is in the keychain
+npm run check-signing
 
-# Create and push a version tag (e.g., v1.0.0)
+# 2. Notarize locally (do this before the first friend drop)
+export CSC_NAME="JESSICA L SARTIN (LKF2468HZ2)"
+export APPLE_ID="your-email@example.com"
+export APPLE_TEAM_ID="TEAM_ID"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+npm run build:fat:arm64
+npm run build:fat:x64
+bash scripts/verify-signed-build.sh
+
+# 3. After the signed DMGs look good, tag a version
+#    (CI currently ships unsigned artifacts — attach local DMGs or wait for CI signing)
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-**That's it!** GitHub Actions will automatically:
-- Build all versions (x64 and arm64, fat and lite)
-- Create a GitHub Release
-- Attach all download files to the release
+Latest GitHub release: https://github.com/jsartin513/graphic_video_editor/releases/latest
 
-#### Step 2: Share the Link
+## Message to send friends
 
-Share this link with your friends:
-```
-https://github.com/jsartin513/graphic_video_editor/releases/latest
-```
+**Video Merger**
 
-Or for a specific version:
-```
-https://github.com/jsartin513/graphic_video_editor/releases/tag/v1.0.0
-```
+1. Check your Mac: Apple menu → About This Mac.
+   - Apple chip (M1/M2/…) → download the **arm64-fat** `.dmg`
+   - Intel → download the **x64-fat** `.dmg`
+2. Open the DMG, drag Video Merger to Applications, open it from Applications.
 
-#### Step 3: Simple Instructions for Your Friends
+Needs macOS 10.15 or later. ffmpeg is already inside the app.
 
-Send them this:
+## Auto-updates
 
----
+In-app updates need signed GitHub Release artifacts plus `latest-mac.yml`. Until CI signing is wired up, send friends a new DMG when you ship a fix.
 
-**Hey! Here's the Video Merger app:**
+## Versioning
 
-📥 **Download:** https://github.com/jsartin513/graphic_video_editor/releases/latest
+- v1.0.0 — first friend-ready build
+- v1.0.1 — bug fix
+- v1.1.0 — new features
 
-**Which file to download?**
-
-1. **Check your Mac type:**
-   - Click the 🍎 Apple menu → "About This Mac"
-   - See "Chip: Apple M1/M2/M3"? → Download the **arm64-fat** file
-   - See "Processor: Intel"? → Download the **x64-fat** file
-
-2. **Download the `.dmg` file** (it's easier than the zip)
-
-3. **Install:**
-   - Open the downloaded `.dmg` file
-   - Drag "Video Merger" to your Applications folder
-   - Open it from Applications
-
-4. **If it says "App is damaged":**
-   - Open Terminal (Applications > Utilities > Terminal)
-   - Copy and paste this command:
-     ```bash
-     xattr -cr "/Applications/Video Merger.app"
-     ```
-   - Press Enter
-   - Try opening the app again
-
-**That's it!** The app includes everything needed - no extra software to install.
-
----
-
-### Option 2: Direct Download Links
-
-You can also share direct download links to specific files:
-
-```
-# For Intel Macs (fat build - recommended)
-https://github.com/jsartin513/graphic_video_editor/releases/download/v1.0.0/Video-Merger-1.0.0-x64-fat.dmg
-
-# For Apple Silicon Macs (fat build - recommended)
-https://github.com/jsartin513/graphic_video_editor/releases/download/v1.0.0/Video-Merger-1.0.0-arm64-fat.dmg
-```
-
-Replace `v1.0.0` with your actual version tag.
-
-### Option 3: Create a Simple Landing Page
-
-For the most user-friendly experience, you could create a simple webpage that:
-- Detects the user's Mac type
-- Shows a "Download" button that links to the correct file
-- Includes installation instructions
-
-But GitHub Releases is probably the easiest option!
-
-## Auto-Updates (Future Enhancement)
-
-If you want the app to automatically notify users about updates:
-
-1. The app already has auto-update code in place
-2. You'll need to enable it in `electron-builder.config.js` by setting the `publish` option
-3. Users will then see update notifications in the app when new versions are released
-
-## Versioning Tips
-
-Use semantic versioning:
-- **v1.0.0** - First stable release
-- **v1.1.0** - New features, backward compatible
-- **v1.0.1** - Bug fixes
-- **v2.0.0** - Breaking changes
-
-## Quick Release Checklist
-
-Before creating a release:
-
-- [ ] All tests pass
-- [ ] PR is merged to main
-- [ ] Version number updated in `package.json` (if needed)
-- [ ] Changelog/notes prepared (optional but helpful)
-- [ ] Tag created and pushed: `git tag v1.0.0 && git push origin v1.0.0`
-
-That's it! GitHub Actions does the rest automatically.
-
+Paid checkout, LGPL ffmpeg, and the Mac App Store are documented in [FUTURE_RELEASE.md](FUTURE_RELEASE.md).

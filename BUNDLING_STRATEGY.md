@@ -108,6 +108,8 @@ If you bundle ffmpeg, ensure compliance with the applicable FFmpeg licensing ter
 - Provide source code access if required
 - Carefully consider your app's license compatibility
 
+Paid / closed-source distribution is deferred — see [FUTURE_RELEASE.md](FUTURE_RELEASE.md).
+
 The `ffmpeg-static` package currently used for bundling is licensed under **GPL-3.0-or-later**, which is a strong copyleft license. Bundling this GPL-licensed binary may require that your application be GPL-compatible (for example, also under GPL-3.0-or-later or a compatible license).
 
 If you require more permissive licensing (e.g., commercial distribution under a non-GPL license), you should either:

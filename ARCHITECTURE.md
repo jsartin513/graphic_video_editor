@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This document describes the high-level architecture of the Video Editor application.
+This document describes the high-level architecture of the Video Merger application.
 
 ## Application Model
 

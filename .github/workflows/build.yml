@@ -65,12 +65,20 @@ jobs:
           echo "✅ FFmpeg binaries found:"
           ls -lh resources/ffmpeg resources/ffprobe
           file resources/ffmpeg resources/ffprobe
+          FFMPEG_ARCH=$(file resources/ffmpeg | grep -o 'arm64\|x86_64' | head -1)
+          FFPROBE_ARCH=$(file resources/ffprobe | grep -o 'arm64\|x86_64' | head -1)
+          if [ "$FFMPEG_ARCH" != "$FFPROBE_ARCH" ]; then
+            echo "❌ Architecture mismatch: ffmpeg=$FFMPEG_ARCH ffprobe=$FFPROBE_ARCH"
+            exit 1
+          fi
+          echo "✅ Architecture match: $FFMPEG_ARCH"
 
       - name: Build for x64 (Intel) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
           TARGET_ARCH: 'x64'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build:fat:x64
 
       - name: Rename x64 files to include architecture suffix
@@ -119,6 +127,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
           TARGET_ARCH: 'x64'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build:x64
 
       - name: Rename x64 files to include architecture suffix
@@ -177,12 +186,20 @@ jobs:
           echo "✅ FFmpeg binaries found:"
           ls -lh resources/ffmpeg resources/ffprobe
           file resources/ffmpeg resources/ffprobe
+          FFMPEG_ARCH=$(file resources/ffmpeg | grep -o 'arm64\|x86_64' | head -1)
+          FFPROBE_ARCH=$(file resources/ffprobe | grep -o 'arm64\|x86_64' | head -1)
+          if [ "$FFMPEG_ARCH" != "$FFPROBE_ARCH" ]; then
+            echo "❌ Architecture mismatch: ffmpeg=$FFMPEG_ARCH ffprobe=$FFPROBE_ARCH"
+            exit 1
+          fi
+          echo "✅ Architecture match: $FFMPEG_ARCH"
 
       - name: Build for arm64 (Apple Silicon) - Fat Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'true'
           TARGET_ARCH: 'arm64'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build:fat:arm64
 
       - name: Rename arm64 files to include variant suffix
@@ -230,6 +247,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLE_FFMPEG: 'false'
           TARGET_ARCH: 'arm64'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build:arm64
 
       - name: Rename arm64 files to include variant suffix
