@@ -18,7 +18,7 @@ fi
 
 LOG="${RELEASE_LOG:-$ROOT/docs/local/release-${VERSION}.log}"
 PIDFILE="${LOG}.pid"
-mkdir -p "$(dirname "$LOG")")
+mkdir -p "$(dirname "$LOG")"
 
 if [[ -f "$PIDFILE" ]]; then
   OLD_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
