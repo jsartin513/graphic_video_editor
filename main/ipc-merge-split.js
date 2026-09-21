@@ -17,6 +17,9 @@ const {
   validateQualityOption
 } = require('../src/quality-utils');
 const { buildMergeLogEntryForCompletedMerge, appendMergeLogEntry } = require('../src/merge-log');
+const { createStallWatchdog } = require('../src/stall-watchdog');
+
+const MERGE_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
 let currentMergeProcess = null;
 let currentMergeTempFile = null;
@@ -124,7 +127,32 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
           let errorOutput = '';
           let totalDuration = null;
+          let settled = false;
+          let timedOut = false;
           ffmpeg.startTime = Date.now();
+
+          const settleResolve = (value) => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+          };
+          const settleReject = (error) => {
+            if (settled) return;
+            settled = true;
+            reject(error);
+          };
+
+          const stallWatchdog = createStallWatchdog(MERGE_STALL_TIMEOUT_MS, () => {
+            if (!ffmpeg || ffmpeg.killed) return;
+            timedOut = true;
+            ffmpeg.kill('SIGTERM');
+            const forceKillTimeout = setTimeout(() => {
+              if (ffmpeg && !ffmpeg.killed) ffmpeg.kill('SIGKILL');
+            }, 2000);
+            ffmpeg.once('exit', () => clearTimeout(forceKillTimeout));
+            logger.error('merge-videos: FFmpeg stalled (no progress)');
+            settleReject(new Error('FFmpeg operation timed out. The merge may have failed or is taking too long.'));
+          });
 
           (async () => {
             try {
@@ -153,15 +181,8 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             }
           })();
 
-          const timeout = setTimeout(() => {
-            if (ffmpeg && !ffmpeg.killed) {
-              ffmpeg.kill('SIGTERM');
-              logger.error('merge-videos: FFmpeg operation timed out');
-              reject(new Error('FFmpeg operation timed out. The merge may have failed or is taking too long.'));
-            }
-          }, 5 * 60 * 1000);
-
           ffmpeg.stderr.on('data', (data) => {
+            stallWatchdog.ping();
             const output = data.toString();
             errorOutput += output;
             logger.debug('merge-videos: FFmpeg stderr', { output: output.trim() });
@@ -203,7 +224,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
           });
 
           ffmpeg.on('error', (error) => {
-            clearTimeout(timeout);
+            stallWatchdog.clear();
             currentMergeProcess = null;
             currentMergeTempFile = null;
             currentMergeOutputPath = null;
@@ -213,17 +234,17 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
               const mapped = mapError('ffmpeg not found');
               const err = new Error(mapped.userMessage);
               err.mappedError = mapped;
-              reject(err);
+              settleReject(err);
             } else {
               const mapped = mapError(error);
               const err = new Error(mapped.userMessage);
               err.mappedError = mapped;
-              reject(err);
+              settleReject(err);
             }
           });
 
           ffmpeg.on('close', (code) => {
-            clearTimeout(timeout);
+            stallWatchdog.clear();
             const tempFile = currentMergeTempFile;
             const outputFile = currentMergeOutputPath;
             currentMergeProcess = null;
@@ -232,9 +253,11 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
             if (tempFile) fs.unlink(tempFile).catch(() => {});
 
-            if (isCancelled) {
+            if (isCancelled || timedOut) {
               if (outputFile) fs.unlink(outputFile).catch(() => {});
-              reject(new Error('Operation cancelled by user'));
+              if (isCancelled) {
+                settleReject(new Error('Operation cancelled by user'));
+              }
               return;
             }
 
@@ -255,9 +278,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
                   } catch (logError) {
                     logger.error('merge-videos: merge log append failed', { error: logError.message });
                   }
-                  resolve({ success: true, outputPath: outputFile });
+                  settleResolve({ success: true, outputPath: outputFile });
                 } catch (err) {
-                  reject(err);
+                  settleReject(err);
                 }
               })();
             } else {
@@ -265,7 +288,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
               const mapped = mapError(`ffmpeg failed: ${errorOutput}`);
               const err = new Error(mapped.userMessage);
               err.mappedError = mapped;
-              reject(err);
+              settleReject(err);
             }
           });
         })
@@ -489,5 +512,6 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 }
 
 module.exports = {
-  registerMergeSplitIpcHandlers
+  registerMergeSplitIpcHandlers,
+  MERGE_STALL_TIMEOUT_MS
 };

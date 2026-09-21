@@ -103,6 +103,8 @@ const baseConfig = {
       ? { teamId: process.env.APPLE_TEAM_ID }
       : false
   },
+  // Only pack listed app files plus electron-updater (and its nested deps).
+  // Do not require() other npm packages from main/ — they will be missing in asar.
   files: [
     "main.js",
     "preload.js",

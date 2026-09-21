@@ -6,14 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const { app, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
-const semver = require('semver');
-
-function isNewerRelease(remoteVersion, currentVersion) {
-  const remote = semver.coerce(remoteVersion);
-  const current = semver.coerce(currentVersion);
-  if (!remote || !current) return false;
-  return semver.gt(remote, current);
-}
 
 const RELEASES_LATEST_URL = 'https://github.com/jsartin513/graphic_video_editor/releases/latest';
 
@@ -48,7 +40,10 @@ function registerUpdatesIpcHandlers() {
     try {
       const result = await autoUpdater.checkForUpdates();
       const updateInfo = result?.updateInfo ?? null;
-      const available = isNewerRelease(updateInfo?.version, app.getVersion());
+      // checkForUpdates() always returns updateInfo for the latest feed entry.
+      // isUpdateAvailable is the version comparison (electron-updater ships its
+      // own nested semver; do not require('semver') here — it is not packed).
+      const available = Boolean(result?.isUpdateAvailable);
       return { available, updateInfo, currentVersion: app.getVersion() };
     } catch (error) {
       const errorMessage = error.message || String(error);
