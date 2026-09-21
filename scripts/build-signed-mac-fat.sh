@@ -142,7 +142,7 @@ if [[ "${PUBLISH_TO_GITHUB:-}" == "true" && -f "$ROOT/dist/latest-mac.yml" ]]; t
 fi
 
 DMG=""
-for candidate in "$ROOT"/dist/Video\ Merger-*-"${ARCH_LABEL}"-fat.dmg; do
+for candidate in "$ROOT"/dist/Video-Merger-*-"${ARCH_LABEL}"-fat.dmg; do
   if [[ -f "$candidate" ]]; then
     DMG="$candidate"
     break
@@ -191,4 +191,6 @@ fi
 
 echo "Done."
 echo "  App: $APP"
-[[ -n "$DMG" ]] && echo "  DMG: $DMG"
+if [[ -n "$DMG" ]]; then
+  echo "  DMG: $DMG"
+fi
