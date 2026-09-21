@@ -788,14 +788,17 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         undoRedo.saveState(`Changed filename to ${value}`);
       }
       
-      // Save the original pattern (with tokens) to preferences, not the replaced value
-      // This allows users to reuse patterns with date tokens
-      try {
-        await window.electronAPI.saveFilenamePattern(originalPattern);
-        // Reload preferences to get updated list
-        await loadUserPreferences();
-      } catch (error) {
-        console.error('Error saving pattern:', error);
+      // Only persist reusable patterns (with tokens), not resolved concrete names from auto-apply
+      const reusablePattern =
+        group.appliedNaming?.templatePattern ||
+        (originalPattern.includes('{') ? originalPattern : null);
+      if (reusablePattern && reusablePattern.includes('{')) {
+        try {
+          await window.electronAPI.saveFilenamePattern(reusablePattern);
+          await loadUserPreferences();
+        } catch (error) {
+          console.error('Error saving pattern:', error);
+        }
       }
     });
 

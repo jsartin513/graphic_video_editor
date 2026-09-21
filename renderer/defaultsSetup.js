@@ -13,18 +13,39 @@ function waitForPrerequisitesResolved() {
   const modal = document.getElementById('prerequisitesModal');
   if (!modal) return Promise.resolve();
 
-  if (modal.style.display === 'none' || !modal.style.display) {
-    return Promise.resolve();
-  }
+  const PREREQ_CHECK_GRACE_MS = 800;
 
   return new Promise((resolve) => {
+    let prerequisitesShown =
+      modal.style.display !== 'none' && Boolean(modal.style.display);
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      observer.disconnect();
+      clearTimeout(graceTimer);
+      clearTimeout(maxTimer);
+      resolve();
+    };
+
     const observer = new MutationObserver(() => {
-      if (modal.style.display === 'none') {
-        observer.disconnect();
-        resolve();
+      if (modal.style.display !== 'none' && modal.style.display) {
+        prerequisitesShown = true;
+      }
+      if (prerequisitesShown && (modal.style.display === 'none' || !modal.style.display)) {
+        finish();
       }
     });
     observer.observe(modal, { attributes: true, attributeFilter: ['style'] });
+
+    const graceTimer = setTimeout(() => {
+      if (!prerequisitesShown) {
+        finish();
+      }
+    }, PREREQ_CHECK_GRACE_MS);
+
+    const maxTimer = setTimeout(finish, 120_000);
   });
 }
 
@@ -223,9 +244,15 @@ export function initializeDefaultsSetup() {
   async function scheduleSetupCheck() {
     if (checkScheduled) return;
     checkScheduled = true;
-    await waitForPrerequisitesResolved();
-    await maybeShowSetup();
-    checkScheduled = false;
+    try {
+      await waitForPrerequisitesResolved();
+      if (isModalVisible(document.getElementById('prerequisitesModal'))) {
+        return;
+      }
+      await maybeShowSetup();
+    } finally {
+      checkScheduled = false;
+    }
   }
 
   if (saveBtn) saveBtn.addEventListener('click', () => handleSave());
@@ -244,11 +271,11 @@ export function initializeDefaultsSetup() {
     }
   });
 
-  setTimeout(() => scheduleSetupCheck(), 1200);
-
   if (window.electronAPI.onPrerequisitesMissing) {
     window.electronAPI.onPrerequisitesMissing(() => {
-      waitForPrerequisitesResolved().then(() => scheduleSetupCheck());
+      scheduleSetupCheck();
     });
   }
+
+  setTimeout(() => scheduleSetupCheck(), 1200);
 }
