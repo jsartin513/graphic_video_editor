@@ -121,6 +121,10 @@ process.on('uncaughtException', (error) => {
     error: error?.message || String(error),
     stack: error?.stack
   });
+  // Node is undefined after uncaughtException; exit after logging.
+  setImmediate(() => {
+    app.exit(1);
+  });
 });
 
 process.on('unhandledRejection', (reason) => {

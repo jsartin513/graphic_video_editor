@@ -2321,6 +2321,10 @@ body {
   backdrop-filter: blur(4px);
 }
 
+#bugReportModal {
+  z-index: 10001;
+}
+
 .modal-content {
   background: var(--bg-secondary);
   border-radius: 12px;

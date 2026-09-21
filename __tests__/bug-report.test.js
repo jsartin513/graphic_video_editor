@@ -30,6 +30,13 @@ describe('bug-report', () => {
       const text = 'Failed at /Users/testuser/Videos/clip.mp4';
       expect(redactPaths(text, '/Users/testuser')).toBe('Failed at ~/Videos/clip.mp4');
     });
+
+    it('does not replace username substrings in non-path text', () => {
+      const text = 'codec testuser-agent failed for /Users/testuser/out.mp4';
+      const redacted = redactPaths(text, '/Users/testuser');
+      expect(redacted).toContain('testuser-agent');
+      expect(redacted).toContain('~/out.mp4');
+    });
   });
 
   describe('buildIssueTitle', () => {

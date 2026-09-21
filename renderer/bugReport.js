@@ -3,6 +3,8 @@
  */
 
 let pendingErrorInfo = null;
+/** Error context for the report currently being edited in the modal. */
+let activeReportErrorInfo = null;
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -39,6 +41,13 @@ function hideBugReportModal() {
     status.textContent = '';
     status.hidden = true;
   }
+  activeReportErrorInfo = null;
+}
+
+function dismissBlockingOverlays() {
+  document.querySelectorAll('.error-dialog-overlay, .error-modal').forEach((el) => {
+    el.remove();
+  });
 }
 
 /**
@@ -46,9 +55,17 @@ function hideBugReportModal() {
  * @param {object|null} options.errorInfo
  */
 export function showBugReportModal(options = {}) {
-  const errorInfo = options.errorInfo !== undefined ? options.errorInfo : pendingErrorInfo;
+  if (options.errorInfo !== undefined) {
+    pendingErrorInfo = options.errorInfo;
+    activeReportErrorInfo = options.errorInfo;
+  } else {
+    activeReportErrorInfo = pendingErrorInfo;
+  }
+  const errorInfo = activeReportErrorInfo;
   const { overlay, description, status, submitBtn } = getBugReportModalElements();
   if (!overlay) return;
+
+  dismissBlockingOverlays();
 
   if (description && !description.value && errorInfo?.userMessage) {
     description.value = errorInfo.userMessage;
@@ -73,7 +90,7 @@ async function submitBugReport() {
   }
 
   const userDescription = description?.value?.trim() || '';
-  const errorInfo = pendingErrorInfo;
+  const errorInfo = activeReportErrorInfo;
 
   if (submitBtn) submitBtn.disabled = true;
   if (status) {

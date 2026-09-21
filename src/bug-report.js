@@ -22,8 +22,7 @@ function redactPaths(text, homeDir) {
   const user = os.userInfo().username;
   if (user && user.length > 0) {
     const userEscaped = user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    result = result.replace(new RegExp(`/Users/${userEscaped}`, 'g'), '/Users/[user]');
-    result = result.replace(new RegExp(userEscaped, 'g'), '[user]');
+    result = result.replace(new RegExp(`/Users/${userEscaped}(?=/|$)`, 'g'), '/Users/[user]');
   }
   return result;
 }
