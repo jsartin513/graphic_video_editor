@@ -20,7 +20,10 @@ const {
   pinDirectory,
   unpinDirectory,
   clearRecentDirectories,
-  cleanupDirectories
+  cleanupDirectories,
+  shouldShowDefaultsSetup,
+  completeDefaultsSetup,
+  setDefaultFilenamePattern
 } = require('../src/preferences');
 
 const { mapError } = require('../src/error-mapper');
@@ -83,7 +86,7 @@ function registerPreferenceIpcHandlers() {
         const pattern = derivePatternFromFilename(filename);
         if (pattern && !seen.has(pattern)) {
           seen.add(pattern);
-          prefs = addRecentPattern(prefs, pattern);
+          prefs = addRecentPattern(prefs, pattern, { updateLastUsed: false });
         }
       }
       if (seen.size > 0) {
@@ -92,6 +95,40 @@ function registerPreferenceIpcHandlers() {
       return { success: true, saved: seen.size };
     } catch (error) {
       logger.error('Error saving patterns from selected files', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('should-show-defaults-setup', async () => {
+    try {
+      return { show: await shouldShowDefaultsSetup() };
+    } catch (error) {
+      logger.error('Error checking defaults setup', { error: error.message });
+      return { show: false };
+    }
+  });
+
+  ipcMain.handle('complete-defaults-setup', async (event, options) => {
+    try {
+      const preferences = await completeDefaultsSetup(options || {});
+      return { success: true, preferences };
+    } catch (error) {
+      logger.error('Error completing defaults setup', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('set-default-filename-pattern', async (event, pattern, templateName) => {
+    try {
+      if (typeof pattern !== 'string' || !pattern.trim()) {
+        return { success: false, error: 'Pattern is required.' };
+      }
+      const prefs = await loadPreferences();
+      const updated = setDefaultFilenamePattern(prefs, pattern, templateName);
+      await savePreferences(updated);
+      return { success: true, preferences: updated };
+    } catch (error) {
+      logger.error('Error setting default filename pattern', { error: error.message });
       throw error;
     }
   });

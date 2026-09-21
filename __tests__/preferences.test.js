@@ -10,7 +10,8 @@ jest.mock('fs', () => {
     promises: {
       readFile: jest.fn(),
       writeFile: jest.fn(),
-      mkdir: jest.fn()
+      mkdir: jest.fn(),
+      access: jest.fn()
     }
   };
 });
@@ -32,6 +33,10 @@ const {
   clearFailedOperations,
   loadPreferences,
   savePreferences,
+  preferencesFileExists,
+  shouldShowDefaultsSetup,
+  completeDefaultsSetup,
+  setDefaultFilenamePattern,
   setPreferredQuality,
   setPreferredFormat,
   setLastOutputDestination,
@@ -181,7 +186,11 @@ describe('loadPreferences', () => {
 
     const result = await loadPreferences();
 
-    expect(result).toEqual({ ...DEFAULT_PREFERENCES });
+    expect(result).toEqual({
+      ...DEFAULT_PREFERENCES,
+      eventTemplates: [...DEFAULT_EVENT_TEMPLATES],
+      eventTemplatesSeeded: true
+    });
   });
 
   test('returns defaults on parse error', async () => {
@@ -189,7 +198,94 @@ describe('loadPreferences', () => {
 
     const result = await loadPreferences();
 
-    expect(result).toEqual({ ...DEFAULT_PREFERENCES });
+    expect(result).toEqual({ ...DEFAULT_PREFERENCES, eventTemplates: [...DEFAULT_EVENT_TEMPLATES], eventTemplatesSeeded: true });
+  });
+});
+
+describe('preferencesFileExists and shouldShowDefaultsSetup', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('preferencesFileExists returns true when access succeeds', async () => {
+    fs.access.mockResolvedValue(undefined);
+    expect(await preferencesFileExists()).toBe(true);
+  });
+
+  test('preferencesFileExists returns false when access fails', async () => {
+    fs.access.mockRejectedValue(new Error('ENOENT'));
+    expect(await preferencesFileExists()).toBe(false);
+  });
+
+  test('shouldShowDefaultsSetup is true when file missing', async () => {
+    fs.access.mockRejectedValue(new Error('ENOENT'));
+    expect(await shouldShowDefaultsSetup()).toBe(true);
+  });
+
+  test('shouldShowDefaultsSetup is false for legacy file without flag', async () => {
+    fs.access.mockResolvedValue(undefined);
+    fs.readFile.mockResolvedValue(JSON.stringify({ preferredQuality: 'copy' }));
+    expect(await shouldShowDefaultsSetup()).toBe(false);
+  });
+
+  test('shouldShowDefaultsSetup is true when flag is false', async () => {
+    fs.access.mockResolvedValue(undefined);
+    fs.readFile.mockResolvedValue(JSON.stringify({ defaultsSetupCompleted: false }));
+    expect(await shouldShowDefaultsSetup()).toBe(true);
+  });
+
+  test('shouldShowDefaultsSetup is false when flag is true', async () => {
+    fs.access.mockResolvedValue(undefined);
+    fs.readFile.mockResolvedValue(JSON.stringify({ defaultsSetupCompleted: true }));
+    expect(await shouldShowDefaultsSetup()).toBe(false);
+  });
+});
+
+describe('completeDefaultsSetup', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    fs.mkdir.mockResolvedValue(undefined);
+    fs.writeFile.mockResolvedValue(undefined);
+  });
+
+  test('skip writes preferences with defaultsSetupCompleted', async () => {
+    const err = new Error('not found');
+    err.code = 'ENOENT';
+    fs.readFile.mockRejectedValue(err);
+
+    const result = await completeDefaultsSetup({ skipped: true });
+
+    expect(result.defaultsSetupCompleted).toBe(true);
+    expect(result.lastUsedPattern).toBeNull();
+    expect(fs.writeFile).toHaveBeenCalled();
+  });
+
+  test('save sets lastUsedPattern and date format', async () => {
+    const err = new Error('not found');
+    err.code = 'ENOENT';
+    fs.readFile.mockRejectedValue(err);
+
+    const result = await completeDefaultsSetup({
+      skipped: false,
+      dateFormat: 'MM-DD-YYYY',
+      pattern: 'BDL Open Gym {date} {sessionId}',
+      templateName: 'BDL Open Gym',
+      templatePattern: 'BDL Open Gym {date} {sessionId}'
+    });
+
+    expect(result.defaultsSetupCompleted).toBe(true);
+    expect(result.preferredDateFormat).toBe('MM-DD-YYYY');
+    expect(result.lastUsedPattern).toBe('BDL Open Gym {date} {sessionId}');
+    expect(result.defaultTemplateName).toBe('BDL Open Gym');
+  });
+});
+
+describe('setDefaultFilenamePattern', () => {
+  test('updates lastUsedPattern and defaultTemplateName', () => {
+    const prefs = { ...DEFAULT_PREFERENCES };
+    const updated = setDefaultFilenamePattern(prefs, 'Week {count} {date}', 'BYOT');
+    expect(updated.lastUsedPattern).toBe('Week {count} {date}');
+    expect(updated.defaultTemplateName).toBe('BYOT');
   });
 });
 

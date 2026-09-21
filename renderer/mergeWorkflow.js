@@ -4,6 +4,12 @@ import { getFileName, escapeHtml, escapeAttr, formatDuration, getDirectoryName, 
 import { showError, enhanceError } from './errorHandler.js';
 import { showErrorDialog } from './errorDialog.js';
 import { setAppPhase, resetToEmptyPick, isAddingMoreVideos } from './appPhase.js';
+import {
+  chooseDefaultFilenamePattern,
+  isProcessedPlaceholderFilename,
+  directorySuffixForGroup,
+  GENERIC_FILENAME_PATTERN
+} from './filenamePattern.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -156,7 +162,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     for (const i of state.selectedGroups) {
       const group = state.videoGroups[i];
       if (!group) continue;
-      const value = await resolveFilenamePattern(pattern, group.sessionId);
+      let value = await resolveFilenamePattern(pattern, group.sessionId);
+      value += directorySuffixForGroup(group, state.videoGroups);
       const input = document.querySelector(`.filename-input[data-index="${i}"]`);
       if (input) input.value = value;
       state.videoGroups[i].outputFilename = value + ext;
@@ -167,6 +174,47 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         eventName: customTokens.eventName,
         leagueName: customTokens.leagueName,
         weekName: customTokens.weekName,
+        dateFormat,
+        appliedAt
+      };
+    }
+    try {
+      const result = await window.electronAPI.setDefaultFilenamePattern(pattern, templateName || null);
+      if (result?.preferences) {
+        userPreferences = result.preferences;
+      }
+    } catch (error) {
+      console.error('Error saving default filename pattern:', error);
+    }
+  }
+
+  async function resolveOutputBasenameForGroup(group, pattern) {
+    let value = await resolveFilenamePattern(pattern, group.sessionId);
+    value += directorySuffixForGroup(group, state.videoGroups);
+    return value;
+  }
+
+  async function applyDefaultNamingToGroups() {
+    if (!state.videoGroups?.length) return;
+    await loadUserPreferences();
+    const pattern = chooseDefaultFilenamePattern(userPreferences);
+    const ext = '.' + (selectedFormat || 'mp4').toLowerCase();
+    const customTokens = getFilenameCustomTokens();
+    const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+    const appliedAt = new Date().toISOString();
+    const templateName = userPreferences?.defaultTemplateName || '';
+
+    for (let i = 0; i < state.videoGroups.length; i++) {
+      const group = state.videoGroups[i];
+      if (!isProcessedPlaceholderFilename(group.outputFilename)) {
+        continue;
+      }
+      const base = await resolveOutputBasenameForGroup(group, pattern);
+      state.videoGroups[i].outputFilename = base + ext;
+      state.videoGroups[i].appliedNaming = {
+        templateName,
+        templatePattern: pattern,
+        weekCount: customTokens.count,
         dateFormat,
         appliedAt
       };
@@ -333,7 +381,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       state.videoGroups = videoGroups;
       
       // Show preview screen
-      showPreviewScreen();
+      await showPreviewScreen();
       
       // Load and set quality preference
       if (userPreferences && userPreferences.preferredQuality) {
@@ -401,7 +449,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   }
 
   // Show preview screen
-  function showPreviewScreen() {
+  async function showPreviewScreen() {
     state.currentScreen = 'preview';
     setAppPhase('merge');
     previewScreen.style.display = 'flex';
@@ -434,6 +482,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       state.selectedGroups.add(i);
     }
 
+    await applyDefaultNamingToGroups();
     renderPreviewList();
     setupEventTemplateControls();
     loadPreviewThumbnails();
@@ -454,7 +503,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       opt.textContent = t.name;
       templateSelect.appendChild(opt);
     }
-    templateSelect.value = '';
+    const defaultPattern = chooseDefaultFilenamePattern(userPreferences);
+    const matchingTemplate = templates.find((t) => t.pattern === defaultPattern);
+    if (matchingTemplate) {
+      templateSelect.value = matchingTemplate.pattern;
+    } else if (userPreferences?.lastUsedPattern) {
+      templateSelect.value = userPreferences.lastUsedPattern;
+    } else {
+      templateSelect.value = '';
+    }
 
     // Remove old listeners by cloning (we re-run this each time preview is shown)
     if (applyBtn) {
@@ -653,7 +710,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
                    data-index="${index}"
                    list="patterns-${index}"
                    value="${escapeHtml(group.outputFilename)}"
-                   placeholder="PROCESSED${group.sessionId}.${selectedFormat}">
+                   placeholder="${escapeAttr(GENERIC_FILENAME_PATTERN)}.${selectedFormat}">
             ${patternsDatalist}
             <span class="filename-hint" id="filename-hint-${index}">.${selectedFormat.toUpperCase()}</span>
           </div>
@@ -693,8 +750,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     // Validate filename on blur and apply date tokens
     input.addEventListener('blur', async (e) => {
       let value = e.target.value.trim();
-      if (!value) {
-        value = `PROCESSED${group.sessionId}`;
+      if (!value || isProcessedPlaceholderFilename(value)) {
+        value = await resolveOutputBasenameForGroup(group, chooseDefaultFilenamePattern(userPreferences));
       }
       // Remove any video extension if present
       value = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
@@ -892,8 +949,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       const input = document.querySelector(`.filename-input[data-index="${index}"]`);
       const group = state.videoGroups[index];
       let value = input ? input.value.trim() : (group.outputFilename || '').replace(/\.MP4$/i, '');
-      if (!value) value = `PROCESSED${group.sessionId}`;
-      value = value.replace(/\.MP4$/i, '');
+      if (!value || isProcessedPlaceholderFilename(value)) {
+        value = await resolveOutputBasenameForGroup(group, chooseDefaultFilenamePattern(userPreferences));
+      }
+      value = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+
+      if (isProcessedPlaceholderFilename(value)) {
+        value = await resolveOutputBasenameForGroup(group, chooseDefaultFilenamePattern(userPreferences));
+      }
 
       value = value.replace(/\{sessionId\}/gi, group.sessionId);
       if (value.includes('{')) {
@@ -1573,7 +1636,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   window.addEventListener('preferences-updated', async () => {
     await loadUserPreferences();
     if (previewScreen.style.display !== 'none' && state.videoGroups?.length) {
+      await applyDefaultNamingToGroups();
+      renderPreviewList();
       setupEventTemplateControls();
+      loadPreviewThumbnails();
     }
   });
 

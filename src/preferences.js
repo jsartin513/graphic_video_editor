@@ -48,7 +48,9 @@ const DEFAULT_PREFERENCES = {
   eventTemplates: [...DEFAULT_EVENT_TEMPLATES], // Reusable filename patterns: [{ name, pattern }]
   maxEventTemplates: 10,
   lastWeekCount: '', // Remembered week number for {count} in BYOT templates
-  eventTemplatesSeeded: true // false only before first migration; empty list is intentional once seeded
+  eventTemplatesSeeded: true, // false only before first migration; empty list is intentional once seeded
+  defaultsSetupCompleted: false,
+  defaultTemplateName: null
 };
 
 function mergeLoadedPreferences(prefs) {
@@ -80,10 +82,114 @@ function mergeLoadedPreferences(prefs) {
       pinnedDirectories: prefs.pinnedDirectories || [],
       eventTemplates,
       eventTemplatesSeeded,
-      lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : '')
+      lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : ''),
+      defaultsSetupCompleted: prefs.defaultsSetupCompleted === true,
+      defaultTemplateName: typeof prefs.defaultTemplateName === 'string' ? prefs.defaultTemplateName : null
     },
     needsTemplateMigration
   };
+}
+
+/**
+ * @returns {Promise<boolean>}
+ */
+async function preferencesFileExists() {
+  try {
+    await fs.access(getPreferencesPath());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * First-launch wizard: show when setup is not completed.
+ * Legacy installs (preferences.json without defaultsSetupCompleted) are treated as complete.
+ * @returns {Promise<boolean>}
+ */
+async function shouldShowDefaultsSetup() {
+  if (!(await preferencesFileExists())) {
+    return true;
+  }
+  try {
+    const data = await fs.readFile(getPreferencesPath(), 'utf8');
+    const parsed = JSON.parse(data);
+    if (!Object.prototype.hasOwnProperty.call(parsed, 'defaultsSetupCompleted')) {
+      return false;
+    }
+    return parsed.defaultsSetupCompleted !== true;
+  } catch (error) {
+    logger.error('Error checking defaults setup flag', { error: error.message });
+    return false;
+  }
+}
+
+/**
+ * @param {Object} preferences
+ * @param {string} pattern
+ * @param {string|null} [templateName]
+ * @returns {Object}
+ */
+function setDefaultFilenamePattern(preferences, pattern, templateName = null) {
+  if (!pattern || typeof pattern !== 'string' || !pattern.trim()) {
+    return preferences;
+  }
+  const trimmed = pattern.trim();
+  let updated = addRecentPattern(preferences, trimmed);
+  updated = {
+    ...updated,
+    lastUsedPattern: trimmed,
+    defaultTemplateName: templateName && String(templateName).trim() ? String(templateName).trim() : null
+  };
+  return updated;
+}
+
+/**
+ * Persist first-launch naming setup (save or skip).
+ * @param {Object} options
+ * @param {boolean} options.skipped
+ * @param {string} [options.dateFormat]
+ * @param {string} [options.pattern]
+ * @param {string} [options.templateName]
+ * @param {string} [options.templatePattern]
+ * @returns {Promise<Object>}
+ */
+async function completeDefaultsSetup(options = {}) {
+  const {
+    skipped = false,
+    dateFormat,
+    pattern,
+    templateName,
+    templatePattern
+  } = options;
+
+  let prefs = await loadPreferences();
+  prefs = {
+    ...prefs,
+    defaultsSetupCompleted: true,
+    eventTemplatesSeeded: true
+  };
+
+  if (!skipped) {
+    if (dateFormat && typeof dateFormat === 'string') {
+      prefs = setPreferredDateFormat(prefs, dateFormat);
+    }
+    const usePattern = (pattern && pattern.trim()) || (templatePattern && templatePattern.trim());
+    if (usePattern) {
+      const name = templateName && templateName.trim() ? templateName.trim() : null;
+      prefs = setDefaultFilenamePattern(prefs, usePattern, name);
+      if (name && templatePattern && templatePattern.trim()) {
+        const trimmedPattern = templatePattern.trim();
+        const exists = (prefs.eventTemplates || []).some((t) => t && t.name === name);
+        if (!exists) {
+          prefs = addEventTemplate(prefs, { name, pattern: trimmedPattern });
+        }
+      }
+    }
+  }
+
+  await savePreferences(prefs);
+  return prefs;
 }
 
 /**
@@ -135,13 +241,16 @@ async function savePreferences(preferences) {
  * Add a filename pattern to recent patterns
  * @param {Object} preferences - Current preferences
  * @param {string} pattern - The filename pattern to add
+ * @param {{ updateLastUsed?: boolean }} [options] - When false, only updates recentFilenamePatterns
  * @returns {Object} Updated preferences
  */
-function addRecentPattern(preferences, pattern) {
+function addRecentPattern(preferences, pattern, options = {}) {
   if (!pattern || typeof pattern !== 'string') {
     return preferences;
   }
-  
+
+  const updateLastUsed = options.updateLastUsed !== false;
+
   // Remove pattern if it already exists (to move it to the front)
   const filtered = preferences.recentFilenamePatterns.filter(p => p !== pattern);
   
@@ -155,7 +264,7 @@ function addRecentPattern(preferences, pattern) {
   return {
     ...preferences,
     recentFilenamePatterns: trimmed,
-    lastUsedPattern: pattern
+    ...(updateLastUsed ? { lastUsedPattern: pattern } : {})
   };
 }
 
@@ -707,6 +816,10 @@ function addEventTemplate(preferences, template) {
 module.exports = {
   loadPreferences,
   savePreferences,
+  preferencesFileExists,
+  shouldShowDefaultsSetup,
+  completeDefaultsSetup,
+  setDefaultFilenamePattern,
   addRecentPattern,
   setPreferredDateFormat,
   setPreferredQuality,

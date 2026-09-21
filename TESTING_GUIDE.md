@@ -29,6 +29,23 @@ npm run test:coverage
 
 Coverage reports are generated in the `coverage/` directory and displayed in the terminal.
 
+### End-to-end (Playwright + Electron)
+
+Playwright drives the real Electron app with an isolated `--user-data-dir` so first-launch flows are testable without touching your normal preferences.
+
+```bash
+npm install
+npm run test:e2e
+```
+
+Optional UI mode:
+
+```bash
+npm run test:e2e:ui
+```
+
+E2E specs live in `e2e/` (see `e2e/first-launch-defaults.spec.js` for the naming defaults wizard and merge preview naming). Reports: `playwright-report/`.
+
 ## Test Structure
 
 Tests are organized in the `__tests__/` directory with the following structure:

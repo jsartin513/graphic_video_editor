@@ -22,6 +22,9 @@ export function initializeSettings() {
   const updateHintEl = document.getElementById('settingsUpdateHint');
   const checkUpdatesBtn = document.getElementById('settingsCheckUpdatesBtn');
   const debugLoggingCheckbox = document.getElementById('settingsDebugLoggingCheckbox');
+  const defaultTemplateSelect = document.getElementById('settingsDefaultTemplateSelect');
+  const defaultPatternInput = document.getElementById('settingsDefaultPatternInput');
+  const saveDefaultPatternBtn = document.getElementById('settingsSaveDefaultPatternBtn');
 
   let editingTemplateName = null;
   let appInfo = null;
@@ -151,10 +154,59 @@ export function initializeSettings() {
       await loadAppInfo();
       currentPreferences = await window.electronAPI.loadPreferences();
       renderDateFormats(currentPreferences);
+      renderDefaultPatternControls(currentPreferences);
       renderTemplateList(currentPreferences);
       await loadDebugLoggingState();
     } catch (error) {
       console.error('Error loading settings:', error);
+    }
+  }
+
+  function renderDefaultPatternControls(prefs) {
+    if (defaultTemplateSelect) {
+      const templates = prefs.eventTemplates || [];
+      defaultTemplateSelect.innerHTML = '<option value="">— Custom pattern —</option>';
+      for (const t of templates) {
+        const opt = document.createElement('option');
+        opt.value = t.pattern;
+        opt.textContent = t.name;
+        opt.dataset.templateName = t.name;
+        defaultTemplateSelect.appendChild(opt);
+      }
+      const last = prefs.lastUsedPattern || '';
+      if (last) {
+        const match = templates.find((t) => t.pattern === last);
+        defaultTemplateSelect.value = match ? match.pattern : '';
+      }
+    }
+    if (defaultPatternInput) {
+      defaultPatternInput.value = prefs.lastUsedPattern || '';
+    }
+  }
+
+  async function saveDefaultPatternFromForm() {
+    const pattern = defaultPatternInput?.value.trim();
+    if (!pattern) {
+      alert('Enter a default filename pattern.');
+      return;
+    }
+    let templateName = null;
+    if (defaultTemplateSelect?.value) {
+      const opt = defaultTemplateSelect.options[defaultTemplateSelect.selectedIndex];
+      templateName = opt?.dataset?.templateName || opt?.textContent?.trim() || null;
+    }
+    try {
+      const result = await window.electronAPI.setDefaultFilenamePattern(pattern, templateName);
+      if (result?.success === false) {
+        alert(result.error || 'Could not save default pattern.');
+        return;
+      }
+      currentPreferences = result.preferences;
+      dispatchPreferencesUpdated(currentPreferences);
+      renderDefaultPatternControls(currentPreferences);
+    } catch (error) {
+      console.error('Error saving default pattern:', error);
+      alert('Could not save default pattern.');
     }
   }
 
@@ -217,6 +269,7 @@ export function initializeSettings() {
           currentPreferences = result.preferences;
           dispatchPreferencesUpdated(currentPreferences);
           renderTemplateList(currentPreferences);
+          renderDefaultPatternControls(currentPreferences);
           if (editingTemplateName === name) {
             editingTemplateName = null;
             if (templateNameInput) templateNameInput.value = '';
@@ -247,6 +300,7 @@ export function initializeSettings() {
       currentPreferences = result.preferences;
       dispatchPreferencesUpdated(currentPreferences);
       renderTemplateList(currentPreferences);
+      renderDefaultPatternControls(currentPreferences);
       editingTemplateName = null;
       if (templateNameInput) templateNameInput.value = '';
       if (templatePatternInput) templatePatternInput.value = '';
@@ -301,6 +355,19 @@ export function initializeSettings() {
 
   if (dateFormatSelect) {
     dateFormatSelect.addEventListener('change', () => handleDateFormatChange());
+  }
+
+  if (defaultTemplateSelect) {
+    defaultTemplateSelect.addEventListener('change', () => {
+      const pattern = defaultTemplateSelect.value;
+      if (pattern && defaultPatternInput) {
+        defaultPatternInput.value = pattern;
+      }
+    });
+  }
+
+  if (saveDefaultPatternBtn) {
+    saveDefaultPatternBtn.addEventListener('click', () => saveDefaultPatternFromForm());
   }
 
   if (debugLoggingCheckbox) {
