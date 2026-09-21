@@ -3,6 +3,8 @@
  * Displays user-friendly error messages with actionable suggestions
  */
 
+import { wireReportBugButton } from './bugReport.js';
+
 /**
  * Simple HTML escape function to prevent XSS
  * @param {string} text - Text to escape
@@ -68,6 +70,7 @@ function showErrorDialog(errorInfo) {
     
     <div class="error-dialog-footer">
       <button class="btn-secondary" id="error-help-btn">Get Help</button>
+      <button class="btn-secondary" id="error-report-btn">Report a bug</button>
       <button class="btn-primary" id="error-close-btn">OK</button>
     </div>
   `;
@@ -79,6 +82,9 @@ function showErrorDialog(errorInfo) {
   // Add event listeners
   const closeBtn = document.getElementById('error-close-btn');
   const helpBtn = document.getElementById('error-help-btn');
+  const reportBtn = document.getElementById('error-report-btn');
+
+  wireReportBugButton(reportBtn, errorInfo);
   
   closeBtn.addEventListener('click', () => {
     document.body.removeChild(overlay);

@@ -90,8 +90,14 @@ class Logger {
    * Write log to file
    * @param {string} logEntry - Formatted log entry
    */
-  async writeToFile(logEntry) {
-    if (!this.initialized || !this.debugMode) {
+  shouldPersistToFile(level) {
+    if (!this.initialized) return false;
+    if (level === LogLevel.ERROR || level === LogLevel.WARN) return true;
+    return this.debugMode;
+  }
+
+  async writeToFile(logEntry, level = LogLevel.INFO) {
+    if (!this.shouldPersistToFile(level)) {
       return;
     }
 
@@ -174,8 +180,7 @@ class Logger {
                         : 'log';
     console[consoleMethod](`[${level.toUpperCase()}]`, message, context);
 
-    // Write to file if debug mode is enabled
-    await this.writeToFile(logEntry);
+    await this.writeToFile(logEntry, level);
   }
 
   /**

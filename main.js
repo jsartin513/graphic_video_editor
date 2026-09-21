@@ -13,6 +13,7 @@ const { registerMergeSplitIpcHandlers } = require('./main/ipc-merge-split');
 const { registerMiscIpcHandlers } = require('./main/ipc-misc');
 const { registerUpdatesIpcHandlers, hasUpdateFeed } = require('./main/ipc-updates');
 const { registerLoggerIpcHandlers } = require('./main/ipc-logger');
+const { registerBugReportIpcHandlers } = require('./main/ipc-bug-report');
 const { registerSDCardIpcHandlers } = require('./main/ipc-sd-card');
 const { SDCardDetector } = require('./src/sd-card-detector');
 
@@ -115,6 +116,26 @@ autoUpdater.on('update-downloaded', (info) => {
   }
 });
 
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', {
+    error: error?.message || String(error),
+    stack: error?.stack
+  });
+});
+
+process.on('unhandledRejection', (reason) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  const stack = reason instanceof Error ? reason.stack : undefined;
+  logger.error('Unhandled promise rejection', { error: message, stack });
+});
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  logger.error('Renderer process gone', {
+    reason: details?.reason,
+    exitCode: details?.exitCode
+  });
+});
+
 app.whenReady().then(async () => {
   await logger.initialize();
   let prefs = {};
@@ -135,6 +156,7 @@ app.whenReady().then(async () => {
   registerMiscIpcHandlers();
   registerUpdatesIpcHandlers();
   registerLoggerIpcHandlers();
+  registerBugReportIpcHandlers();
   registerSDCardIpcHandlers(
     () => sdCardDetector,
     (v) => { sdCardDetector = v; },

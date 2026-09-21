@@ -13,6 +13,7 @@ import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
 import { initUpdateNotifications } from './updateNotification.js';
 import { initializeHelpUi } from './helpUi.js';
+import { initializeBugReport } from './bugReport.js';
 import { setAppPhase } from './appPhase.js';
 
 const SPLIT_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v']);
@@ -232,6 +233,7 @@ updateShortcutHints();
 initUpdateNotifications();
 
 initializeHelpUi();
+initializeBugReport();
 
 // SD Card Detection
 let currentSDCard = null;

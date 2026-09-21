@@ -1385,6 +1385,44 @@ body {
   margin-bottom: 8px;
 }
 
+.settings-help-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-debug-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.settings-debug-toggle input {
+  margin-top: 3px;
+}
+
+.bug-report-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.bug-report-status {
+  margin-top: 8px;
+  color: var(--text-secondary);
+}
+
 .settings-template-list {
   display: flex;
   flex-direction: column;

@@ -11,7 +11,12 @@ const app = {
   }),
   getVersion: jest.fn(() => '1.0.0'),
   getName: jest.fn(() => 'video-editor'),
+  isPackaged: false,
   quit: jest.fn()
+};
+
+const clipboard = {
+  writeText: jest.fn()
 };
 
 const shell = {
@@ -22,6 +27,7 @@ const shell = {
 module.exports = {
   app,
   BrowserWindow: jest.fn(),
+  clipboard,
   dialog: { showOpenDialog: jest.fn(), showSaveDialog: jest.fn() },
   ipcMain: { handle: jest.fn(), on: jest.fn() },
   nativeImage: { createFromPath: jest.fn(() => ({})) },

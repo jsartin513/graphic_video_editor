@@ -4,6 +4,8 @@
  * Integrates with backend error-mapper.js for consistent error handling
  */
 
+import { wireReportBugButton } from './bugReport.js';
+
 // Simple HTML escape function
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -261,6 +263,7 @@ export function showError(error, context = {}, callback = null) {
         ` : ''}
       </div>
       <div class="error-modal-footer">
+        <button type="button" class="btn btn-secondary error-report-btn">Report a bug</button>
         ${callback ? `<button class="btn btn-secondary error-retry">Retry</button>` : ''}
         <button class="btn btn-primary error-close-btn">Close</button>
       </div>
@@ -275,6 +278,13 @@ export function showError(error, context = {}, callback = null) {
     errorModal.remove();
   };
   
+  const reportErrorInfo = {
+    userMessage: enhanced.userMessage,
+    technicalDetails: enhanced.original,
+    code: enhanced.code
+  };
+  wireReportBugButton(errorModal.querySelector('.error-report-btn'), reportErrorInfo);
+
   errorModal.querySelector('.error-close').addEventListener('click', closeError);
   errorModal.querySelector('.error-close-btn').addEventListener('click', closeError);
   errorModal.addEventListener('click', (e) => {

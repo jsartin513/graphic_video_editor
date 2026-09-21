@@ -144,6 +144,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportLogs: (destinationPath) => ipcRenderer.invoke('export-logs', destinationPath),
   getDebugMode: () => ipcRenderer.invoke('get-debug-mode'),
   setDebugMode: (enabled) => ipcRenderer.invoke('set-debug-mode', enabled),
+  // Bug report API
+  prepareBugReport: (input) => ipcRenderer.invoke('prepare-bug-report', input),
+  openBugReport: (input) => ipcRenderer.invoke('open-bug-report', input),
   // Error recovery API
   addFailedOperation: (operation) => ipcRenderer.invoke('add-failed-operation', operation),
   removeFailedOperation: (sessionId, outputPath) => ipcRenderer.invoke('remove-failed-operation', sessionId, outputPath),

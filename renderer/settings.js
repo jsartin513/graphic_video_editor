@@ -21,6 +21,7 @@ export function initializeSettings() {
   const appVersionEl = document.getElementById('settingsAppVersion');
   const updateHintEl = document.getElementById('settingsUpdateHint');
   const checkUpdatesBtn = document.getElementById('settingsCheckUpdatesBtn');
+  const debugLoggingCheckbox = document.getElementById('settingsDebugLoggingCheckbox');
 
   let editingTemplateName = null;
   let appInfo = null;
@@ -115,12 +116,43 @@ export function initializeSettings() {
     }
   }
 
+  async function loadDebugLoggingState() {
+    if (!debugLoggingCheckbox || !window.electronAPI?.getDebugMode) return;
+    try {
+      const result = await window.electronAPI.getDebugMode();
+      if (result?.success) {
+        debugLoggingCheckbox.checked = Boolean(result.debugMode);
+      } else if (currentPreferences) {
+        debugLoggingCheckbox.checked = Boolean(currentPreferences.debugMode);
+      }
+    } catch (error) {
+      console.error('Error loading debug mode:', error);
+    }
+  }
+
+  async function handleDebugLoggingChange() {
+    if (!debugLoggingCheckbox || !window.electronAPI?.setDebugMode) return;
+    const enabled = debugLoggingCheckbox.checked;
+    try {
+      const result = await window.electronAPI.setDebugMode(enabled);
+      if (result?.success === false) {
+        debugLoggingCheckbox.checked = !enabled;
+        alert(result.error || 'Could not update debug logging.');
+      }
+    } catch (error) {
+      console.error('Error setting debug mode:', error);
+      debugLoggingCheckbox.checked = !enabled;
+      alert('Could not update debug logging.');
+    }
+  }
+
   async function loadAndRender() {
     try {
       await loadAppInfo();
       currentPreferences = await window.electronAPI.loadPreferences();
       renderDateFormats(currentPreferences);
       renderTemplateList(currentPreferences);
+      await loadDebugLoggingState();
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -269,6 +301,10 @@ export function initializeSettings() {
 
   if (dateFormatSelect) {
     dateFormatSelect.addEventListener('change', () => handleDateFormatChange());
+  }
+
+  if (debugLoggingCheckbox) {
+    debugLoggingCheckbox.addEventListener('change', () => handleDebugLoggingChange());
   }
 
   if (checkUpdatesBtn) {
