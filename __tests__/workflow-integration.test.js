@@ -134,6 +134,19 @@ describe('Video Merge Workflow Integration', () => {
       expect(byotName).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12 0534');
     });
 
+    test('generic default pattern resolves without PROCESSED placeholder', () => {
+      const { chooseDefaultFilenamePattern } = require('../src/filename-pattern');
+      const { applyDateTokens, sanitizeFilenameForOutput } = require('../src/preferences');
+      const files = ['/court1/GX010534.MP4'];
+      const groups = analyzeAndGroupVideos(files);
+      const pattern = chooseDefaultFilenamePattern({});
+      const date = new Date(2026, 8, 21);
+      let resolved = applyDateTokens(pattern.replace(/\{sessionId\}/gi, groups[0].sessionId), date, 'YYYY-MM-DD');
+      resolved = sanitizeFilenameForOutput(resolved);
+      expect(resolved).toBe('2026-09-21 0534');
+      expect(resolved).not.toMatch(/PROCESSED/i);
+    });
+
     test('apply template workflow: PROCESSED placeholder then BYOT pattern with sessionId', () => {
       const files = ['/court1/GX010534.MP4', '/court1/GX020534.MP4'];
       const groups = analyzeAndGroupVideos(files);

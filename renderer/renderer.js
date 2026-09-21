@@ -9,6 +9,7 @@ import { getFileName, getDirectoryPath } from './utils.js';
 import { initializeFailedOperations } from './failedOperations.js';
 import { initializeRecentDirectories } from './recentDirectories.js';
 import { initializeSettings } from './settings.js';
+import { initializeDefaultsSetup } from './defaultsSetup.js';
 import { initializeUndoRedo } from './undoRedo.js';
 import { initializeVideoComparison } from './videoComparison.js';
 import { initUpdateNotifications } from './updateNotification.js';
@@ -174,6 +175,7 @@ mergeWorkflow = initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 setAppPhase('pick');
 const recentDirectories = initializeRecentDirectories(state, domElements, fileHandling);
 const settings = initializeSettings();
+initializeDefaultsSetup();
 initializeVideoComparison(state, domElements);
 
 // Set up lazy loading for prerequisites

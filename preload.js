@@ -111,6 +111,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setLastWeekCount: (count) => ipcRenderer.invoke('set-last-week-count', count),
   savePatternsFromSelectedFiles: (filePaths) => ipcRenderer.invoke('save-patterns-from-selected-files', filePaths),
   setDateFormat: (format) => ipcRenderer.invoke('set-date-format', format),
+  shouldShowDefaultsSetup: () => ipcRenderer.invoke('should-show-defaults-setup'),
+  completeDefaultsSetup: (options) => ipcRenderer.invoke('complete-defaults-setup', options),
+  setDefaultFilenamePattern: (pattern, templateName) =>
+    ipcRenderer.invoke('set-default-filename-pattern', pattern, templateName),
   applyDateTokens: (pattern, dateStr, dateFormat, customTokens) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat, customTokens),
   // Recent directories API
   addRecentDirectory: (dirPath) => ipcRenderer.invoke('add-recent-directory', dirPath),

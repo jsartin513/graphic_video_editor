@@ -503,6 +503,50 @@
     </div>
   </div>
 
+  <!-- First-launch naming defaults -->
+  <div id="defaultsSetupModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="defaultsSetupModalTitle">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2 id="defaultsSetupModalTitle">Set up merged video names</h2>
+        <button type="button" id="defaultsSetupCloseBtn" class="modal-close-btn" aria-label="Skip setup for now">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint">
+          Choose how merged files should be named by default. You can change this anytime in Settings.
+          Tokens: <code>{date}</code>, <code>{sessionId}</code>, <code>{count}</code>, and more.
+        </p>
+        <section class="settings-section" aria-labelledby="defaultsSetupDateHeading">
+          <h3 id="defaultsSetupDateHeading">Date format</h3>
+          <select id="defaultsSetupDateFormatSelect" class="quality-select" aria-label="Preferred date format for filenames"></select>
+        </section>
+        <section class="settings-section" aria-labelledby="defaultsSetupTemplateHeading">
+          <h3 id="defaultsSetupTemplateHeading">Default template</h3>
+          <label for="defaultsSetupTemplateSelect">Template</label>
+          <select id="defaultsSetupTemplateSelect" class="quality-select" aria-label="Default naming template"></select>
+          <div class="form-group defaults-setup-custom">
+            <label for="defaultsSetupCustomNameInput">Custom template name <span class="optional">(optional)</span></label>
+            <input type="text" id="defaultsSetupCustomNameInput" placeholder="e.g. BDL Open Gym">
+            <label for="defaultsSetupCustomPatternInput">Custom pattern</label>
+            <input type="text" id="defaultsSetupCustomPatternInput" placeholder="e.g. BDL Open Gym {date} {sessionId}">
+          </div>
+          <div class="form-group field-with-hint">
+            <label for="defaultsSetupWeekCountInput">Week number (for <code>{count}</code>)</label>
+            <input type="text" id="defaultsSetupWeekCountInput" inputmode="numeric" placeholder="e.g. 3" aria-label="Sample week number for preview">
+          </div>
+        </section>
+        <section class="settings-section" aria-labelledby="defaultsSetupPreviewHeading">
+          <h3 id="defaultsSetupPreviewHeading">Preview</h3>
+          <p class="form-hint">Example for session <strong>0534</strong>:</p>
+          <p id="defaultsSetupPreview" class="defaults-setup-preview" aria-live="polite"></p>
+        </section>
+      </div>
+      <div class="modal-footer defaults-setup-footer">
+        <button type="button" id="defaultsSetupSkipBtn" class="btn btn-text">Skip for now</button>
+        <button type="button" id="defaultsSetupSaveBtn" class="btn btn-primary">Save defaults</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Modal -->
   <div id="settingsModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
     <div class="modal-content modal-large">
@@ -527,6 +571,17 @@
           <h3 id="settingsDateFormatHeading">Date format</h3>
           <p class="form-hint">Used for the {date} token in merged filenames.</p>
           <select id="settingsDateFormatSelect" class="quality-select" aria-label="Preferred date format"></select>
+        </section>
+        <section class="settings-section" aria-labelledby="settingsDefaultPatternHeading">
+          <h3 id="settingsDefaultPatternHeading">Default filename pattern</h3>
+          <p class="form-hint">Applied automatically when you open Merge. Tokens: {date}, {count}, {sessionId}, {eventName}, {leagueName}, {weekName}</p>
+          <label for="settingsDefaultTemplateSelect">From template</label>
+          <select id="settingsDefaultTemplateSelect" class="quality-select" aria-label="Choose default from saved template"></select>
+          <div class="form-group">
+            <label for="settingsDefaultPatternInput">Pattern</label>
+            <input type="text" id="settingsDefaultPatternInput" class="split-pattern-input" placeholder="e.g. BDL Open Gym {date} {sessionId}">
+          </div>
+          <button type="button" id="settingsSaveDefaultPatternBtn" class="btn btn-secondary btn-small">Save default pattern</button>
         </section>
         <section class="settings-section" aria-labelledby="settingsUpdatesHeading">
           <h3 id="settingsUpdatesHeading">Updates</h3>
