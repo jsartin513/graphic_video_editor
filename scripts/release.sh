@@ -150,24 +150,25 @@ if [[ -n "$NOTES_FILE" && -f "$NOTES_FILE" ]]; then
   RELEASE_NOTES="$(cat "$NOTES_FILE")"
 fi
 
-echo "Creating GitHub release ${TAG}..."
-gh release create "$TAG" \
-  --title "Video Merger ${NEW_VERSION}" \
-  --notes "$RELEASE_NOTES" \
-  "$RELEASE_DIR"/*
-
-if [[ "$INSTALL" == true ]]; then
-  PUBLISH_TO_GITHUB=true "$ROOT/scripts/build-signed-mac-fat.sh" arm64 --install
-fi
-
 if [[ "$NO_PUSH" == true ]]; then
-  echo "Skipping git push (--no-push). Push manually:"
+  echo "Skipping git push (--no-push). Push manually before creating the GitHub release:"
   echo "  git push origin HEAD"
   echo "  git push origin ${TAG}"
 else
   echo "Pushing commit and tag..."
   git push origin HEAD
   git push origin "$TAG"
+fi
+
+echo "Creating GitHub release ${TAG}..."
+gh release create "$TAG" \
+  --title "Video Merger ${NEW_VERSION}" \
+  --notes "$RELEASE_NOTES" \
+  --verify-tag \
+  "$RELEASE_DIR"/*
+
+if [[ "$INSTALL" == true ]]; then
+  PUBLISH_TO_GITHUB=true "$ROOT/scripts/build-signed-mac-fat.sh" arm64 --install
 fi
 
 echo ""

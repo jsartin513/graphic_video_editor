@@ -51,8 +51,7 @@ Lower-level (no preflight): `npm run release -- patch`
 3. Bump `package.json` (this is the version **electron-updater** uses).
 4. Signed + notarized **fat** arm64 and x64 with `PUBLISH_TO_GITHUB=true` and `--publish never`.
 5. Merge `latest-mac.yml` for both architectures.
-6. Commit `Release X.Y.Z`, tag `vX.Y.Z`, `gh release create` with fat DMGs, zips, blockmaps, `latest-mac.yml`.
-7. Push commit + tag (unless `--no-push`).
+6. Commit `Release X.Y.Z`, tag `vX.Y.Z`, push commit + tag, then `gh release create` with assets (unless `--no-push`).
 8. Print **friend message** via `scripts/print-friend-release-message.sh`.
 
 Re-run friend text anytime: `npm run release:message`
