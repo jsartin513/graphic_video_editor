@@ -1,6 +1,6 @@
 {
   "name": "video-editor",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Mac app for merging GoPro videos",
   "main": "main.js",
   "scripts": {
