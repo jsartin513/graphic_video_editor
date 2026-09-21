@@ -197,22 +197,26 @@ Please gather this information:
    - Number of files being processed
 
 ### Where to Get Help
-1. **GitHub Issues**: https://github.com/jsartin513/graphic_video_editor/issues
-   - Search existing issues first
-   - Create a new issue with all relevant information
-   - Include error messages and screenshots
+1. **Report a bug in the app** (recommended):
+   - Open **Settings** (⌘,) → **Help** → **Report a bug**
+   - Or use **Report a bug** on an error dialog after something fails
+   - The app copies diagnostics to your clipboard and opens a pre-filled GitHub issue
+   - You need a GitHub account to submit the issue
 
-2. **Check for Updates**:
+2. **GitHub Issues**: https://github.com/jsartin513/graphic_video_editor/issues
+   - Search existing issues first
+   - Use **Report a bug** in the app instead of typing details by hand when possible
+
+3. **Check for Updates**:
    - Visit the releases page for the latest version
    - Review the changelog for recent bug fixes
 
-3. **Enable Debug Logging**:
-   - Open Console.app
-   - Filter by "Video Merger" to see detailed logs
-   - Include relevant logs when reporting issues
+4. **Enable debug logging** (optional, for richer reports):
+   - **Settings** → **Help** → enable **Enable debug logging**
+   - Warnings and errors are always saved locally; debug mode adds more detail
 
 ### Reporting Bugs
-When creating a GitHub issue, please include:
+When creating a GitHub issue (via **Report a bug** or manually), please include:
 - Clear description of the problem
 - Steps to reproduce
 - Expected vs. actual behavior

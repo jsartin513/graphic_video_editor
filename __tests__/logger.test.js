@@ -75,13 +75,35 @@ describe('Logger', () => {
       expect(fs.appendFile).not.toHaveBeenCalled();
     });
 
-    it('returns early when debug mode is off', async () => {
+    it('returns early when debug mode is off for info level', async () => {
       logger.logDir = '/tmp/logs';
       logger.currentLogFile = '/tmp/logs/app.log';
       logger.initialized = true;
       logger.debugMode = false;
-      await logger.writeToFile('[INFO] test\n');
+      await logger.writeToFile('[INFO] test\n', LogLevel.INFO);
       expect(fs.appendFile).not.toHaveBeenCalled();
+    });
+
+    it('writes warn when debug mode is off', async () => {
+      logger.logDir = '/tmp/logs';
+      logger.currentLogFile = '/tmp/logs/app.log';
+      logger.initialized = true;
+      logger.debugMode = false;
+      fs.appendFile.mockResolvedValue(undefined);
+      fs.stat.mockRejectedValue({ code: 'ENOENT' });
+      await logger.writeToFile('[WARN] test\n', LogLevel.WARN);
+      expect(fs.appendFile).toHaveBeenCalled();
+    });
+
+    it('writes error when debug mode is off', async () => {
+      logger.logDir = '/tmp/logs';
+      logger.currentLogFile = '/tmp/logs/app.log';
+      logger.initialized = true;
+      logger.debugMode = false;
+      fs.appendFile.mockResolvedValue(undefined);
+      fs.stat.mockRejectedValue({ code: 'ENOENT' });
+      await logger.writeToFile('[ERROR] test\n', LogLevel.ERROR);
+      expect(fs.appendFile).toHaveBeenCalled();
     });
   });
 
