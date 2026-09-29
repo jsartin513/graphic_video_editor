@@ -26,9 +26,10 @@ jest.mock('../src/youtube-auth', () => ({
 jest.mock('../src/youtube-upload', () => ({
   enqueueYouTubeUpload: jest.fn().mockResolvedValue({ success: true, videoId: 'v1' }),
   cancelYouTubeUpload: jest.fn().mockReturnValue({ success: true }),
-  cancelAllYouTubeUploads: jest.fn().mockReturnValue({ success: true })
+  cancelAllYouTubeUploads: jest.fn().mockReturnValue({ success: true, cancelled: true })
 }));
 
+const youtubeUpload = require('../src/youtube-upload');
 const { registerYouTubeIpcHandlers } = require('../main/ipc-youtube');
 
 function getHandler(channel) {
@@ -48,6 +49,8 @@ describe('ipc-youtube', () => {
     expect(channels).toContain('youtube-get-status');
     expect(channels).toContain('youtube-upload-video');
     expect(channels).toContain('youtube-save-settings');
+    expect(channels).toContain('youtube-cancel-upload');
+    expect(channels).toContain('youtube-cancel-all-uploads');
   });
 
   it('youtube-get-status returns status and settings', async () => {
@@ -56,5 +59,18 @@ describe('ipc-youtube', () => {
     expect(result.success).toBe(true);
     expect(result.status).toEqual({ connected: false });
     expect(result.settings).toBeDefined();
+  });
+
+  it('youtube-cancel-upload forwards uploadId', async () => {
+    const handler = getHandler('youtube-cancel-upload');
+    await handler(null, '/tmp/video.mp4');
+    expect(youtubeUpload.cancelYouTubeUpload).toHaveBeenCalledWith('/tmp/video.mp4');
+  });
+
+  it('youtube-cancel-all-uploads clears in-flight and queued work', async () => {
+    const handler = getHandler('youtube-cancel-all-uploads');
+    const result = await handler();
+    expect(youtubeUpload.cancelAllYouTubeUploads).toHaveBeenCalled();
+    expect(result.cancelled).toBe(true);
   });
 });
