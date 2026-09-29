@@ -1,4 +1,4 @@
-import { escapeHtml, escapeAttr, getFileName } from './utils.js';
+import { escapeHtml, escapeAttr, getFileName, isYouTubeUploadablePath } from './utils.js';
 
 const ACTIVE_PHASES = new Set(['queued', 'uploading', 'playlist']);
 
@@ -21,6 +21,11 @@ export function attachYouTubeUploadToMergeResults({
   function renderUploadBlock(outputPath) {
     const state = uploadStateByPath.get(outputPath) || { phase: 'idle', percent: 0 };
     const filename = getFileName(outputPath);
+    if (!isYouTubeUploadablePath(outputPath)) {
+      return `<div class="youtube-upload-row" data-path="${escapeAttr(outputPath)}">
+        <span class="youtube-upload-hint">YouTube upload supports MP4, MOV, and MKV only</span>
+      </div>`;
+    }
     const showCancel =
       state.phase === 'queued' ||
       ((state.phase === 'uploading' || state.phase === 'playlist') &&
@@ -94,6 +99,7 @@ export function attachYouTubeUploadToMergeResults({
   }
 
   async function startUpload(outputPath) {
+    if (!isYouTubeUploadablePath(outputPath)) return;
     if (!canStartUpload(outputPath)) return;
 
     uploadStateByPath.set(outputPath, { phase: 'queued', percent: 0 });
@@ -238,7 +244,10 @@ export function attachYouTubeUploadToMergeResults({
     }
   });
 
-  const successfulPaths = results.filter((r) => r.success).map((r) => r.outputPath);
+  const successfulPaths = results
+    .filter((r) => r.success)
+    .map((r) => r.outputPath)
+    .filter((outputPath) => isYouTubeUploadablePath(outputPath));
   if (connected && autoUpload) {
     (async () => {
       for (const outputPath of successfulPaths) {

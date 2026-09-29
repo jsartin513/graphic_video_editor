@@ -20,7 +20,17 @@ export function initializeYouTubeSettings({ onPreferencesUpdated }) {
   let lastSettings = null;
   let playlistsLoaded = false;
 
-  async function loadPlaylistsIfConnected(connected) {
+  function ensureSavedPlaylistOption(playlistId, playlistTitle) {
+    if (!playlistSelect || !playlistId) return;
+    const exists = Array.from(playlistSelect.options).some((opt) => opt.value === playlistId);
+    if (exists) return;
+    const opt = document.createElement('option');
+    opt.value = playlistId;
+    opt.textContent = playlistTitle?.trim() || playlistId;
+    playlistSelect.appendChild(opt);
+  }
+
+  async function loadPlaylistsIfConnected(connected, settings) {
     if (!playlistSelect || !connected) {
       playlistsLoaded = false;
       return;
@@ -35,6 +45,9 @@ export function initializeYouTubeSettings({ onPreferencesUpdated }) {
           opt.textContent = pl.title;
           playlistSelect.appendChild(opt);
         }
+      }
+      if (settings?.playlistId) {
+        ensureSavedPlaylistOption(settings.playlistId, settings.playlistTitle);
       }
       playlistsLoaded = true;
     } catch (error) {
@@ -54,6 +67,9 @@ export function initializeYouTubeSettings({ onPreferencesUpdated }) {
       descriptionInput.value = lastSettings.description || '';
     }
     if (playlistSelect && playlistsLoaded) {
+      if (lastSettings.playlistId) {
+        ensureSavedPlaylistOption(lastSettings.playlistId, lastSettings.playlistTitle);
+      }
       playlistSelect.value = lastSettings.playlistId || '';
     }
   }
@@ -96,7 +112,7 @@ export function initializeYouTubeSettings({ onPreferencesUpdated }) {
           : '';
       }
       if (connectBtn) connectBtn.disabled = !status.clientConfigured;
-      await loadPlaylistsIfConnected(connected);
+      await loadPlaylistsIfConnected(connected, settings);
       applySettingsToForm(settings);
     } catch (error) {
       console.error('YouTube settings refresh failed', error);
@@ -105,10 +121,19 @@ export function initializeYouTubeSettings({ onPreferencesUpdated }) {
   }
 
   async function saveYouTubeSettings() {
-    const playlistId = playlistSelect?.value || null;
+    let playlistId = playlistSelect?.value || null;
     const selectedOpt = playlistSelect?.selectedOptions?.[0];
-    const playlistTitle =
+    let playlistTitle =
       playlistId && selectedOpt ? selectedOpt.textContent.trim() : null;
+    if (!playlistId && lastSettings?.playlistId) {
+      const savedStillListed = Array.from(playlistSelect?.options || []).some(
+        (opt) => opt.value === lastSettings.playlistId
+      );
+      if (savedStillListed) {
+        playlistId = lastSettings.playlistId;
+        playlistTitle = lastSettings.playlistTitle || playlistTitle;
+      }
+    }
     const payload = {
       autoUpload: Boolean(autoUploadCheckbox?.checked),
       privacyStatus: privacySelect?.value || 'private',
@@ -163,8 +188,6 @@ export function initializeYouTubeSettings({ onPreferencesUpdated }) {
         console.error('YouTube connect failed', error);
         alert('Could not connect YouTube.');
         await refreshYouTubeUi();
-      } finally {
-        connectBtn.disabled = false;
       }
     });
   }

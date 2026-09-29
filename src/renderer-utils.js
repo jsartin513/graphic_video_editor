@@ -2,6 +2,11 @@
  * Pure utility functions used by the renderer (extracted for testability)
  */
 
+function isYouTubeUploadablePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') return false;
+  return /\.(mp4|mov|mkv)$/i.test(filePath);
+}
+
 function getFileName(filePath) {
   const parts = filePath.split(/[/\\]/);
   return parts[parts.length - 1];
@@ -94,6 +99,7 @@ function formatTimeForFFmpeg(seconds) {
 }
 
 module.exports = {
+  isYouTubeUploadablePath,
   getFileName,
   formatDuration,
   getDirectoryPath,
