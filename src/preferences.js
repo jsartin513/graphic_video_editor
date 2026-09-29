@@ -50,7 +50,14 @@ const DEFAULT_PREFERENCES = {
   lastWeekCount: '', // Remembered week number for {count} in BYOT templates
   eventTemplatesSeeded: true, // false only before first migration; empty list is intentional once seeded
   defaultsSetupCompleted: false,
-  defaultTemplateName: null
+  defaultTemplateName: null,
+  youtube: {
+    autoUpload: false,
+    privacyStatus: 'private',
+    playlistId: null,
+    playlistTitle: null,
+    description: ''
+  }
 };
 
 function mergeLoadedPreferences(prefs) {
@@ -84,9 +91,50 @@ function mergeLoadedPreferences(prefs) {
       eventTemplatesSeeded,
       lastWeekCount: typeof prefs.lastWeekCount === 'string' ? prefs.lastWeekCount : (prefs.lastWeekCount != null ? String(prefs.lastWeekCount) : ''),
       defaultsSetupCompleted: prefs.defaultsSetupCompleted === true,
-      defaultTemplateName: typeof prefs.defaultTemplateName === 'string' ? prefs.defaultTemplateName : null
+      defaultTemplateName: typeof prefs.defaultTemplateName === 'string' ? prefs.defaultTemplateName : null,
+      youtube: {
+        ...DEFAULT_PREFERENCES.youtube,
+        ...(prefs.youtube && typeof prefs.youtube === 'object' ? prefs.youtube : {})
+      }
     },
     needsTemplateMigration
+  };
+}
+
+const VALID_YOUTUBE_PRIVACY = new Set(['private', 'unlisted', 'public']);
+
+/**
+ * @param {Object} preferences
+ * @param {Object} youtubeSettings
+ * @returns {Object}
+ */
+function setYouTubePreferences(preferences, youtubeSettings) {
+  if (!youtubeSettings || typeof youtubeSettings !== 'object') {
+    return preferences;
+  }
+  const current = {
+    ...DEFAULT_PREFERENCES.youtube,
+    ...(preferences.youtube && typeof preferences.youtube === 'object' ? preferences.youtube : {})
+  };
+  const next = { ...current };
+  if (typeof youtubeSettings.autoUpload === 'boolean') {
+    next.autoUpload = youtubeSettings.autoUpload;
+  }
+  if (youtubeSettings.privacyStatus && VALID_YOUTUBE_PRIVACY.has(youtubeSettings.privacyStatus)) {
+    next.privacyStatus = youtubeSettings.privacyStatus;
+  }
+  if (youtubeSettings.playlistId === null || typeof youtubeSettings.playlistId === 'string') {
+    next.playlistId = youtubeSettings.playlistId;
+  }
+  if (youtubeSettings.playlistTitle === null || typeof youtubeSettings.playlistTitle === 'string') {
+    next.playlistTitle = youtubeSettings.playlistTitle;
+  }
+  if (typeof youtubeSettings.description === 'string') {
+    next.description = youtubeSettings.description.slice(0, 5000);
+  }
+  return {
+    ...preferences,
+    youtube: next
   };
 }
 
@@ -845,6 +893,7 @@ module.exports = {
   replaceEventTemplate,
   setLastWeekCount,
   sanitizeFilenameForOutput,
+  setYouTubePreferences,
   DEFAULT_EVENT_TEMPLATES,
   DEFAULT_PREFERENCES
 };

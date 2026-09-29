@@ -1,5 +1,6 @@
 import { escapeHtml, escapeAttr } from './utils.js';
 import { checkForUpdates } from './updateNotification.js';
+import { initializeYouTubeSettings } from './youtubeSettings.js';
 
 function dispatchPreferencesUpdated(preferences) {
   window.dispatchEvent(new CustomEvent('preferences-updated', { detail: preferences }));
@@ -31,6 +32,7 @@ export function initializeSettings() {
   let currentPreferences = null;
   let previousFocus = null;
   let settingsOpenInProgress = false;
+  let youtubeSettingsApi = null;
 
   function isModalVisible() {
     return modal && modal.style.display !== 'none';
@@ -157,10 +159,20 @@ export function initializeSettings() {
       renderDefaultPatternControls(currentPreferences);
       renderTemplateList(currentPreferences);
       await loadDebugLoggingState();
+      if (youtubeSettingsApi?.refreshYouTubeUi) {
+        await youtubeSettingsApi.refreshYouTubeUi();
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   }
+
+  youtubeSettingsApi = initializeYouTubeSettings({
+    onPreferencesUpdated: (preferences) => {
+      currentPreferences = preferences;
+      dispatchPreferencesUpdated(preferences);
+    }
+  });
 
   function renderDefaultPatternControls(prefs) {
     if (defaultTemplateSelect) {

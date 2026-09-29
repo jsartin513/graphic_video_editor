@@ -583,6 +583,43 @@
           </div>
           <button type="button" id="settingsSaveDefaultPatternBtn" class="btn btn-secondary btn-small">Save default pattern</button>
         </section>
+        <section class="settings-section" aria-labelledby="settingsYouTubeHeading">
+          <h3 id="settingsYouTubeHeading">YouTube</h3>
+          <p class="form-hint">Upload merged videos to your channel. Each person uses their own Google Cloud OAuth client (see setup guide).</p>
+          <p id="settingsYouTubeStatus" class="form-hint" aria-live="polite">Loading…</p>
+          <p id="settingsYouTubeClientHint" class="form-hint settings-youtube-client-hint"></p>
+          <div class="settings-youtube-actions">
+            <button type="button" id="settingsYouTubeSetupGuideBtn" class="btn btn-secondary btn-small">Setup guide</button>
+            <button type="button" id="settingsYouTubeImportBtn" class="btn btn-secondary btn-small">Import OAuth JSON</button>
+            <button type="button" id="settingsYouTubeConnectBtn" class="btn btn-primary btn-small">Connect YouTube</button>
+            <button type="button" id="settingsYouTubeDisconnectBtn" class="btn btn-text btn-small">Disconnect</button>
+            <button type="button" id="settingsYouTubeClearBtn" class="btn btn-text btn-small">Remove client</button>
+          </div>
+          <div id="settingsYouTubeConnectedPanel" hidden>
+            <label for="settingsYouTubePlaylistSelect">Playlist after upload</label>
+            <select id="settingsYouTubePlaylistSelect" class="quality-select" aria-label="YouTube playlist">
+              <option value="">Don't add to a playlist</option>
+            </select>
+            <label for="settingsYouTubePrivacySelect">Privacy</label>
+            <select id="settingsYouTubePrivacySelect" class="quality-select" aria-label="YouTube privacy">
+              <option value="private">Private</option>
+              <option value="unlisted">Unlisted</option>
+              <option value="public">Public</option>
+            </select>
+            <label class="settings-debug-toggle">
+              <input type="checkbox" id="settingsYouTubeAutoUploadCheckbox" />
+              Upload automatically after merge
+            </label>
+            <div class="form-group">
+              <label for="settingsYouTubeDescriptionInput">Default description (optional)</label>
+              <textarea id="settingsYouTubeDescriptionInput" class="bug-report-textarea" rows="2" placeholder="Applied to each upload"></textarea>
+            </div>
+            <button type="button" id="settingsYouTubeSaveBtn" class="btn btn-secondary btn-small">Save YouTube settings</button>
+          </div>
+          <div id="settingsYouTubeDisconnectedPanel">
+            <p class="form-hint">Import your Desktop OAuth client, then connect to choose playlist and privacy options.</p>
+          </div>
+        </section>
         <section class="settings-section" aria-labelledby="settingsUpdatesHeading">
           <h3 id="settingsUpdatesHeading">Updates</h3>
           <p id="settingsAppVersion" class="form-hint" aria-live="polite">Version …</p>

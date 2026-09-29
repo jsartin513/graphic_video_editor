@@ -131,8 +131,39 @@ Click **Settings** (top right), or press **⌘ ,** (Command + comma).
 | **Date format** | How `{date}` appears in filenames (e.g. 2026-03-15 vs 03-15-2026). |
 | **Updates** | Shows your version; **Check for updates** looks for a newer release. |
 | **Naming templates** | Save reusable name patterns (e.g. `BDL Open Gym {date}`) for events. |
+| **YouTube** | Connect your channel and optionally upload merged videos (see below). |
 
 Preferences are stored on your Mac only (not in the cloud).
+
+---
+
+## YouTube upload after merge
+
+Each person who uploads needs **their own** Google Cloud project and OAuth client (this keeps your login, upload quota, and channel permissions on your account).
+
+### One-time Google Cloud setup
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project (or pick an existing one).
+2. Enable **YouTube Data API v3** for that project (APIs & Services → Library).
+3. Configure the **OAuth consent screen**:
+   - User type: **External**
+   - Publishing status: **Testing** (fine for personal use)
+   - Add your Google account under **Test users**
+4. Create credentials: **OAuth client ID** → Application type **Desktop app** → Download the JSON file.
+5. In Video Merger → **Settings** → **YouTube**, click **Import OAuth JSON** and choose that file.
+6. Click **Connect YouTube** and sign in in the browser. When you see “Connected”, return to the app.
+
+**Notes:**
+
+- Use the same Google account that owns the YouTube channel you upload to.
+- In **Testing** mode, Google may ask you to reconnect about once a week.
+- Default upload privacy is **Private**. You can choose Unlisted or Public in Settings.
+
+### After a merge
+
+On the merge-complete screen, each successful file can be uploaded to YouTube. Turn on **Upload automatically after merge** in Settings if you want uploads to start without clicking **Upload to YouTube**.
+
+If you pick a **playlist**, the app adds each uploaded video to that playlist. Title is the output filename (without extension). An optional default description in Settings is applied to every upload.
 
 ---
 

@@ -15,6 +15,7 @@ const { registerUpdatesIpcHandlers, hasUpdateFeed } = require('./main/ipc-update
 const { registerLoggerIpcHandlers } = require('./main/ipc-logger');
 const { registerBugReportIpcHandlers } = require('./main/ipc-bug-report');
 const { registerSDCardIpcHandlers } = require('./main/ipc-sd-card');
+const { registerYouTubeIpcHandlers } = require('./main/ipc-youtube');
 const { SDCardDetector } = require('./src/sd-card-detector');
 
 let mainWindow;
@@ -166,6 +167,7 @@ app.whenReady().then(async () => {
     (v) => { sdCardDetector = v; },
     () => initializeSDCardDetection()
   );
+  registerYouTubeIpcHandlers(() => mainWindow);
 
   // Check prerequisites after window is ready
   setTimeout(() => {

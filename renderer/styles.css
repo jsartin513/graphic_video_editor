@@ -2199,6 +2199,56 @@ body {
   background: var(--success-bg);
   color: var(--text-primary);
   border: 1px solid var(--accent-secondary);
+  flex-wrap: wrap;
+}
+
+.youtube-upload-slot {
+  flex: 1 1 100%;
+  margin-top: 4px;
+}
+
+.youtube-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.youtube-upload-row.uploading {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.youtube-upload-bar {
+  width: 100%;
+  max-width: 280px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.youtube-upload-bar-fill {
+  height: 100%;
+  background: var(--accent-primary, #2563eb);
+  transition: width 0.2s ease;
+}
+
+.youtube-upload-hint {
+  color: var(--text-secondary);
+}
+
+.settings-youtube-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.settings-youtube-client-hint {
+  font-size: 12px;
+  word-break: break-all;
 }
 
 .result-item.error {

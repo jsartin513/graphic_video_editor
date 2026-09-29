@@ -155,6 +155,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addFailedOperation: (operation) => ipcRenderer.invoke('add-failed-operation', operation),
   removeFailedOperation: (sessionId, outputPath) => ipcRenderer.invoke('remove-failed-operation', sessionId, outputPath),
   getFailedOperations: () => ipcRenderer.invoke('get-failed-operations'),
-  clearFailedOperations: () => ipcRenderer.invoke('clear-failed-operations')
+  clearFailedOperations: () => ipcRenderer.invoke('clear-failed-operations'),
+  // YouTube upload API
+  youtubeImportOAuthClient: (json) => ipcRenderer.invoke('youtube-import-oauth-client', json),
+  youtubeImportOAuthClientFile: () => ipcRenderer.invoke('youtube-import-oauth-client-file'),
+  youtubeConnect: () => ipcRenderer.invoke('youtube-connect'),
+  youtubeDisconnect: () => ipcRenderer.invoke('youtube-disconnect'),
+  youtubeClearCredentials: () => ipcRenderer.invoke('youtube-clear-credentials'),
+  youtubeGetStatus: () => ipcRenderer.invoke('youtube-get-status'),
+  youtubeListPlaylists: () => ipcRenderer.invoke('youtube-list-playlists'),
+  youtubeSaveSettings: (settings) => ipcRenderer.invoke('youtube-save-settings', settings),
+  youtubeUploadVideo: (options) => ipcRenderer.invoke('youtube-upload-video', options),
+  youtubeCancelUpload: () => ipcRenderer.invoke('youtube-cancel-upload'),
+  onYouTubeUploadProgress: (callback) => {
+    ipcRenderer.on('youtube-upload-progress', (_event, data) => callback(data));
+  },
+  removeYouTubeUploadProgressListener: () => {
+    ipcRenderer.removeAllListeners('youtube-upload-progress');
+  }
 });
 
