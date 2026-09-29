@@ -16,7 +16,11 @@ const {
   getConnectionStatus,
   listMyPlaylists
 } = require('../src/youtube-auth');
-const { enqueueYouTubeUpload, cancelCurrentYouTubeUpload } = require('../src/youtube-upload');
+const {
+  enqueueYouTubeUpload,
+  cancelYouTubeUpload,
+  cancelAllYouTubeUploads
+} = require('../src/youtube-upload');
 
 /**
  * @param {() => import('electron').BrowserWindow|null} getMainWindow
@@ -147,8 +151,12 @@ function registerYouTubeIpcHandlers(getMainWindow) {
     }
   });
 
-  ipcMain.handle('youtube-cancel-upload', async () => {
-    return cancelCurrentYouTubeUpload();
+  ipcMain.handle('youtube-cancel-upload', async (_event, uploadId) => {
+    return cancelYouTubeUpload(uploadId);
+  });
+
+  ipcMain.handle('youtube-cancel-all-uploads', async () => {
+    return cancelAllYouTubeUploads();
   });
 }
 

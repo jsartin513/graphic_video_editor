@@ -166,7 +166,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   youtubeListPlaylists: () => ipcRenderer.invoke('youtube-list-playlists'),
   youtubeSaveSettings: (settings) => ipcRenderer.invoke('youtube-save-settings', settings),
   youtubeUploadVideo: (options) => ipcRenderer.invoke('youtube-upload-video', options),
-  youtubeCancelUpload: () => ipcRenderer.invoke('youtube-cancel-upload'),
+  youtubeCancelUpload: (uploadId) => ipcRenderer.invoke('youtube-cancel-upload', uploadId),
+  youtubeCancelAllUploads: () => ipcRenderer.invoke('youtube-cancel-all-uploads'),
   onYouTubeUploadProgress: (callback) => {
     ipcRenderer.on('youtube-upload-progress', (_event, data) => callback(data));
   },

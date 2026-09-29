@@ -21,8 +21,13 @@ const MIME_BY_EXT = {
 };
 
 let currentAbortController = null;
+let currentUploadId = null;
 let uploadQueue = [];
 let isProcessingQueue = false;
+
+function jobKey(job) {
+  return job.uploadId || job.filePath;
+}
 
 function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -178,6 +183,10 @@ async function uploadVideoToYouTube(options, onProgress) {
     }
   };
 
+  const id = uploadId || filePath;
+  if (!currentUploadId) {
+    currentUploadId = id;
+  }
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;
 
@@ -195,13 +204,23 @@ async function uploadVideoToYouTube(options, onProgress) {
       throw new Error('Upload completed but no video id was returned');
     }
 
+    let playlistError = null;
     if (playlistId) {
       emit('playlist', 100, { videoId });
-      await addVideoToPlaylist(accessToken, playlistId, videoId);
+      try {
+        await addVideoToPlaylist(accessToken, playlistId, videoId);
+      } catch (playlistErr) {
+        playlistError = playlistErr?.message || String(playlistErr);
+        logger.warn('YouTube playlist insert failed after upload', {
+          error: playlistError,
+          videoId,
+          playlistId
+        });
+      }
     }
 
-    emit('complete', 100, { videoId });
-    return { success: true, videoId };
+    emit('complete', 100, { videoId, playlistError });
+    return { success: true, videoId, playlistError };
   } catch (error) {
     const message = error?.message || String(error);
     if (message.includes('cancelled') || message.includes('aborted')) {
@@ -213,20 +232,91 @@ async function uploadVideoToYouTube(options, onProgress) {
     return { success: false, error: message };
   } finally {
     currentAbortController = null;
+    currentUploadId = null;
   }
 }
 
-function cancelCurrentYouTubeUpload() {
+function cancelQueuedUpload(uploadId) {
+  if (!uploadId) return null;
+  const index = uploadQueue.findIndex((entry) => jobKey(entry.job) === uploadId);
+  if (index < 0) return null;
+  const [item] = uploadQueue.splice(index, 1);
+  const result = { success: false, cancelled: true, uploadId };
+  if (item.onProgress) {
+    item.onProgress({
+      uploadId,
+      filePath: item.job.filePath,
+      phase: 'cancelled',
+      percent: 0
+    });
+  }
+  item.resolve(result);
+  return result;
+}
+
+function cancelYouTubeUpload(uploadId) {
+  if (uploadId) {
+    const queued = cancelQueuedUpload(uploadId);
+    if (queued) {
+      return { success: true, cancelled: true, uploadId, queued: true };
+    }
+    if (currentUploadId === uploadId && currentAbortController) {
+      currentAbortController.abort();
+      return { success: true, cancelled: true, uploadId };
+    }
+    if (currentUploadId && currentUploadId !== uploadId) {
+      return { success: false, error: 'Another upload is in progress', uploadId };
+    }
+    return { success: false, error: 'No upload found for this file', uploadId };
+  }
+  return cancelAllYouTubeUploads();
+}
+
+function cancelAllYouTubeUploads() {
+  const pending = [...uploadQueue];
+  uploadQueue = [];
+  for (const item of pending) {
+    const uploadId = jobKey(item.job);
+    if (item.onProgress) {
+      item.onProgress({
+        uploadId,
+        filePath: item.job.filePath,
+        phase: 'cancelled',
+        percent: 0
+      });
+    }
+    item.resolve({ success: false, cancelled: true, uploadId });
+  }
   if (currentAbortController) {
     currentAbortController.abort();
-    return { success: true };
   }
-  return { success: false, error: 'No upload in progress' };
+  return { success: true, cancelled: true };
+}
+
+function cancelCurrentYouTubeUpload(uploadId) {
+  return cancelYouTubeUpload(uploadId);
 }
 
 function enqueueYouTubeUpload(job, onProgress) {
+  const key = jobKey(job);
+  const alreadyQueued = uploadQueue.some((entry) => jobKey(entry.job) === key);
+  if (alreadyQueued || currentUploadId === key) {
+    return Promise.resolve({
+      success: false,
+      error: 'Upload already in progress for this file',
+      uploadId: key
+    });
+  }
   return new Promise((resolve, reject) => {
     uploadQueue.push({ job, onProgress, resolve, reject });
+    if (onProgress) {
+      onProgress({
+        uploadId: key,
+        filePath: job.filePath,
+        phase: 'queued',
+        percent: 0
+      });
+    }
     processUploadQueue();
   });
 }
@@ -236,20 +326,36 @@ async function processUploadQueue() {
   isProcessingQueue = true;
   while (uploadQueue.length > 0) {
     const { job, onProgress, resolve } = uploadQueue.shift();
+    currentUploadId = jobKey(job);
     try {
       const result = await uploadVideoToYouTube(job, onProgress);
       resolve(result);
     } catch (error) {
       resolve({ success: false, error: error.message || String(error) });
+    } finally {
+      if (currentUploadId === jobKey(job)) {
+        currentUploadId = null;
+      }
     }
   }
   isProcessingQueue = false;
 }
 
+/** @internal test helper */
+function resetYouTubeUploadStateForTests() {
+  uploadQueue = [];
+  isProcessingQueue = false;
+  currentAbortController = null;
+  currentUploadId = null;
+}
+
 module.exports = {
   uploadVideoToYouTube,
   enqueueYouTubeUpload,
+  cancelYouTubeUpload,
+  cancelAllYouTubeUploads,
   cancelCurrentYouTubeUpload,
+  resetYouTubeUploadStateForTests,
   assertSupportedFormat,
   buildVideoMetadata,
   SUPPORTED_EXTENSIONS

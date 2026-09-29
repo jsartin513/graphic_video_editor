@@ -25,7 +25,8 @@ jest.mock('../src/youtube-auth', () => ({
 }));
 jest.mock('../src/youtube-upload', () => ({
   enqueueYouTubeUpload: jest.fn().mockResolvedValue({ success: true, videoId: 'v1' }),
-  cancelCurrentYouTubeUpload: jest.fn().mockReturnValue({ success: true })
+  cancelYouTubeUpload: jest.fn().mockReturnValue({ success: true }),
+  cancelAllYouTubeUploads: jest.fn().mockReturnValue({ success: true })
 }));
 
 const { registerYouTubeIpcHandlers } = require('../main/ipc-youtube');
