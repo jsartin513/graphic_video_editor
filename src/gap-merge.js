@@ -171,6 +171,14 @@ async function renderGapIndicatorClip({
   }
 }
 
+async function unlinkTempFiles(paths) {
+  for (const filePath of paths || []) {
+    if (filePath) {
+      await fs.unlink(filePath).catch(() => {});
+    }
+  }
+}
+
 /**
  * @param {{ sessions: Array<{ sessionId: string, files: string[] }>, gaps: Array<{ afterSessionIndex: number, indicatorPath: string, gapSeconds: number|null, gapKnown: boolean, fromSessionId: string, toSessionId: string }> }} segmentPlan
  */
@@ -185,9 +193,10 @@ async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, 
     throw new Error('Session has no video files.');
   }
 
+  const tempFiles = [];
+  try {
   const env = buildFfmpegEnv(getFFmpegPath());
   const specs = await probeVideoStreamSpecs(referenceFile, env);
-  const tempFiles = [];
   const sessionPaths = [];
 
   for (let i = 0; i < sessions.length; i++) {
@@ -239,6 +248,10 @@ async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, 
   }
 
   return { finalPaths, tempFiles, gapLog };
+  } catch (error) {
+    await unlinkTempFiles(tempFiles);
+    throw error;
+  }
 }
 
 module.exports = {

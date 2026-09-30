@@ -22,6 +22,14 @@ const { resolveCombinedMergePaths } = require('../src/gap-merge');
 
 const MERGE_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
+async function cleanupSegmentTempFiles(paths) {
+  for (const filePath of paths || []) {
+    if (filePath) {
+      await fs.unlink(filePath).catch(() => {});
+    }
+  }
+}
+
 let currentMergeProcess = null;
 let currentMergeTempFile = null;
 let currentMergeOutputPath = null;
@@ -252,6 +260,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             currentMergeTempFile = null;
             currentMergeOutputPath = null;
             fs.unlink(tempFileList).catch(() => {});
+            cleanupSegmentTempFiles(segmentTempFiles);
             logger.error('merge-videos: FFmpeg spawn error', { error: error.message });
             if (error.code === 'ENOENT') {
               const mapped = mapError('ffmpeg not found');
@@ -318,7 +327,14 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             }
           });
         })
-        .catch(reject);
+        .catch(async (error) => {
+          await cleanupSegmentTempFiles(segmentTempFiles);
+          if (currentMergeTempFile) {
+            await fs.unlink(currentMergeTempFile).catch(() => {});
+            currentMergeTempFile = null;
+          }
+          reject(error);
+        });
     });
   });
 
