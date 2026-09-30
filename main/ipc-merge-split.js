@@ -35,6 +35,7 @@ let currentMergeTempFile = null;
 let currentMergeOutputPath = null;
 let currentSplitProcesses = [];
 let isCancelled = false;
+let mergePreparationActive = false;
 
 function formatTime(seconds) {
   const hours = Math.floor(seconds / 3600);
@@ -55,6 +56,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
       throw new Error('outputPath is required');
     }
     validateQualityOption(qualityOption);
+
+    isCancelled = false;
+    mergePreparationActive = true;
 
     const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
     let segmentTempFiles = [];
@@ -83,7 +87,8 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
           path.dirname(outputPath),
           qualityOption,
           normalizedFormat,
-          normalizeAudio
+          normalizeAudio,
+          () => isCancelled
         );
         validFilePaths = resolved.finalPaths;
         segmentTempFiles = resolved.tempFiles || [];
@@ -91,16 +96,25 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
           mergeLogContext.gaps = resolved.gapLog;
         }
       } catch (error) {
+        mergePreparationActive = false;
+        await cleanupSegmentTempFiles(segmentTempFiles);
         throw new Error(error.message || 'Failed to prepare combined session merge.');
       }
     }
 
+    if (isCancelled) {
+      mergePreparationActive = false;
+      await cleanupSegmentTempFiles(segmentTempFiles);
+      throw new Error('Operation cancelled by user');
+    }
+
     if (validFilePaths.length === 0) {
+      mergePreparationActive = false;
       throw new Error('No valid video files found (all files appear to be macOS metadata files)');
     }
 
     return new Promise((resolve, reject) => {
-      isCancelled = false;
+      mergePreparationActive = false;
       currentMergeOutputPath = outputPath;
 
       const tempFileList = path.join(path.dirname(outputPath), `filelist_${Date.now()}.txt`);
@@ -351,6 +365,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             }
           }, 2000);
           currentMergeProcess.once('exit', () => clearTimeout(forceKillTimeout));
+          resolve({ success: true, message: 'Merge operation cancelled' });
+        } else if (mergePreparationActive) {
+          isCancelled = true;
           resolve({ success: true, message: 'Merge operation cancelled' });
         } else {
           resolve({ success: false, message: 'No active merge operation to cancel' });

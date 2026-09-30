@@ -179,10 +179,32 @@ async function unlinkTempFiles(paths) {
   }
 }
 
+async function normalizeSegmentForConcat(inputPath, outputPath, specs, normalizeAudio) {
+  const ffmpegCmd = getFFmpegPath();
+  const env = buildFfmpegEnv(ffmpegCmd);
+  const vf = [
+    `scale=${specs.width}:${specs.height}:force_original_aspect_ratio=decrease`,
+    `pad=${specs.width}:${specs.height}:(ow-iw)/2:(oh-ih)/2`
+  ].join(',');
+  const args = [
+    '-i', inputPath,
+    '-vf', vf,
+    '-r', String(Math.round(specs.fps) || 30),
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23'
+  ];
+  if (normalizeAudio) {
+    args.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k');
+  } else {
+    args.push('-c:a', 'aac', '-b:a', '192k');
+  }
+  args.push('-y', outputPath);
+  await runProcess(ffmpegCmd, args, env);
+}
+
 /**
  * @param {{ sessions: Array<{ sessionId: string, files: string[] }>, gaps: Array<{ afterSessionIndex: number, indicatorPath: string, gapSeconds: number|null, gapKnown: boolean, fromSessionId: string, toSessionId: string }> }} segmentPlan
  */
-async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, normalizedFormat, normalizeAudio) {
+async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, normalizedFormat, normalizeAudio, shouldAbort) {
   const sessions = segmentPlan?.sessions || [];
   if (!sessions.length) {
     throw new Error('No sessions to merge.');
@@ -194,60 +216,82 @@ async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, 
   }
 
   const tempFiles = [];
+  const assertNotCancelled = () => {
+    if (shouldAbort?.()) {
+      throw new Error('Operation cancelled by user');
+    }
+  };
+
   try {
-  const env = buildFfmpegEnv(getFFmpegPath());
-  const specs = await probeVideoStreamSpecs(referenceFile, env);
-  const sessionPaths = [];
+    const env = buildFfmpegEnv(getFFmpegPath());
+    const specs = await probeVideoStreamSpecs(referenceFile, env);
+    const sessionPaths = [];
 
-  for (let i = 0; i < sessions.length; i++) {
-    const files = (sessions[i].files || []).filter((f) => f && !path.basename(f).startsWith('._'));
-    if (files.length === 0) continue;
-    if (files.length === 1) {
-      sessionPaths.push(files[0]);
-    } else {
-      const tempSession = path.join(outputDir, `session_part_${Date.now()}_${i}.mp4`);
-      await concatVideoFiles(files, tempSession, qualityOption, normalizedFormat, normalizeAudio);
-      tempFiles.push(tempSession);
-      sessionPaths.push(tempSession);
+    for (let i = 0; i < sessions.length; i++) {
+      assertNotCancelled();
+      const files = (sessions[i].files || []).filter((f) => f && !path.basename(f).startsWith('._'));
+      if (files.length === 0) continue;
+      if (files.length === 1) {
+        sessionPaths.push(files[0]);
+      } else {
+        const tempSession = path.join(outputDir, `session_part_${Date.now()}_${i}.mp4`);
+        await concatVideoFiles(files, tempSession, qualityOption, normalizedFormat, normalizeAudio);
+        tempFiles.push(tempSession);
+        sessionPaths.push(tempSession);
+      }
     }
-  }
 
-  const gapsByIndex = new Map();
-  for (const gap of segmentPlan.gaps || []) {
-    if (typeof gap.afterSessionIndex === 'number') {
-      gapsByIndex.set(gap.afterSessionIndex, gap);
+    const gapsByIndex = new Map();
+    for (const gap of segmentPlan.gaps || []) {
+      if (typeof gap.afterSessionIndex === 'number') {
+        gapsByIndex.set(gap.afterSessionIndex, gap);
+      }
     }
-  }
 
-  const finalPaths = [];
-  const gapLog = [];
+    const willInsertGaps = [...gapsByIndex.values()].some((gap) => gap?.indicatorPath);
+    let segmentsForFinal = sessionPaths;
+    if (willInsertGaps) {
+      const normalizedPaths = [];
+      for (let i = 0; i < sessionPaths.length; i++) {
+        assertNotCancelled();
+        const normTemp = path.join(outputDir, `session_norm_${Date.now()}_${i}.mp4`);
+        await normalizeSegmentForConcat(sessionPaths[i], normTemp, specs, normalizeAudio);
+        tempFiles.push(normTemp);
+        normalizedPaths.push(normTemp);
+      }
+      segmentsForFinal = normalizedPaths;
+    }
 
-  for (let i = 0; i < sessionPaths.length; i++) {
-    finalPaths.push(sessionPaths[i]);
-    const gap = gapsByIndex.get(i);
-    if (!gap || !gap.indicatorPath) continue;
+    const finalPaths = [];
+    const gapLog = [];
 
-    const overlayText = buildGapOverlayText(gap);
-    const gapTemp = path.join(outputDir, `gap_indicator_${Date.now()}_${i}.mp4`);
-    await renderGapIndicatorClip({
-      indicatorPath: gap.indicatorPath,
-      outputPath: gapTemp,
-      width: specs.width,
-      height: specs.height,
-      fps: specs.fps,
-      overlayText
-    });
-    tempFiles.push(gapTemp);
-    finalPaths.push(gapTemp);
-    gapLog.push({
-      fromSessionId: gap.fromSessionId,
-      toSessionId: gap.toSessionId,
-      gapSeconds: gap.gapKnown ? gap.gapSeconds : null,
-      gapKnown: !!gap.gapKnown
-    });
-  }
+    for (let i = 0; i < segmentsForFinal.length; i++) {
+      assertNotCancelled();
+      finalPaths.push(segmentsForFinal[i]);
+      const gap = gapsByIndex.get(i);
+      if (!gap || !gap.indicatorPath) continue;
 
-  return { finalPaths, tempFiles, gapLog };
+      const overlayText = buildGapOverlayText(gap);
+      const gapTemp = path.join(outputDir, `gap_indicator_${Date.now()}_${i}.mp4`);
+      await renderGapIndicatorClip({
+        indicatorPath: gap.indicatorPath,
+        outputPath: gapTemp,
+        width: specs.width,
+        height: specs.height,
+        fps: specs.fps,
+        overlayText
+      });
+      tempFiles.push(gapTemp);
+      finalPaths.push(gapTemp);
+      gapLog.push({
+        fromSessionId: gap.fromSessionId,
+        toSessionId: gap.toSessionId,
+        gapSeconds: gap.gapKnown ? gap.gapSeconds : null,
+        gapKnown: !!gap.gapKnown
+      });
+    }
+
+    return { finalPaths, tempFiles, gapLog };
   } catch (error) {
     await unlinkTempFiles(tempFiles);
     throw error;

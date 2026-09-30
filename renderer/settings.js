@@ -291,8 +291,8 @@ export function initializeSettings() {
     if (!window.electronAPI.selectFiles || !window.electronAPI.addGapIndicator) return;
     try {
       const pick = await window.electronAPI.selectFiles();
-      if (!pick?.filePaths?.length) return;
-      const sourcePath = pick.filePaths[0];
+      if (pick?.canceled || !pick?.files?.length) return;
+      const sourcePath = pick.files[0];
       const displayName = gapIndicatorNameInput?.value.trim() || undefined;
       const result = await window.electronAPI.addGapIndicator(sourcePath, displayName);
       if (result?.success === false) {
