@@ -11,6 +11,14 @@ import {
   GENERIC_FILENAME_PATTERN
 } from './filenamePattern.js';
 import { attachYouTubeUploadToMergeResults } from './youtubeUploadUi.js';
+import {
+  parseCreationTimeMs,
+  analyzeSessionGaps,
+  shouldInsertGapIndicator,
+  formatGapDurationHuman,
+  sessionIdRangeToken,
+  buildSegmentPlan
+} from './sessionGaps.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -256,6 +264,122 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   loadUserPreferences();
 
   let normalizeAudio = false; // Audio normalization option
+  let gapIndicatorOptions = [];
+
+  async function loadGapIndicatorOptions() {
+    if (!window.electronAPI.listGapIndicators) {
+      gapIndicatorOptions = [];
+      return;
+    }
+    try {
+      const result = await window.electronAPI.listGapIndicators();
+      gapIndicatorOptions = result?.indicators || [];
+    } catch (error) {
+      console.error('Error loading gap indicators:', error);
+      gapIndicatorOptions = [];
+    }
+  }
+
+  function isCombineSessionsEnabled() {
+    const checkbox = document.getElementById('combineSessionsCheckbox');
+    return Boolean(checkbox?.checked) && state.selectedGroups.size >= 2;
+  }
+
+  function getSelectedGapIndicatorPath() {
+    const select = document.getElementById('gapIndicatorSelect');
+    const id = select?.value;
+    if (!id) return null;
+    const match = gapIndicatorOptions.find((item) => item.id === id);
+    return match?.path || null;
+  }
+
+  function populateGapIndicatorSelect() {
+    const select = document.getElementById('gapIndicatorSelect');
+    if (!select) return;
+    const previous = select.value;
+    select.innerHTML = '<option value="">No indicator (join only)</option>';
+    for (const item of gapIndicatorOptions) {
+      const opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = item.name;
+      select.appendChild(opt);
+    }
+    if (previous && gapIndicatorOptions.some((item) => item.id === previous)) {
+      select.value = previous;
+    }
+  }
+
+  function getOrderedSelectedSessionModels(indicesToMerge) {
+    const models = indicesToMerge
+      .map((index) => state.videoGroups[index])
+      .filter(Boolean)
+      .map((group) => ({
+        sessionId: group.sessionId,
+        directory: group.directory,
+        creationTimeMs: group.creationTimeMs,
+        durationSeconds: group.durationSeconds ?? group.totalDuration ?? 0,
+        files: group.files
+      }));
+    const { orderedSessions } = analyzeSessionGaps(models);
+    return orderedSessions;
+  }
+
+  function refreshSessionGapPreview() {
+    const listEl = document.getElementById('sessionGapPreviewList');
+    const controls = document.getElementById('combineSessionsControls');
+    if (!listEl || !controls) return;
+
+    if (!isCombineSessionsEnabled()) {
+      controls.hidden = true;
+      listEl.innerHTML = '';
+      return;
+    }
+
+    controls.hidden = false;
+    const indices = Array.from(state.selectedGroups).sort((a, b) => a - b);
+    const ordered = getOrderedSelectedSessionModels(indices);
+    const { boundaries } = analyzeSessionGaps(ordered);
+    const indicatorPath = getSelectedGapIndicatorPath();
+
+    if (boundaries.length === 0) {
+      listEl.innerHTML = '<li>Only one session selected — nothing to combine.</li>';
+      return;
+    }
+
+    listEl.innerHTML = boundaries.map((boundary) => {
+      const willInsert = shouldInsertGapIndicator(boundary, !!indicatorPath);
+      const gapLabel = boundary.gapKnown && boundary.gapSeconds != null
+        ? `${formatGapDurationHuman(boundary.gapSeconds)} missing`
+        : 'time unknown';
+      const indicatorNote = willInsert ? ' · indicator will play' : ' · continuous (no indicator)';
+      return `<li>Session ${escapeHtml(boundary.fromSessionId)} → ${escapeHtml(boundary.toSessionId)} · ${escapeHtml(gapLabel)}${escapeHtml(indicatorNote)}</li>`;
+    }).join('');
+
+    const combinedInput = document.getElementById('combinedOutputFilenameInput');
+    if (combinedInput && !combinedInput.dataset.userEdited) {
+      const rangeToken = sessionIdRangeToken(ordered);
+      const pattern = chooseDefaultFilenamePattern(userPreferences);
+      const placeholder = pattern.replace(/\{sessionId\}/gi, rangeToken);
+      if (!combinedInput.value.trim()) {
+        combinedInput.placeholder = placeholder;
+      }
+    }
+  }
+
+  function updatePerSessionFilenameVisibility() {
+    const combineOn = isCombineSessionsEnabled();
+    document.querySelectorAll('.preview-item-body .filename-edit').forEach((el) => {
+      el.style.display = combineOn ? 'none' : '';
+    });
+  }
+
+  async function refreshCombineSessionsUi() {
+    await loadGapIndicatorOptions();
+    populateGapIndicatorSelect();
+    refreshSessionGapPreview();
+    updatePerSessionFilenameVisibility();
+    updateMergeSummary();
+  }
   function openPickForMoreVideos() {
     state.currentScreen = 'fileList';
     previewScreen.style.display = 'none';
@@ -330,10 +454,21 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       
       const durations = await Promise.all(durationPromises);
       if (requestId !== prepareMergeRequestId) return;
+
+      const metadataPromises = videoGroups.map((group) =>
+        window.electronAPI.getVideoMetadata(group.files[0])
+          .catch((error) => {
+            console.error(`Error getting metadata for ${group.files[0]}:`, error);
+            return { creationTime: null };
+          })
+      );
+      const metadataResults = await Promise.all(metadataPromises);
+      if (requestId !== prepareMergeRequestId) return;
       
       // Aggregate durations by group
       let fileIndex = 0;
-      for (const group of videoGroups) {
+      for (let gi = 0; gi < videoGroups.length; gi++) {
+        const group = videoGroups[gi];
         let totalDuration = 0;
         for (let i = 0; i < group.files.length; i++) {
           const duration = durations[fileIndex++];
@@ -343,6 +478,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           totalDuration += duration;
         }
         group.totalDuration = totalDuration;
+        group.durationSeconds = totalDuration;
+        group.creationTimeMs = parseCreationTimeMs(metadataResults[gi]?.creationTime);
         
         // Calculate total input file size
         try {
@@ -447,6 +584,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     previewList.appendChild(fragment);
 
     updateBatchControls();
+    refreshCombineSessionsUi();
   }
 
   // Show preview screen
@@ -746,6 +884,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         state.selectedGroups.delete(index);
       }
       updateBatchControls();
+      refreshCombineSessionsUi();
     });
     
     // Validate filename on blur and apply date tokens
@@ -934,6 +1073,12 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     }
 
+    if (isCombineSessionsEnabled()) {
+      const destLabel = getDestinationSummaryLabel();
+      summaryEl.textContent = `1 combined video (${selectedIndices.length} sessions) · Save to ${destLabel}`;
+      return;
+    }
+
     const sessionLabel =
       selectedIndices.length === 1 ? '1 session' : `${selectedIndices.length} sessions`;
     const durationLabel = totalDuration > 0 ? ` · ${formatDuration(totalDuration)}` : '';
@@ -978,6 +1123,115 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   }
 
+  async function resolveCombinedOutputBasename(indicesToMerge) {
+    const ordered = getOrderedSelectedSessionModels(indicesToMerge);
+    const rangeToken = sessionIdRangeToken(ordered);
+    const combinedInput = document.getElementById('combinedOutputFilenameInput');
+    let value = combinedInput?.value.trim() || '';
+    if (!value) {
+      value = combinedInput?.placeholder?.trim() || '';
+    }
+    if (!value) {
+      value = chooseDefaultFilenamePattern(userPreferences);
+    }
+    value = value.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+    value = value.replace(/\{sessionId\}/gi, rangeToken);
+    if (value.includes('{')) {
+      const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+      const customTokens = getFilenameCustomTokens();
+      const result = await window.electronAPI.applyDateTokens(value, null, dateFormat, customTokens);
+      if (result?.result) value = result.result;
+    }
+    return sanitizeFilenameForOutput(value);
+  }
+
+  async function runCombinedSessionMerge(indicesToMerge, outputDir) {
+    const orderedModels = getOrderedSelectedSessionModels(indicesToMerge);
+    const { orderedSessions, boundaries } = analyzeSessionGaps(orderedModels);
+    const indicatorPath = getSelectedGapIndicatorPath();
+    const segmentPlan = buildSegmentPlan(orderedSessions, boundaries, indicatorPath);
+    const rangeToken = sessionIdRangeToken(orderedSessions);
+    const baseName = await resolveCombinedOutputBasename(indicesToMerge);
+    if (!baseName) {
+      showError('Missing combined output filename', {
+        operation: 'Merge Videos',
+        suggestions: ['Enter a filename for the combined video']
+      });
+      return;
+    }
+
+    const outputFilename = `${baseName}.${selectedFormat.toLowerCase()}`;
+    const outputPath = `${outputDir.replace(/[/\\]$/, '')}/${outputFilename}`;
+    const allInputFiles = orderedSessions.flatMap((session) => session.files || []);
+
+    showProgressScreen();
+    updateProgress(0, 1, `Merging combined sessions ${rangeToken}...`, indicesToMerge);
+
+    let currentGroup = { sessionId: rangeToken };
+    const progressListener = (progressData) => {
+      updateRealTimeProgress(0, 1, currentGroup, progressData);
+    };
+    window.electronAPI.onMergeProgress(progressListener);
+
+    const mergeLogPayload = {
+      sessionId: rangeToken,
+      inputFiles: allInputFiles,
+      outputPath,
+      outputFilename,
+      outputDir,
+      settings: {
+        quality: selectedQuality,
+        format: selectedFormat,
+        normalizeAudio
+      },
+      naming: {},
+      gaps: segmentPlan.gaps.map((gap) => ({
+        fromSessionId: gap.fromSessionId,
+        toSessionId: gap.toSessionId,
+        gapSeconds: gap.gapKnown ? gap.gapSeconds : null,
+        gapKnown: gap.gapKnown
+      }))
+    };
+
+    const results = [];
+    try {
+      await window.electronAPI.mergeVideos(
+        allInputFiles,
+        outputPath,
+        selectedQuality,
+        selectedFormat,
+        normalizeAudio,
+        mergeLogPayload,
+        segmentPlan
+      );
+      results.push({ success: true, sessionId: rangeToken, outputPath });
+      updateProgress(1, 1, 'Combined merge complete', indicesToMerge);
+    } catch (error) {
+      console.error('Error merging combined sessions:', error);
+      if (error.message && error.message.includes('cancelled')) {
+        results.push({ success: false, sessionId: rangeToken, error: 'Cancelled', cancelled: true });
+      } else {
+        const enhanced = enhanceError(error, {
+          operation: 'Merge Videos',
+          sessionId: rangeToken,
+          outputPath
+        });
+        results.push({
+          success: false,
+          sessionId: rangeToken,
+          error: enhanced.userMessage,
+          errorDetails: enhanced,
+          files: allInputFiles,
+          outputPath
+        });
+      }
+    } finally {
+      window.electronAPI.removeMergeProgressListener();
+    }
+
+    await showMergeResults(results, outputDir);
+  }
+
   // Handle Merge Selected button (batch merge)
   async function handleBatchMerge(selectedIndices = null) {
     const indicesToMerge = selectedIndices || Array.from(state.selectedGroups).sort((a, b) => a - b);
@@ -990,12 +1244,15 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       return;
     }
     
-    // Sync from DOM and apply tokens before validating (handles Merge clicked while cursor still in filename input)
-    await syncAndApplyTokensFromInputs(indicesToMerge);
-    
-    // Validate filenames for selected groups only
-    for (const index of indicesToMerge) {
-      const group = state.videoGroups[index];
+    const combineSessions = isCombineSessionsEnabled();
+
+    if (!combineSessions) {
+      // Sync from DOM and apply tokens before validating (handles Merge clicked while cursor still in filename input)
+      await syncAndApplyTokensFromInputs(indicesToMerge);
+
+      // Validate filenames for selected groups only
+      for (const index of indicesToMerge) {
+        const group = state.videoGroups[index];
         if (!group.outputFilename || !group.outputFilename.trim()) {
           showError(`Missing filename for Session ${group.sessionId}`, {
             operation: 'Merge Videos',
@@ -1003,25 +1260,26 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
           });
           return;
         }
-    }
-
-    const duplicateNames = new Map();
-    for (const index of indicesToMerge) {
-      const group = state.videoGroups[index];
-      const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
-      const normalizedName = (baseName + '.' + selectedFormat.toLowerCase()).toLowerCase();
-      if (duplicateNames.has(normalizedName)) {
-        const otherSession = duplicateNames.get(normalizedName);
-        showError(`Duplicate output filename for Sessions ${otherSession} and ${group.sessionId}`, {
-          operation: 'Merge Videos',
-          suggestions: [
-            'Each selected session needs a unique output filename',
-            'Apply a template with {sessionId} or edit filenames before merging'
-          ]
-        });
-        return;
       }
-      duplicateNames.set(normalizedName, group.sessionId);
+
+      const duplicateNames = new Map();
+      for (const index of indicesToMerge) {
+        const group = state.videoGroups[index];
+        const baseName = group.outputFilename.replace(/\.(mp4|mov|mkv|avi|m4v)$/i, '');
+        const normalizedName = (baseName + '.' + selectedFormat.toLowerCase()).toLowerCase();
+        if (duplicateNames.has(normalizedName)) {
+          const otherSession = duplicateNames.get(normalizedName);
+          showError(`Duplicate output filename for Sessions ${otherSession} and ${group.sessionId}`, {
+            operation: 'Merge Videos',
+            suggestions: [
+              'Each selected session needs a unique output filename',
+              'Apply a template with {sessionId} or edit filenames before merging'
+            ]
+          });
+          return;
+        }
+        duplicateNames.set(normalizedName, group.sessionId);
+      }
     }
     
     // Get output directory (use custom if selected, otherwise default)
@@ -1040,6 +1298,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       return;
     }
     
+    if (combineSessions) {
+      await runCombinedSessionMerge(indicesToMerge, outputDir);
+      return;
+    }
+
     // Show progress screen
     showProgressScreen();
     
@@ -1640,6 +1903,23 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   };
   mergeBtn.addEventListener('click', handleMerge);
 
+  const combineSessionsCheckbox = document.getElementById('combineSessionsCheckbox');
+  if (combineSessionsCheckbox) {
+    combineSessionsCheckbox.addEventListener('change', () => {
+      refreshCombineSessionsUi();
+    });
+  }
+  const gapIndicatorSelect = document.getElementById('gapIndicatorSelect');
+  if (gapIndicatorSelect) {
+    gapIndicatorSelect.addEventListener('change', () => refreshSessionGapPreview());
+  }
+  const combinedOutputFilenameInput = document.getElementById('combinedOutputFilenameInput');
+  if (combinedOutputFilenameInput) {
+    combinedOutputFilenameInput.addEventListener('input', () => {
+      combinedOutputFilenameInput.dataset.userEdited = 'true';
+    });
+  }
+
   const stopOnErrorCheckbox = document.getElementById('stopOnErrorCheckbox');
   if (stopOnErrorCheckbox) {
     stopOnErrorCheckbox.addEventListener('change', (e) => {
@@ -1660,6 +1940,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       renderPreviewList();
       setupEventTemplateControls();
       loadPreviewThumbnails();
+      await refreshCombineSessionsUi();
     }
   });
 

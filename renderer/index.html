@@ -178,6 +178,31 @@
               <button type="button" id="saveAsTemplateBtn" class="btn btn-text btn-small" aria-label="Save current pattern as template">Save pattern as template</button>
             </div>
           </div>
+          <div id="combineSessionsSection" class="combine-sessions-section field-with-hint">
+            <label class="batch-option">
+              <input type="checkbox" id="combineSessionsCheckbox" aria-describedby="combineSessionsHelp">
+              <span>Combine selected sessions into one video</span>
+            </label>
+            <p id="combineSessionsHelp" class="form-hint">
+              Joins checked sessions in recording order. Add short indicator clips in <strong>Settings → Missing-time indicators</strong> to mark time lost between sessions.
+            </p>
+            <div id="combineSessionsControls" class="combine-sessions-controls" hidden>
+              <div class="event-template-row">
+                <label for="gapIndicatorSelect">Missing-time indicator</label>
+                <select id="gapIndicatorSelect" aria-label="Missing-time indicator video">
+                  <option value="">No indicator (join only)</option>
+                </select>
+              </div>
+              <p class="form-hint combine-gap-hint">
+                Indicators play at their own length; missing time is shown on the clip when the GoPro clock is available. Indicators are scaled to match the first clip — use <strong>High</strong> or <strong>Medium</strong> quality if <strong>Copy</strong> fails.
+              </p>
+              <div class="filename-edit combine-filename-edit">
+                <label for="combinedOutputFilenameInput">Combined output filename</label>
+                <input type="text" id="combinedOutputFilenameInput" class="filename-input" placeholder="e.g. BDL Open Gym {date} {sessionId}">
+              </div>
+              <ul id="sessionGapPreviewList" class="session-gap-preview-list" aria-label="Gaps between sessions"></ul>
+            </div>
+          </div>
         </section>
 
         <details id="mergeMoreOptions" class="merge-more-options">
@@ -625,6 +650,18 @@
           <p id="settingsAppVersion" class="form-hint" aria-live="polite">Version …</p>
           <p id="settingsUpdateHint" class="form-hint settings-update-hint" hidden></p>
           <button type="button" id="settingsCheckUpdatesBtn" class="btn btn-secondary btn-small">Check for updates</button>
+        </section>
+        <section class="settings-section" aria-labelledby="settingsGapIndicatorsHeading">
+          <h3 id="settingsGapIndicatorsHeading">Missing-time indicators</h3>
+          <p class="form-hint">Short videos inserted between GoPro sessions when recording time jumps. Stored on this Mac for offline use.</p>
+          <div id="settingsGapIndicatorList" class="settings-template-list" role="list"></div>
+          <div class="settings-gap-indicator-form">
+            <div class="form-group">
+              <label for="settingsGapIndicatorNameInput">Display name</label>
+              <input type="text" id="settingsGapIndicatorNameInput" class="split-pattern-input" placeholder="e.g. Recording paused">
+            </div>
+            <button type="button" id="settingsAddGapIndicatorBtn" class="btn btn-secondary btn-small">Add indicator video…</button>
+          </div>
         </section>
         <section class="settings-section" aria-labelledby="settingsTemplatesHeading">
           <h3 id="settingsTemplatesHeading">Naming templates</h3>

@@ -18,6 +18,7 @@ const {
 } = require('../src/quality-utils');
 const { buildMergeLogEntryForCompletedMerge, appendMergeLogEntry } = require('../src/merge-log');
 const { createStallWatchdog } = require('../src/stall-watchdog');
+const { resolveCombinedMergePaths } = require('../src/gap-merge');
 
 const MERGE_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -38,38 +39,61 @@ function formatTime(seconds) {
  * @param {() => import('electron').BrowserWindow|null} getMainWindow
  */
 function registerMergeSplitIpcHandlers(getMainWindow) {
-  ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false, mergeLogPayload = null) => {
-    return new Promise((resolve, reject) => {
-      if (!Array.isArray(filePaths)) {
-        reject(new Error('filePaths must be an array'));
-        return;
-      }
-      if (!outputPath || typeof outputPath !== 'string') {
-        reject(new Error('outputPath is required'));
-        return;
-      }
-      try {
-        validateQualityOption(qualityOption);
-      } catch (error) {
-        reject(error);
-        return;
-      }
+  ipcMain.handle('merge-videos', async (event, filePaths, outputPath, qualityOption = 'copy', format = 'mp4', normalizeAudio = false, mergeLogPayload = null, segmentPlan = null) => {
+    if (!Array.isArray(filePaths)) {
+      throw new Error('filePaths must be an array');
+    }
+    if (!outputPath || typeof outputPath !== 'string') {
+      throw new Error('outputPath is required');
+    }
+    validateQualityOption(qualityOption);
 
+    const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
+    let segmentTempFiles = [];
+    let validFilePaths = filePaths.filter((filePath) => {
+      const filename = path.basename(filePath);
+      return !filename.startsWith('._');
+    });
+
+    const mergeLogContext = mergeLogPayload && typeof mergeLogPayload === 'object'
+      ? {
+          sessionId: mergeLogPayload.sessionId,
+          naming: mergeLogPayload.naming,
+          gaps: Array.isArray(mergeLogPayload.gaps) ? mergeLogPayload.gaps : undefined
+        }
+      : null;
+
+    const hasSegmentPlan = segmentPlan &&
+      typeof segmentPlan === 'object' &&
+      Array.isArray(segmentPlan.sessions) &&
+      segmentPlan.sessions.length > 0;
+
+    if (hasSegmentPlan) {
+      try {
+        const resolved = await resolveCombinedMergePaths(
+          segmentPlan,
+          path.dirname(outputPath),
+          qualityOption,
+          normalizedFormat,
+          normalizeAudio
+        );
+        validFilePaths = resolved.finalPaths;
+        segmentTempFiles = resolved.tempFiles || [];
+        if (mergeLogContext && resolved.gapLog?.length) {
+          mergeLogContext.gaps = resolved.gapLog;
+        }
+      } catch (error) {
+        throw new Error(error.message || 'Failed to prepare combined session merge.');
+      }
+    }
+
+    if (validFilePaths.length === 0) {
+      throw new Error('No valid video files found (all files appear to be macOS metadata files)');
+    }
+
+    return new Promise((resolve, reject) => {
       isCancelled = false;
       currentMergeOutputPath = outputPath;
-      const mergeLogContext = mergeLogPayload && typeof mergeLogPayload === 'object'
-        ? { sessionId: mergeLogPayload.sessionId, naming: mergeLogPayload.naming }
-        : null;
-
-      const validFilePaths = filePaths.filter(filePath => {
-        const filename = path.basename(filePath);
-        return !filename.startsWith('._');
-      });
-
-      if (validFilePaths.length === 0) {
-        reject(new Error('No valid video files found (all files appear to be macOS metadata files)'));
-        return;
-      }
 
       const tempFileList = path.join(path.dirname(outputPath), `filelist_${Date.now()}.txt`);
       currentMergeTempFile = tempFileList;
@@ -87,7 +111,6 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             env.PATH = process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin';
           }
 
-          const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
           const formatMuxers = { mp4: 'mp4', mov: 'mov', mkv: 'matroska', avi: 'avi', m4v: 'mp4' };
 
           const outputExt = path.extname(outputPath).toLowerCase().slice(1);
@@ -252,6 +275,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             currentMergeOutputPath = null;
 
             if (tempFile) fs.unlink(tempFile).catch(() => {});
+            for (const extraTemp of segmentTempFiles) {
+              if (extraTemp) fs.unlink(extraTemp).catch(() => {});
+            }
 
             if (isCancelled || timedOut) {
               if (outputFile) fs.unlink(outputFile).catch(() => {});
