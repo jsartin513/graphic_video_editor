@@ -37,17 +37,40 @@ function buildFfmpegEnv(ffmpegCmd) {
   return env;
 }
 
+let activePrepProcess = null;
+
+function killActiveGapPrepProcess() {
+  if (activePrepProcess && !activePrepProcess.killed) {
+    activePrepProcess.kill('SIGTERM');
+  }
+}
+
 function runProcess(cmd, args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { env });
+    activePrepProcess = child;
     let stderr = '';
+    const clearActive = () => {
+      if (activePrepProcess === child) activePrepProcess = null;
+    };
     child.stderr.on('data', (d) => { stderr += d.toString(); });
-    child.on('error', reject);
+    child.on('error', (error) => {
+      clearActive();
+      reject(error);
+    });
     child.on('close', (code) => {
+      clearActive();
       if (code === 0) resolve({ stderr });
       else reject(new Error(stderr || `${cmd} exited with code ${code}`));
     });
   });
+}
+
+function encodingSettings(qualityOption) {
+  if (qualityOption === QUALITY_COPY || !QUALITY_SETTINGS[qualityOption]) {
+    return { crf: '23', preset: 'fast' };
+  }
+  return QUALITY_SETTINGS[qualityOption];
 }
 
 async function probeVideoStreamSpecs(filePath, env) {
@@ -149,10 +172,14 @@ async function renderGapIndicatorClip({
 
   const args = [
     '-i', indicatorPath,
+    '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+    '-map', '0:v:0',
+    '-map', '1:a:0',
     '-vf', vf,
     '-r', String(Math.round(fps) || 30),
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-c:a', 'aac', '-b:a', '128k',
+    '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-b:a', '192k',
+    '-shortest',
     '-y', outputPath
   ];
 
@@ -161,10 +188,14 @@ async function renderGapIndicatorClip({
   } catch (error) {
     const fallbackArgs = [
       '-i', indicatorPath,
+      '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+      '-map', '0:v:0',
+      '-map', '1:a:0',
       '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
       '-r', String(Math.round(fps) || 30),
       '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-      '-c:a', 'aac', '-b:a', '128k',
+      '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-b:a', '192k',
+      '-shortest',
       '-y', outputPath
     ];
     await runProcess(ffmpegCmd, fallbackArgs, env);
@@ -179,26 +210,46 @@ async function unlinkTempFiles(paths) {
   }
 }
 
-async function normalizeSegmentForConcat(inputPath, outputPath, specs, normalizeAudio) {
+async function normalizeSegmentForConcat(inputPath, outputPath, specs, normalizeAudio, qualityOption) {
   const ffmpegCmd = getFFmpegPath();
   const env = buildFfmpegEnv(ffmpegCmd);
+  const { crf, preset } = encodingSettings(qualityOption);
   const vf = [
     `scale=${specs.width}:${specs.height}:force_original_aspect_ratio=decrease`,
     `pad=${specs.width}:${specs.height}:(ow-iw)/2:(oh-ih)/2`
   ].join(',');
+  const audioFilter = normalizeAudio
+    ? 'loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,aformat=channel_layouts=stereo'
+    : 'aresample=48000,aformat=channel_layouts=stereo';
   const args = [
     '-i', inputPath,
-    '-vf', vf,
+    '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+    '-filter_complex', `[0:v]${vf}[v];[0:a]${audioFilter}[a0];[1:a]asetpts=PTS-STARTPTS[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[a]`,
+    '-map', '[v]',
+    '-map', '[a]',
     '-r', String(Math.round(specs.fps) || 30),
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23'
+    '-c:v', 'libx264', '-preset', preset, '-crf', crf,
+    '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-b:a', '192k',
+    '-shortest',
+    '-y', outputPath
   ];
-  if (normalizeAudio) {
-    args.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k');
-  } else {
-    args.push('-c:a', 'aac', '-b:a', '192k');
+  try {
+    await runProcess(ffmpegCmd, args, env);
+  } catch {
+    const fallbackArgs = [
+      '-i', inputPath,
+      '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+      '-map', '0:v:0',
+      '-map', '1:a:0',
+      '-vf', vf,
+      '-r', String(Math.round(specs.fps) || 30),
+      '-c:v', 'libx264', '-preset', preset, '-crf', crf,
+      '-c:a', 'aac', '-ar', '48000', '-ac', '2', '-b:a', '192k',
+      '-shortest',
+      '-y', outputPath
+    ];
+    await runProcess(ffmpegCmd, fallbackArgs, env);
   }
-  args.push('-y', outputPath);
-  await runProcess(ffmpegCmd, args, env);
 }
 
 /**
@@ -255,7 +306,7 @@ async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, 
       for (let i = 0; i < sessionPaths.length; i++) {
         assertNotCancelled();
         const normTemp = path.join(outputDir, `session_norm_${Date.now()}_${i}.mp4`);
-        await normalizeSegmentForConcat(sessionPaths[i], normTemp, specs, normalizeAudio);
+        await normalizeSegmentForConcat(sessionPaths[i], normTemp, specs, normalizeAudio, qualityOption);
         tempFiles.push(normTemp);
         normalizedPaths.push(normTemp);
       }
@@ -291,7 +342,12 @@ async function resolveCombinedMergePaths(segmentPlan, outputDir, qualityOption, 
       });
     }
 
-    return { finalPaths, tempFiles, gapLog };
+    return {
+      finalPaths,
+      tempFiles,
+      gapLog,
+      segmentsPreparedForCopy: willInsertGaps
+    };
   } catch (error) {
     await unlinkTempFiles(tempFiles);
     throw error;
@@ -303,5 +359,6 @@ module.exports = {
   escapeDrawtext,
   resolveCombinedMergePaths,
   renderGapIndicatorClip,
-  concatVideoFiles
+  concatVideoFiles,
+  killActiveGapPrepProcess
 };

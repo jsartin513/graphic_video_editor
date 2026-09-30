@@ -18,7 +18,7 @@ const {
 } = require('../src/quality-utils');
 const { buildMergeLogEntryForCompletedMerge, appendMergeLogEntry } = require('../src/merge-log');
 const { createStallWatchdog } = require('../src/stall-watchdog');
-const { resolveCombinedMergePaths } = require('../src/gap-merge');
+const { resolveCombinedMergePaths, killActiveGapPrepProcess } = require('../src/gap-merge');
 
 const MERGE_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -62,6 +62,10 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
     const normalizedFormat = (typeof format === 'string' ? format : 'mp4').toLowerCase();
     let segmentTempFiles = [];
+    let useCopyForFinalConcat = false;
+    const logInputFiles = Array.isArray(mergeLogPayload?.inputFiles) && mergeLogPayload.inputFiles.length
+      ? mergeLogPayload.inputFiles
+      : filePaths;
     let validFilePaths = filePaths.filter((filePath) => {
       const filename = path.basename(filePath);
       return !filename.startsWith('._');
@@ -95,6 +99,9 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
         if (mergeLogContext && resolved.gapLog?.length) {
           mergeLogContext.gaps = resolved.gapLog;
         }
+        if (resolved.segmentsPreparedForCopy) {
+          useCopyForFinalConcat = true;
+        }
       } catch (error) {
         mergePreparationActive = false;
         await cleanupSegmentTempFiles(segmentTempFiles);
@@ -112,6 +119,8 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
       mergePreparationActive = false;
       throw new Error('No valid video files found (all files appear to be macOS metadata files)');
     }
+
+    const finalQualityOption = useCopyForFinalConcat ? QUALITY_COPY : qualityOption;
 
     return new Promise((resolve, reject) => {
       mergePreparationActive = false;
@@ -147,14 +156,14 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
             ffmpegArgs.push('-f', formatMuxers[normalizedFormat]);
           }
 
-          if (qualityOption === QUALITY_COPY) {
-            if (normalizeAudio) {
+          if (finalQualityOption === QUALITY_COPY) {
+            if (normalizeAudio && !useCopyForFinalConcat) {
               ffmpegArgs.push('-c:v', 'copy', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k');
             } else {
               ffmpegArgs.push('-c', 'copy');
             }
           } else {
-            const settings = QUALITY_SETTINGS[qualityOption];
+            const settings = QUALITY_SETTINGS[finalQualityOption];
             ffmpegArgs.push('-c:v', 'libx264', '-crf', settings.crf, '-preset', settings.preset);
             if (normalizeAudio) {
               ffmpegArgs.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k');
@@ -316,7 +325,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
                 try {
                   try {
                     const entry = buildMergeLogEntryForCompletedMerge({
-                      filePaths: validFilePaths,
+                      filePaths: logInputFiles,
                       outputPath: outputFile,
                       qualityOption,
                       format: normalizedFormat,
@@ -368,6 +377,7 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
           resolve({ success: true, message: 'Merge operation cancelled' });
         } else if (mergePreparationActive) {
           isCancelled = true;
+          killActiveGapPrepProcess();
           resolve({ success: true, message: 'Merge operation cancelled' });
         } else {
           resolve({ success: false, message: 'No active merge operation to cancel' });
