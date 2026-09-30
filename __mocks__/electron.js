@@ -24,8 +24,18 @@ const shell = {
   openExternal: jest.fn().mockResolvedValue(undefined)
 };
 
+const safeStorage = {
+  isEncryptionAvailable: jest.fn(() => true),
+  encryptString: jest.fn((str) => Buffer.from(`enc:${str}`, 'utf8')),
+  decryptString: jest.fn((buf) => {
+    const s = buf.toString('utf8');
+    return s.startsWith('enc:') ? s.slice(4) : s;
+  })
+};
+
 module.exports = {
   app,
+  safeStorage,
   BrowserWindow: jest.fn(),
   clipboard,
   dialog: { showOpenDialog: jest.fn(), showSaveDialog: jest.fn() },

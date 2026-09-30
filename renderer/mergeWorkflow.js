@@ -10,6 +10,7 @@ import {
   directorySuffixForGroup,
   GENERIC_FILENAME_PATTERN
 } from './filenamePattern.js';
+import { attachYouTubeUploadToMergeResults } from './youtubeUploadUi.js';
 
 function removeExtension(str) {
   if (!str || typeof str !== 'string') return str || '';
@@ -1355,9 +1356,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         const durationSeconds = durationsByIndex.get(i) ?? 0;
         const showSplitBtn = durationSeconds >= MIN_DURATION_FOR_SPLIT_SECONDS;
         resultsHtml += `
-          <div class="result-item success">
+          <div class="result-item success" data-output-path="${escapeAttr(result.outputPath)}">
             <span class="result-icon">✓</span>
             <span class="result-name">${escapeHtml(filename)}</span>
+            <div class="youtube-upload-slot"></div>
             <button class="btn-trim-video" data-index="${i}" data-video-path="${escapeAttr(result.outputPath)}" data-video-name="${escapeAttr(filename)}">
               ✂️ Trim
             </button>
@@ -1424,6 +1426,20 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     
     progressDetails.innerHTML = resultsHtml;
     progressDetails.classList.add('completion-results');
+
+    let cleanupYouTubeUploadUi = () => {};
+    try {
+      const prefs = await window.electronAPI.loadPreferences();
+      const ytStatus = await window.electronAPI.youtubeGetStatus?.();
+      cleanupYouTubeUploadUi = attachYouTubeUploadToMergeResults({
+        results,
+        progressDetails,
+        youtubeSettings: prefs?.youtube,
+        youtubeStatus: ytStatus?.status
+      }) || (() => {});
+    } catch (error) {
+      console.error('YouTube upload UI setup failed', error);
+    }
     
     // Add event listeners
     const openFolderBtn = document.getElementById('openFolderBtn');
@@ -1440,6 +1456,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     const newMergeBtn = document.getElementById('newMergeBtn');
     if (newMergeBtn) {
       newMergeBtn.addEventListener('click', () => {
+        cleanupYouTubeUploadUi();
         state.selectedFiles = [];
         state.videoGroups = [];
         state.currentScreen = 'fileList';
@@ -1480,7 +1497,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         trimVideo.showTrimVideoModal(videoPath, videoName, outputDir);
       });
     });
-    
+
     // Add event listeners for error detail buttons
     document.querySelectorAll('.error-retry-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {

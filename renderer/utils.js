@@ -108,6 +108,13 @@ function formatTimeForFFmpeg(seconds) {
 }
 
 /** Remove characters invalid in filenames; preserve spaces. Matches src/filename-sanitize.js */
+const YOUTUBE_UPLOAD_EXTENSIONS = /\.(mp4|mov|mkv)$/i;
+
+export function isYouTubeUploadablePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') return false;
+  return YOUTUBE_UPLOAD_EXTENSIONS.test(filePath);
+}
+
 export function sanitizeFilenameForOutput(name) {
   if (!name || typeof name !== 'string') return '';
   const WINDOWS_RESERVED = new Set([

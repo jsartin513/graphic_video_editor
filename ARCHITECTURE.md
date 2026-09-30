@@ -23,6 +23,7 @@ IPC handlers are organized into modules under `main/`:
 | `ipc-updates.js` | check-for-updates, download-update | Auto-update |
 | `ipc-logger.js` | get-logs, get-log-files, clear-logs, export-logs, get-debug-mode, set-debug-mode | Log viewer and debug mode |
 | `ipc-sd-card.js` | get-gopro-sd-cards, open-sd-card-directory, load-sd-card-files, set-auto-detect-sd-cards, etc. | SD card detection and failed operations |
+| `ipc-youtube.js` | youtube-connect, youtube-upload-video, youtube-save-settings, etc. | YouTube OAuth (per-user Desktop client) and resumable uploads |
 
 ## Core Modules (`src/`)
 

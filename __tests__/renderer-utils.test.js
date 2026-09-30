@@ -3,6 +3,7 @@
  */
 
 const {
+  isYouTubeUploadablePath,
   getFileName,
   formatDuration,
   getDirectoryPath,
@@ -15,6 +16,18 @@ const {
 } = require('../src/renderer-utils');
 
 describe('renderer-utils', () => {
+  describe('isYouTubeUploadablePath', () => {
+    it('allows mp4 mov mkv', () => {
+      expect(isYouTubeUploadablePath('/out/video.mp4')).toBe(true);
+      expect(isYouTubeUploadablePath('/out/video.MOV')).toBe(true);
+      expect(isYouTubeUploadablePath('/out/video.mkv')).toBe(true);
+    });
+    it('rejects avi and m4v', () => {
+      expect(isYouTubeUploadablePath('/out/video.avi')).toBe(false);
+      expect(isYouTubeUploadablePath('/out/video.m4v')).toBe(false);
+    });
+  });
+
   describe('getFileName', () => {
     it('extracts filename from path', () => {
       expect(getFileName('/path/to/video.mp4')).toBe('video.mp4');
