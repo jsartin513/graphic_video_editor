@@ -34,7 +34,9 @@ function computeSessionBoundaries(orderedSessions) {
     const prev = orderedSessions[i];
     const next = orderedSessions[i + 1];
     const prevStart = prev.creationTimeMs;
-    const prevDuration = typeof prev.durationSeconds === 'number' && prev.durationSeconds >= 0
+    const prevDuration = typeof prev.durationSeconds === 'number' &&
+      Number.isFinite(prev.durationSeconds) &&
+      prev.durationSeconds >= 0
       ? prev.durationSeconds
       : null;
     const nextStart = next.creationTimeMs;

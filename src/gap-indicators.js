@@ -15,6 +15,42 @@ function getGapIndicatorsDirectory() {
 }
 
 /**
+ * @param {string} storedFileName
+ * @returns {string|null}
+ */
+function sanitizeStoredFileName(storedFileName) {
+  if (typeof storedFileName !== 'string' || !storedFileName.trim()) {
+    return null;
+  }
+  const trimmed = storedFileName.trim();
+  const base = path.basename(trimmed);
+  if (base !== trimmed) {
+    return null;
+  }
+  if (!ALLOWED_EXTENSIONS.has(path.extname(base).toLowerCase())) {
+    return null;
+  }
+  return base;
+}
+
+/**
+ * @param {{ storedFileName: string }} indicator
+ * @returns {string}
+ */
+function resolveGapIndicatorPath(indicator) {
+  const fileName = sanitizeStoredFileName(indicator?.storedFileName);
+  if (!fileName) {
+    throw new Error('Invalid indicator file reference.');
+  }
+  const root = path.resolve(getGapIndicatorsDirectory());
+  const resolved = path.resolve(path.join(root, fileName));
+  if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
+    throw new Error('Invalid indicator file reference.');
+  }
+  return resolved;
+}
+
+/**
  * @param {object} preferences
  * @returns {Array<{ id: string, name: string, storedFileName: string }>}
  */
@@ -92,22 +128,14 @@ async function removeGapIndicator(preferences, id) {
     return preferences;
   }
 
-  const destPath = path.join(getGapIndicatorsDirectory(), target.storedFileName);
   try {
+    const destPath = resolveGapIndicatorPath(target);
     await fs.unlink(destPath);
   } catch {
-    // File may already be missing
+    // Invalid reference or file already missing
   }
 
   return withGapIndicators(preferences, existing.filter((item) => item.id !== id));
-}
-
-/**
- * @param {{ id: string, storedFileName: string }} indicator
- * @returns {string}
- */
-function resolveGapIndicatorPath(indicator) {
-  return path.join(getGapIndicatorsDirectory(), indicator.storedFileName);
 }
 
 /**
@@ -118,7 +146,12 @@ async function listGapIndicatorsWithPaths(preferences) {
   const items = getGapIndicatorsFromPreferences(preferences);
   const result = [];
   for (const item of items) {
-    const fullPath = resolveGapIndicatorPath(item);
+    let fullPath;
+    try {
+      fullPath = resolveGapIndicatorPath(item);
+    } catch {
+      continue;
+    }
     try {
       await fs.access(fullPath);
       result.push({ id: item.id, name: item.name, path: fullPath });
@@ -137,6 +170,7 @@ module.exports = {
   withGapIndicators,
   addGapIndicator,
   removeGapIndicator,
+  sanitizeStoredFileName,
   resolveGapIndicatorPath,
   listGapIndicatorsWithPaths
 };

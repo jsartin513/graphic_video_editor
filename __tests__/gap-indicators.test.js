@@ -26,6 +26,8 @@ const {
   addGapIndicator,
   removeGapIndicator,
   getGapIndicatorsFromPreferences,
+  listGapIndicatorsWithPaths,
+  resolveGapIndicatorPath,
   MAX_GAP_INDICATORS
 } = require('../src/gap-indicators');
 const { DEFAULT_PREFERENCES } = require('../src/preferences');
@@ -60,6 +62,20 @@ describe('gap-indicators', () => {
     const updated = await removeGapIndicator(prefs, 'abc');
     expect(getGapIndicatorsFromPreferences(updated)).toHaveLength(0);
     expect(fs.unlink).toHaveBeenCalledWith(path.join('/tmp/video-merger-test-userdata', 'gap-indicators', 'abc.mp4'));
+  });
+
+  test('resolveGapIndicatorPath rejects path traversal storedFileName', () => {
+    expect(() => resolveGapIndicatorPath({ storedFileName: '../evil.mp4' })).toThrow(/Invalid indicator/);
+  });
+
+  test('listGapIndicatorsWithPaths skips invalid storedFileName', async () => {
+    const prefs = {
+      ...DEFAULT_PREFERENCES,
+      gapIndicators: [{ id: 'x', name: 'bad', storedFileName: '../evil.mp4' }]
+    };
+    const result = await listGapIndicatorsWithPaths(prefs);
+    expect(result).toHaveLength(0);
+    expect(fs.access).not.toHaveBeenCalled();
   });
 
   test('enforces max indicators', async () => {

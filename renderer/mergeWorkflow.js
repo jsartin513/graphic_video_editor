@@ -317,7 +317,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         sessionId: group.sessionId,
         directory: group.directory,
         creationTimeMs: group.creationTimeMs,
-        durationSeconds: group.durationSeconds ?? group.totalDuration ?? 0,
+        durationSeconds: group.durationSeconds != null ? group.durationSeconds : null,
         files: group.files
       }));
     const { orderedSessions } = analyzeSessionGaps(models);
@@ -446,9 +446,10 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       // Fetch all durations in parallel
       const durationPromises = allFiles.map(({ filePath }) =>
         window.electronAPI.getVideoDuration(filePath)
+          .then((duration) => (Number.isFinite(duration) && duration >= 0 ? duration : null))
           .catch(error => {
             console.error(`Error getting duration for ${filePath}:`, error);
-            return 0;
+            return null;
           })
       );
       
@@ -470,15 +471,20 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       for (let gi = 0; gi < videoGroups.length; gi++) {
         const group = videoGroups[gi];
         let totalDuration = 0;
+        let durationFullyKnown = true;
         for (let i = 0; i < group.files.length; i++) {
           const duration = durations[fileIndex++];
+          if (duration === null || duration === undefined || !Number.isFinite(duration)) {
+            durationFullyKnown = false;
+            continue;
+          }
           if (duration > 0) {
             hasDurations = true;
           }
           totalDuration += duration;
         }
         group.totalDuration = totalDuration;
-        group.durationSeconds = totalDuration;
+        group.durationSeconds = durationFullyKnown ? totalDuration : null;
         group.creationTimeMs = parseCreationTimeMs(metadataResults[gi]?.creationTime);
         
         // Calculate total input file size

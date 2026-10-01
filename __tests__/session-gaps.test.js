@@ -57,6 +57,15 @@ describe('session-gaps', () => {
       expect(boundaries[0].toSessionId).toBe('0535');
     });
 
+    test('marks unknown when previous session duration is missing', () => {
+      const ordered = [
+        { sessionId: '0534', creationTimeMs: 0, durationSeconds: null },
+        { sessionId: '0535', creationTimeMs: 1000, durationSeconds: 300 }
+      ];
+      const boundaries = computeSessionBoundaries(ordered);
+      expect(boundaries[0].gapKnown).toBe(false);
+    });
+
     test('marks unknown when creation time missing', () => {
       const ordered = [
         { sessionId: '0534', creationTimeMs: null, durationSeconds: 600 },
