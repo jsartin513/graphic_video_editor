@@ -57,7 +57,8 @@ const DEFAULT_PREFERENCES = {
     playlistId: null,
     playlistTitle: null,
     description: ''
-  }
+  },
+  gapIndicators: [] // [{ id, name, storedFileName }]
 };
 
 function mergeLoadedPreferences(prefs) {
@@ -95,7 +96,8 @@ function mergeLoadedPreferences(prefs) {
       youtube: {
         ...DEFAULT_PREFERENCES.youtube,
         ...(prefs.youtube && typeof prefs.youtube === 'object' ? prefs.youtube : {})
-      }
+      },
+      gapIndicators: Array.isArray(prefs.gapIndicators) ? prefs.gapIndicators : []
     },
     needsTemplateMigration
   };

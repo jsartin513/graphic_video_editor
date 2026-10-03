@@ -26,6 +26,9 @@ export function initializeSettings() {
   const defaultTemplateSelect = document.getElementById('settingsDefaultTemplateSelect');
   const defaultPatternInput = document.getElementById('settingsDefaultPatternInput');
   const saveDefaultPatternBtn = document.getElementById('settingsSaveDefaultPatternBtn');
+  const gapIndicatorList = document.getElementById('settingsGapIndicatorList');
+  const gapIndicatorNameInput = document.getElementById('settingsGapIndicatorNameInput');
+  const addGapIndicatorBtn = document.getElementById('settingsAddGapIndicatorBtn');
 
   let editingTemplateName = null;
   let appInfo = null;
@@ -158,6 +161,7 @@ export function initializeSettings() {
       renderDateFormats(currentPreferences);
       renderDefaultPatternControls(currentPreferences);
       renderTemplateList(currentPreferences);
+      await renderGapIndicatorList();
       await loadDebugLoggingState();
       if (youtubeSettingsApi?.refreshYouTubeUi) {
         await youtubeSettingsApi.refreshYouTubeUi();
@@ -233,6 +237,78 @@ export function initializeSettings() {
       dateFormatSelect.appendChild(opt);
     }
     dateFormatSelect.value = prefs.preferredDateFormat || 'YYYY-MM-DD';
+  }
+
+  async function renderGapIndicatorList() {
+    if (!gapIndicatorList || !window.electronAPI.listGapIndicators) return;
+    try {
+      const result = await window.electronAPI.listGapIndicators();
+      const indicators = result?.indicators || [];
+      if (indicators.length === 0) {
+        gapIndicatorList.innerHTML = '<p class="settings-empty-hint">No indicator videos yet.</p>';
+        return;
+      }
+      gapIndicatorList.innerHTML = indicators.map((item) => `
+        <div class="settings-template-item" role="listitem" data-id="${escapeAttr(item.id)}">
+          <div class="settings-template-info">
+            <strong>${escapeHtml(item.name)}</strong>
+          </div>
+          <div class="settings-template-actions">
+            <button type="button" class="btn btn-text btn-small settings-remove-gap-indicator" data-id="${escapeAttr(item.id)}" aria-label="Remove ${escapeAttr(item.name)}">Remove</button>
+          </div>
+        </div>
+      `).join('');
+
+      gapIndicatorList.querySelectorAll('.settings-remove-gap-indicator').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-id');
+          if (!id) return;
+          if (!confirm('Remove this indicator video from Settings?')) return;
+          try {
+            const removeResult = await window.electronAPI.removeGapIndicator(id);
+            if (removeResult?.success === false) {
+              alert(removeResult.error || 'Could not remove indicator.');
+              return;
+            }
+            if (removeResult?.preferences) {
+              currentPreferences = removeResult.preferences;
+              dispatchPreferencesUpdated(currentPreferences);
+            }
+            await renderGapIndicatorList();
+          } catch (error) {
+            console.error('Error removing gap indicator:', error);
+            alert('Could not remove indicator.');
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error loading gap indicators:', error);
+      gapIndicatorList.innerHTML = '<p class="settings-empty-hint">Could not load indicators.</p>';
+    }
+  }
+
+  async function handleAddGapIndicator() {
+    if (!window.electronAPI.selectFiles || !window.electronAPI.addGapIndicator) return;
+    try {
+      const pick = await window.electronAPI.selectFiles();
+      if (pick?.canceled || !pick?.files?.length) return;
+      const sourcePath = pick.files[0];
+      const displayName = gapIndicatorNameInput?.value.trim() || undefined;
+      const result = await window.electronAPI.addGapIndicator(sourcePath, displayName);
+      if (result?.success === false) {
+        alert(result.error || 'Could not add indicator.');
+        return;
+      }
+      if (result?.preferences) {
+        currentPreferences = result.preferences;
+        dispatchPreferencesUpdated(currentPreferences);
+      }
+      if (gapIndicatorNameInput) gapIndicatorNameInput.value = '';
+      await renderGapIndicatorList();
+    } catch (error) {
+      console.error('Error adding gap indicator:', error);
+      alert('Could not add indicator.');
+    }
   }
 
   function renderTemplateList(prefs) {
@@ -380,6 +456,10 @@ export function initializeSettings() {
 
   if (saveDefaultPatternBtn) {
     saveDefaultPatternBtn.addEventListener('click', () => saveDefaultPatternFromForm());
+  }
+
+  if (addGapIndicatorBtn) {
+    addGapIndicatorBtn.addEventListener('click', () => handleAddGapIndicator());
   }
 
   if (debugLoggingCheckbox) {

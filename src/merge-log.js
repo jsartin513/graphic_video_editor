@@ -60,6 +60,25 @@ function createMergeLogEntry(payload) {
     if (typeof normalizeAudio === 'boolean') entry.settings.normalizeAudio = normalizeAudio;
   }
 
+  if (Array.isArray(payload.gaps) && payload.gaps.length > 0) {
+    entry.gaps = payload.gaps
+      .slice(0, 50)
+      .map((g) => {
+        if (!g || typeof g !== 'object') return null;
+        const item = {
+          fromSessionId: typeof g.fromSessionId === 'string' ? g.fromSessionId.slice(0, 32) : undefined,
+          toSessionId: typeof g.toSessionId === 'string' ? g.toSessionId.slice(0, 32) : undefined,
+          gapKnown: g.gapKnown === true
+        };
+        if (typeof g.gapSeconds === 'number' && Number.isFinite(g.gapSeconds)) {
+          item.gapSeconds = Math.round(g.gapSeconds);
+        }
+        return item;
+      })
+      .filter(Boolean);
+    if (entry.gaps.length === 0) delete entry.gaps;
+  }
+
   if (payload.naming && typeof payload.naming === 'object') {
     const n = payload.naming;
     entry.naming = {};
@@ -106,7 +125,8 @@ function buildMergeLogEntryForCompletedMerge({
       format: typeof format === 'string' ? format : 'mp4',
       normalizeAudio: !!normalizeAudio
     },
-    naming: ctx.naming
+    naming: ctx.naming,
+    gaps: Array.isArray(ctx.gaps) ? ctx.gaps : undefined
   });
 }
 

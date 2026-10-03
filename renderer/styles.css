@@ -1362,6 +1362,30 @@ body {
   margin-left: 8px;
 }
 
+.combine-sessions-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+.combine-sessions-controls {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-gap-preview-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text-muted, #9ca3af);
+}
+
+.session-gap-preview-list li {
+  margin-bottom: 0.25rem;
+}
+
 .merge-naming-section {
   margin: 16px 0;
   padding: 16px;

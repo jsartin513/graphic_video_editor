@@ -29,6 +29,11 @@ const {
 const { mapError } = require('../src/error-mapper');
 const { logger } = require('../src/logger');
 const { derivePatternFromFilename } = require('../src/video-grouping');
+const {
+  addGapIndicator,
+  removeGapIndicator,
+  listGapIndicatorsWithPaths
+} = require('../src/gap-indicators');
 
 /**
  * Register IPC handlers related to preferences, patterns, and updates.
@@ -339,6 +344,46 @@ function registerPreferenceIpcHandlers() {
     } catch (error) {
       logger.error('Error clearing recent directories', { error: error.message });
       throw error;
+    }
+  });
+
+  ipcMain.handle('list-gap-indicators', async () => {
+    try {
+      const prefs = await loadPreferences();
+      const indicators = await listGapIndicatorsWithPaths(prefs);
+      return { success: true, indicators };
+    } catch (error) {
+      logger.error('Error listing gap indicators', { error: error.message });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('add-gap-indicator', async (event, sourcePath, displayName) => {
+    try {
+      if (!sourcePath || typeof sourcePath !== 'string') {
+        return { success: false, error: 'Choose a video file first.' };
+      }
+      const prefs = await loadPreferences();
+      const updated = await addGapIndicator(prefs, sourcePath, displayName);
+      await savePreferences(updated);
+      const indicators = await listGapIndicatorsWithPaths(updated);
+      return { success: true, preferences: updated, indicators };
+    } catch (error) {
+      logger.error('Error adding gap indicator', { error: error.message });
+      return { success: false, error: error.message || 'Could not add indicator.' };
+    }
+  });
+
+  ipcMain.handle('remove-gap-indicator', async (event, id) => {
+    try {
+      const prefs = await loadPreferences();
+      const updated = await removeGapIndicator(prefs, id);
+      await savePreferences(updated);
+      const indicators = await listGapIndicatorsWithPaths(updated);
+      return { success: true, preferences: updated, indicators };
+    } catch (error) {
+      logger.error('Error removing gap indicator', { error: error.message });
+      return { success: false, error: error.message || 'Could not remove indicator.' };
     }
   });
 

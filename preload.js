@@ -44,8 +44,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getVideoMetadata: (videoPath) => ipcRenderer.invoke('get-video-metadata', videoPath),
   generateThumbnail: (videoPath, timestamp) => ipcRenderer.invoke('generate-thumbnail', videoPath, timestamp),
   getTotalFileSize: (filePaths) => ipcRenderer.invoke('get-total-file-size', filePaths),
-  mergeVideos: (filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload) =>
-    ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload),
+  mergeVideos: (filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload, segmentPlan) =>
+    ipcRenderer.invoke('merge-videos', filePaths, outputPath, qualityOption, format, normalizeAudio, mergeLogPayload, segmentPlan),
   cancelMerge: () => ipcRenderer.invoke('cancel-merge'),
   setPreferredFormat: (format) => ipcRenderer.invoke('set-preferred-format', format),
   splitVideo: (videoPath, splits, outputDir) => ipcRenderer.invoke('split-video', videoPath, splits, outputDir),
@@ -115,6 +115,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   completeDefaultsSetup: (options) => ipcRenderer.invoke('complete-defaults-setup', options),
   setDefaultFilenamePattern: (pattern, templateName) =>
     ipcRenderer.invoke('set-default-filename-pattern', pattern, templateName),
+  listGapIndicators: () => ipcRenderer.invoke('list-gap-indicators'),
+  addGapIndicator: (sourcePath, displayName) => ipcRenderer.invoke('add-gap-indicator', sourcePath, displayName),
+  removeGapIndicator: (id) => ipcRenderer.invoke('remove-gap-indicator', id),
   applyDateTokens: (pattern, dateStr, dateFormat, customTokens) => ipcRenderer.invoke('apply-date-tokens', pattern, dateStr, dateFormat, customTokens),
   // Recent directories API
   addRecentDirectory: (dirPath) => ipcRenderer.invoke('add-recent-directory', dirPath),

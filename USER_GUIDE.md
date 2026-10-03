@@ -77,6 +77,7 @@ When you are happy with the list, click **Continue to Merge**.
 On the **Merge** screen:
 
 - Each **group** of clips (often one GoPro “session”) gets its own output name. Click a name to edit it.
+- Optional: check **Combine selected sessions into one video** to export a single file for every checked session, in recording order. Use **Missing-time indicator** to play a short clip (from Settings) where the GoPro clock jumps between sessions; the app shows how much time is missing when it can read the clip timestamps.
 - Use **Naming** templates and **Week number** if you use patterns like league or event filenames.
 - Open **More options** only if you need them:
   - **Video quality** — *Copy* is fastest and keeps original quality; other choices re-encode (slower, different file size).
@@ -132,6 +133,7 @@ Click **Settings** (top right), or press **⌘ ,** (Command + comma).
 | **Updates** | Shows your version; **Check for updates** looks for a newer release. |
 | **Naming templates** | Save reusable name patterns (e.g. `BDL Open Gym {date}`) for events. |
 | **YouTube** | Connect your channel and optionally upload merged videos (see below). |
+| **Missing-time indicators** | Short videos stored on your Mac; pick one when combining sessions so viewers see a card where recording was interrupted. |
 
 Preferences are stored on your Mac only (not in the cloud).
 

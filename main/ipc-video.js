@@ -127,8 +127,11 @@ function registerVideoIpcHandlers() {
               return parseFloat(framerateStr) || 0;
             };
 
+            const creationTime = (format.tags && format.tags.creation_time) || null;
+
             const result = {
               duration: parseFloat(format.duration) || 0,
+              creationTime: typeof creationTime === 'string' ? creationTime : null,
               size: parseInt(format.size) || 0,
               bitrate: parseInt(format.bit_rate) || 0,
               video: videoStream ? {
