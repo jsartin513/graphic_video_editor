@@ -1,6 +1,6 @@
 # Video Merger — User Guide
 
-This guide is for **anyone using Video Merger on a Mac**. You do not need programming tools, Terminal, or technical background.
+This guide is for **anyone using Video Merger on a Mac or Windows PC**. You do not need programming tools, Terminal, or technical background.
 
 Video Merger helps you **combine GoPro and other camera clips into one file**, with sensible names and optional quality settings. It is especially handy when you copy footage off an SD card and want one video per recording session.
 
@@ -8,11 +8,21 @@ Video Merger helps you **combine GoPro and other camera clips into one file**, w
 
 ## What you need
 
+### macOS
+
 - A **Mac** running **macOS 10.15 (Catalina)** or newer
 - **Intel** or **Apple Silicon** (M1/M2/M3, etc.) — use the installer that matches your Mac (see below)
 - Video files in common formats: **MP4, MOV, AVI, MKV, M4V**
 
 You **do not** need to install Node.js, Homebrew, or FFmpeg if you use the recommended **“fat”** download (FFmpeg is included inside the app).
+
+### Windows
+
+- **Windows 10** or **Windows 11** (64-bit)
+- The same supported video formats as on Mac
+- Use a **`fat`** installer (`.exe`) from the releases page — FFmpeg is bundled inside the app
+
+You **do not** need Node.js or a separate FFmpeg install for **fat** builds. **Lite** builds require FFmpeg on your PATH (for example `winget install --id Gyan.FFmpeg -e`).
 
 ---
 
@@ -29,6 +39,11 @@ You **do not** need to install Node.js, Homebrew, or FFmpeg if you use the recom
 **Tip:** If you are unsure, open **Apple menu → About This Mac**. Look for **Chip** (Apple) vs **Processor** (Intel).
 
 Do **not** download files labeled **`lite`** unless someone technical has already set up FFmpeg on your Mac.
+
+### Windows download
+
+1. Open the same [releases page](https://github.com/jsartin513/graphic_video_editor/releases/latest).
+2. Download **`Video-Merger-<version>-x64-fat.exe`** (NSIS installer).
 
 ---
 
@@ -47,6 +62,16 @@ Official signed builds should open normally. If you still see a warning:
 2. Choose **Open**, then click **Open** again in the dialog.
 
 For more detail, see [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md).
+
+---
+
+## Install on Windows
+
+1. Run the downloaded **`Video-Merger-*-x64-fat.exe`** installer.
+2. Follow the prompts (you can change the install folder if you prefer).
+3. Launch **Video Merger** from the Start menu or desktop shortcut.
+
+If **SmartScreen** warns about an unknown publisher, that can happen with new certificates. Choose **More info → Run anyway** only if you trust the download source (official GitHub release).
 
 ---
 

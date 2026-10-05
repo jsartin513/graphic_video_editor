@@ -61,6 +61,8 @@ The script:
 
 CI does **not** publish releases (unsigned artifacts). Friend drops come from this local release flow.
 
+**Windows:** GitHub Actions builds unsigned **`Video-Merger-*-x64-fat.exe`** installers and `latest.yml` on `windows-latest` (job `build-win-fat`). Attach those assets to the same GitHub release as the Mac DMGs. Optional Authenticode signing: [docs/local/WINDOWS_CODE_SIGNING.md](docs/local/WINDOWS_CODE_SIGNING.md).
+
 ## How users upgrade
 
 | Install | First upgrade to a release with update metadata | Later releases |

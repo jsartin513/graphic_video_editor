@@ -9,6 +9,13 @@ const { autoUpdater } = require('electron-updater');
 
 const RELEASES_LATEST_URL = 'https://github.com/jsartin513/graphic_video_editor/releases/latest';
 
+function getManualUpdateInstructions() {
+  if (process.platform === 'win32') {
+    return `Download the latest fat Windows installer from ${RELEASES_LATEST_URL} and run the setup to upgrade Video Merger.`;
+  }
+  return `Download the latest fat DMG from ${RELEASES_LATEST_URL}, then replace Video Merger in Applications.`;
+}
+
 function hasUpdateFeed() {
   try {
     const ymlPath = path.join(process.resourcesPath || '', 'app-update.yml');
@@ -23,7 +30,8 @@ function registerUpdatesIpcHandlers() {
     version: app.getVersion(),
     isPackaged: app.isPackaged,
     hasUpdateFeed: app.isPackaged && hasUpdateFeed(),
-    releasesLatestUrl: RELEASES_LATEST_URL
+    releasesLatestUrl: RELEASES_LATEST_URL,
+    platform: process.platform
   }));
 
   ipcMain.handle('check-for-updates', async () => {
@@ -34,15 +42,12 @@ function registerUpdatesIpcHandlers() {
       return {
         available: false,
         noUpdateFeed: true,
-        message: `This install cannot check for updates in the app. Download the latest fat DMG from ${RELEASES_LATEST_URL}, then replace Video Merger in Applications.`
+        message: `This install cannot check for updates in the app. ${getManualUpdateInstructions()}`
       };
     }
     try {
       const result = await autoUpdater.checkForUpdates();
       const updateInfo = result?.updateInfo ?? null;
-      // checkForUpdates() always returns updateInfo for the latest feed entry.
-      // isUpdateAvailable is the version comparison (electron-updater ships its
-      // own nested semver; do not require('semver') here — it is not packed).
       const available = Boolean(result?.isUpdateAvailable);
       return { available, updateInfo, currentVersion: app.getVersion() };
     } catch (error) {
@@ -64,7 +69,7 @@ function registerUpdatesIpcHandlers() {
     if (!hasUpdateFeed()) {
       return {
         success: false,
-        error: `Download the latest fat DMG from ${RELEASES_LATEST_URL} and replace the app in Applications.`
+        error: getManualUpdateInstructions()
       };
     }
     try {
@@ -85,4 +90,4 @@ function registerUpdatesIpcHandlers() {
   });
 }
 
-module.exports = { registerUpdatesIpcHandlers, hasUpdateFeed };
+module.exports = { registerUpdatesIpcHandlers, hasUpdateFeed, getManualUpdateInstructions };

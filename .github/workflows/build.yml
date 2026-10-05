@@ -275,6 +275,55 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  build-win-fat:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Windows icon
+        run: npm run generate-win-icon
+
+      - name: Download FFmpeg binaries
+        env:
+          BUNDLE_FFMPEG: 'true'
+        run: npm run prebuild:win
+
+      - name: Verify binaries exist
+        shell: pwsh
+        run: |
+          if (-not (Test-Path resources/ffmpeg.exe) -or -not (Test-Path resources/ffprobe.exe)) {
+            Write-Error "FFmpeg binaries not found in resources/"
+            exit 1
+          }
+          Get-Item resources/ffmpeg.exe, resources/ffprobe.exe | Format-Table Name, Length
+
+      - name: Build for Windows x64 - Fat Build
+        env:
+          BUNDLE_FFMPEG: 'true'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run build:win:x64
+
+      - name: Upload Windows fat artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Video-Merger-win-x64-fat
+          path: |
+            dist/*x64*fat*.exe
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 30
+
   # Signed friend releases are created locally via `npm run release` (see RELEASE.md).
   # Re-enable when CI has Apple signing secrets (FUTURE_RELEASE.md).
   release:

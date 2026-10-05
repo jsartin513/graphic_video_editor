@@ -1,6 +1,6 @@
 # Video Merger
 
-A Mac desktop application for selecting and reviewing GoPro video files before merging them.
+A desktop application (macOS and Windows) for selecting and reviewing GoPro video files before merging them.
 
 **Using the app (install, merge, updates):** see **[USER_GUIDE.md](USER_GUIDE.md)** — written for non-developers.
 
@@ -29,8 +29,8 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 ### Prerequisites
 
 **For Running the App:**
-- macOS 10.15 Catalina or later (Intel or Apple Silicon)
-- **No Node.js needed** - the app is a standalone macOS application
+- macOS 10.15 Catalina or later (Intel or Apple Silicon), or Windows 10/11 (64-bit)
+- **No Node.js needed** - the app is a standalone desktop application
 - **No ffmpeg installation needed** - included in fat builds (recommended)
 
 **For Building/Developing:**
