@@ -79,6 +79,13 @@ function normalizeSigningIdentity(name) {
 
 const signingIdentity = normalizeSigningIdentity(process.env.CSC_NAME);
 
+const macBinaries = resourcesExist
+  ? [
+      'Contents/Resources/resources/ffmpeg',
+      'Contents/Resources/resources/ffprobe'
+    ]
+  : [];
+
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
@@ -95,6 +102,7 @@ const baseConfig = {
     gatekeeperAssess: false,
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
+    ...(macBinaries.length > 0 && { binaries: macBinaries }),
     // Only sign when CSC_NAME is set (e.g. "JESSICA L SARTIN (LKF2468HZ2)").
     // null disables auto-discovery so a local "Apple Development" cert is not used by mistake.
     identity: signingIdentity,

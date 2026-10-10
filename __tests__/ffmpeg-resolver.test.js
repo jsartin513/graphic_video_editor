@@ -123,6 +123,7 @@ describe('ffmpeg-resolver', () => {
       expect(result.ffprobeFound).toBe(true);
       expect(result.brewFound).toBe(true);
       expect(result.ffmpegVersion).toBe('5.1.0');
+      expect(result).toHaveProperty('bundledInApp');
     });
 
     it('resolves with installed=false when ffmpeg binary fails', async () => {

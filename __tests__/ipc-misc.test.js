@@ -5,7 +5,10 @@
 const { ipcMain, shell } = require('electron');
 
 jest.mock('../src/logger', () => ({ logger: { error: jest.fn() } }));
-jest.mock('../src/ffmpeg-resolver', () => ({ checkFFmpeg: jest.fn().mockResolvedValue({ installed: true }) }));
+jest.mock('../src/ffmpeg-resolver', () => ({
+  checkFFmpeg: jest.fn().mockResolvedValue({ installed: true }),
+  hasBundledBinariesInApp: jest.fn().mockReturnValue(false)
+}));
 
 const { registerMiscIpcHandlers } = require('../main/ipc-misc');
 
@@ -62,6 +65,28 @@ describe('ipc-misc', () => {
       const handler = getHandler('open-external');
       await expect(handler(null, 123)).rejects.toThrow('Invalid URL');
       expect(shell.openExternal).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('install-prerequisites', () => {
+    const { checkFFmpeg, hasBundledBinariesInApp } = require('../src/ffmpeg-resolver');
+
+    it('refuses when bundled ffmpeg is shipped with the app', async () => {
+      hasBundledBinariesInApp.mockReturnValue(true);
+      registerMiscIpcHandlers();
+      const handler = getHandler('install-prerequisites');
+      const result = await handler(null, { confirmed: true });
+      expect(result.notApplicable).toBe(true);
+      expect(result.success).toBe(false);
+    });
+
+    it('requires explicit user confirmation before Homebrew install', async () => {
+      hasBundledBinariesInApp.mockReturnValue(false);
+      registerMiscIpcHandlers();
+      const handler = getHandler('install-prerequisites');
+      const result = await handler(null, {});
+      expect(result.cancelled).toBe(true);
+      expect(checkFFmpeg).not.toHaveBeenCalled();
     });
   });
 });

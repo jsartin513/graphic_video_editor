@@ -18,6 +18,9 @@ export function initializePrerequisites(domElements) {
   } = domElements;
 
   function showPrerequisitesModal(status) {
+    const installInstructions = document.getElementById('installInstructions');
+    const modalIntro = prerequisitesModal.querySelector('.modal-body > p');
+
     // Update status icons
     ffmpegStatus.textContent = status.ffmpegFound ? '✓' : '❌';
     ffmpegStatus.className = 'status-icon ' + (status.ffmpegFound ? 'success' : 'error');
@@ -27,11 +30,26 @@ export function initializePrerequisites(domElements) {
     
     brewStatus.textContent = status.brewFound ? '✓' : '❌';
     brewStatus.className = 'status-icon ' + (status.brewFound ? 'success' : 'error');
-    
-    // Show/hide install button based on Homebrew availability
-    if (!status.brewFound) {
+
+    const bundledInApp = Boolean(status.bundledInApp);
+    if (modalIntro) {
+      modalIntro.innerHTML = bundledInApp
+        ? 'This build includes bundled <strong>ffmpeg</strong>, but it could not be used. Try reinstalling the latest <strong>fat</strong> build from GitHub Releases, or contact support with app logs.'
+        : 'Video Merger requires <strong>ffmpeg</strong> to merge videos, but it is not available on your system.';
+    }
+
+    if (installInstructions) {
+      installInstructions.style.display = bundledInApp ? 'none' : 'block';
+    }
+    if (bundledInApp) {
       installBtn.style.display = 'none';
-      installBtn.parentElement.querySelector('p').textContent = 'Homebrew is required to install ffmpeg. Please install Homebrew first from https://brew.sh';
+    } else if (!status.brewFound) {
+      installBtn.style.display = 'none';
+      const hint = installBtn.parentElement.querySelector('p');
+      if (hint) {
+        hint.textContent =
+          'Homebrew is required to install ffmpeg. Install Homebrew from https://brew.sh, then use the button below.';
+      }
     } else {
       installBtn.style.display = 'inline-flex';
     }
@@ -63,6 +81,15 @@ export function initializePrerequisites(domElements) {
   }
 
   async function handleInstallPrerequisites() {
+    const confirmed = window.confirm(
+      'Install ffmpeg with Homebrew?\n\n' +
+        'This runs "brew install ffmpeg" on your Mac. It may take several minutes and requires an internet connection.\n\n' +
+        'Only continue if you are using a lite build without bundled ffmpeg.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
     installBtn.disabled = true;
     installProgress.style.display = 'block';
     installProgressBar.style.width = '0%';
@@ -80,7 +107,7 @@ export function initializePrerequisites(domElements) {
         }
       }, 500);
       
-      const result = await window.electronAPI.installPrerequisites();
+      const result = await window.electronAPI.installPrerequisites({ confirmed: true });
       
       clearInterval(progressInterval);
       installProgressBar.style.width = '100%';

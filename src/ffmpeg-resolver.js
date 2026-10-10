@@ -11,6 +11,37 @@ const { logger } = require('./logger');
 let ffmpegPath = null;
 let ffprobePath = null;
 
+function ensureExecutable(binaryPath) {
+  if (process.platform === 'win32') {
+    return;
+  }
+  try {
+    fsSync.accessSync(binaryPath, fsSync.constants.X_OK);
+  } catch {
+    try {
+      fsSync.chmodSync(binaryPath, 0o755);
+    } catch (e) {
+      logger.warn('ensureExecutable: Failed to set executable permissions', {
+        binaryPath,
+        error: e.message
+      });
+    }
+  }
+}
+
+/** True when the packaged app ships its own ffmpeg/ffprobe (fat build). */
+function hasBundledBinariesInApp() {
+  if (!app.isPackaged) {
+    return false;
+  }
+  const resourcesPath =
+    process.resourcesPath ||
+    path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+  const ffmpeg = path.join(resourcesPath, 'resources', 'ffmpeg');
+  const ffprobe = path.join(resourcesPath, 'resources', 'ffprobe');
+  return fsSync.existsSync(ffmpeg) && fsSync.existsSync(ffprobe);
+}
+
 function getBundledBinaryPath(binaryName) {
   try {
     if (app.isPackaged) {
@@ -43,15 +74,10 @@ function getBundledBinaryPath(binaryName) {
       });
 
       if (fsSync.existsSync(binaryPath)) {
-        try {
-          fsSync.chmodSync(binaryPath, 0o755);
-          const stats = fsSync.statSync(binaryPath);
-          logger.info('getBundledBinaryPath: Found binary', { binaryName, binaryPath, size: stats.size });
-          return binaryPath;
-        } catch (e) {
-          logger.warn('getBundledBinaryPath: Failed to set executable permissions', { binaryPath, error: e.message });
-          return binaryPath;
-        }
+        ensureExecutable(binaryPath);
+        const stats = fsSync.statSync(binaryPath);
+        logger.info('getBundledBinaryPath: Found binary', { binaryName, binaryPath, size: stats.size });
+        return binaryPath;
       } else {
         logger.debug('getBundledBinaryPath: Binary not found at expected path', {
           binaryName,
@@ -83,11 +109,7 @@ function getBundledBinaryPath(binaryName) {
         for (const altPath of validAltPaths) {
           if (fsSync.existsSync(altPath)) {
             logger.info('getBundledBinaryPath: Found binary at alternative location', { binaryName, altPath });
-            try {
-              fsSync.chmodSync(altPath, 0o755);
-            } catch (e) {
-              logger.warn('getBundledBinaryPath: Failed to chmod alternative path', { altPath, error: e.message });
-            }
+            ensureExecutable(altPath);
             return altPath;
           }
         }
@@ -206,7 +228,8 @@ async function checkFFmpeg() {
           ffmpegFound,
           ffprobeFound,
           brewFound,
-          ffmpegVersion
+          ffmpegVersion,
+          bundledInApp: hasBundledBinariesInApp()
         });
       }
     }
@@ -221,7 +244,8 @@ async function checkFFmpeg() {
           ffmpegFound,
           ffprobeFound,
           brewFound,
-          ffmpegVersion
+          ffmpegVersion,
+          bundledInApp: hasBundledBinariesInApp()
         });
       }
 
@@ -355,5 +379,6 @@ async function checkFFmpeg() {
 module.exports = {
   getFFmpegPath,
   getFFprobePath,
-  checkFFmpeg
+  checkFFmpeg,
+  hasBundledBinariesInApp
 };

@@ -234,7 +234,7 @@ The app will automatically use bundled ffmpeg if included, or fall back to syste
 
 ### Code signing
 
-Friend-ready builds must be signed with a **Developer ID Application** certificate and notarized. See [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md). Unsigned builds hit Gatekeeper; [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md) covers the workaround.
+Friend-ready builds must be signed with a **Developer ID Application** certificate and notarized. See [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md) for local builds, GitHub Actions secrets, and tag-triggered releases (`v*`). Unsigned builds hit Gatekeeper; [INSTALLATION_TROUBLESHOOTING.md](INSTALLATION_TROUBLESHOOTING.md) covers the workaround.
 
 ### Build Steps
 

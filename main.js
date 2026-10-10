@@ -204,9 +204,10 @@ function isIgnorableUpdateError(message) {
 async function checkPrerequisites() {
   try {
     const result = await checkFFmpeg();
-    if (!result.installed) {
-      mainWindow.webContents.send('prerequisites-missing', result);
+    if (result.installed) {
+      return;
     }
+    mainWindow.webContents.send('prerequisites-missing', result);
   } catch (error) {
     logger.error('Error checking prerequisites', { error: error.message });
   }
