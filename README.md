@@ -201,6 +201,10 @@ See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
 
 The application uses Electron with context isolation for security. File operations are handled in the main process, and the renderer communicates with it via IPC.
 
+## Mac App Store (AVFoundation migration)
+
+Planning for a **Mac App Store build on AVFoundation** (direct-download builds keep FFmpeg) lives in **[docs/avfoundation/README.md](docs/avfoundation/README.md)**.
+
 ## Building for Distribution
 
 ### Prerequisites
