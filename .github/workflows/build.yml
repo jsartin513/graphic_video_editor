@@ -34,6 +34,7 @@ jobs:
 
   build-x64-fat:
     needs: test
+    if: github.ref_type != 'tag'
     runs-on: macos-14  # Apple Silicon runner (can build x64 via Rosetta 2)
     steps:
       - name: Checkout code
@@ -108,6 +109,7 @@ jobs:
 
   build-x64-lite:
     needs: test
+    if: github.ref_type != 'tag'
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -155,6 +157,7 @@ jobs:
 
   build-arm64-fat:
     needs: test
+    if: github.ref_type != 'tag'
     runs-on: macos-14  # Apple Silicon runner
     steps:
       - name: Checkout code
@@ -228,6 +231,7 @@ jobs:
 
   build-arm64-lite:
     needs: test
+    if: github.ref_type != 'tag'
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -275,91 +279,198 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  # Signed friend releases are created locally via `npm run release` (see RELEASE.md).
-  # Re-enable when CI has Apple signing secrets (FUTURE_RELEASE.md).
-  release:
-    needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
-    runs-on: ubuntu-latest
-    if: false
-    permissions:
-      contents: write  # Required to create releases
-      id-token: write  # Required for OIDC token
-    
+  build-signed-arm64-fat:
+    needs: test
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: macos-14
     steps:
-      - name: Download x64 fat artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: Video-Merger-x64-fat
-          path: artifacts/x64-fat
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Download x64 lite artifacts
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: Video-Merger-x64-lite
-          path: artifacts/x64-lite
+          node-version: '18'
+          cache: 'npm'
 
-      - name: Download arm64 fat artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: Video-Merger-arm64-fat
-          path: artifacts/arm64-fat
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Download arm64 lite artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: Video-Merger-arm64-lite
-          path: artifacts/arm64-lite
-
-      - name: List downloaded artifacts
+      - name: Import code signing certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
-          echo "=== Artifacts structure ==="
-          find artifacts -type f -name "*" || echo "No artifacts found"
-          echo ""
-          echo "=== x64-fat ==="
-          ls -la artifacts/x64-fat/ || echo "x64-fat directory not found"
-          echo ""
-          echo "=== x64-lite ==="
-          ls -la artifacts/x64-lite/ || echo "x64-lite directory not found"
-          echo ""
-          echo "=== arm64-fat ==="
-          ls -la artifacts/arm64-fat/ || echo "arm64-fat directory not found"
-          echo ""
-          echo "=== arm64-lite ==="
-          ls -la artifacts/arm64-lite/ || echo "arm64-lite directory not found"
+          set -euo pipefail
+          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
-      - name: Determine release tag and name
-        id: release
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'arm64'
+        run: npm run prebuild:arm64
+
+      - name: Build signed notarized arm64 fat
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'arm64'
+          PUBLISH_TO_GITHUB: 'true'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # Use the tag as the release tag
-            TAG_NAME="${{ github.ref_name }}"
-            RELEASE_NAME="Release ${{ github.ref_name }}"
-            IS_PRERELEASE="false"
-          else
-            # Use commit SHA for push to main
-            TAG_NAME="v${{ github.run_number }}-${{ github.sha }}"
-            RELEASE_NAME="Build from main (${{ github.sha }} - Run #${{ github.run_number }})"
-            IS_PRERELEASE="true"
-          fi
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
-          echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
-          echo "prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
-          echo "Tag: ${TAG_NAME}"
-          echo "Release name: ${RELEASE_NAME}"
-          echo "Prerelease: ${IS_PRERELEASE}"
+          npx electron-builder --config electron-builder.config.js --mac --arm64 --publish never
+          cp dist/latest-mac.yml dist/latest-mac-arm64.yml
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Verify bundled ffmpeg signatures
+        run: |
+          APP="dist/mac-arm64/Video Merger.app"
+          for helper in "$APP/Contents/Resources/resources/ffmpeg" "$APP/Contents/Resources/resources/ffprobe"; do
+            codesign --verify --strict "$helper"
+            codesign -dv "$helper" 2>&1 | grep -q "Developer ID Application"
+          done
+
+      - name: Upload signed arm64 artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.release.outputs.tag_name }}
-          name: ${{ steps.release.outputs.release_name }}
+          name: signed-arm64-fat
+          path: |
+            dist/*arm64*fat*.dmg
+            dist/*arm64*fat*.zip
+            dist/latest-mac-arm64.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  build-signed-x64-fat:
+    needs: test
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import code signing certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Download FFmpeg binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'x64'
+        run: npm run prebuild:x64
+
+      - name: Build signed notarized x64 fat
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_FFMPEG: 'true'
+          TARGET_ARCH: 'x64'
+          PUBLISH_TO_GITHUB: 'true'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          npx electron-builder --config electron-builder.config.js --mac --x64 --publish never
+          cp dist/latest-mac.yml dist/latest-mac-x64.yml
+
+      - name: Verify bundled ffmpeg signatures
+        run: |
+          APP="dist/mac/Video Merger.app"
+          for helper in "$APP/Contents/Resources/resources/ffmpeg" "$APP/Contents/Resources/resources/ffprobe"; do
+            codesign --verify --strict "$helper"
+            codesign -dv "$helper" 2>&1 | grep -q "Developer ID Application"
+          done
+
+      - name: Upload signed x64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-x64-fat
+          path: |
+            dist/*x64*fat*.dmg
+            dist/*x64*fat*.zip
+            dist/latest-mac-x64.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-signed-release:
+    needs: [build-signed-arm64-fat, build-signed-x64-fat]
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-arm64-fat
+          path: release/arm64
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-x64-fat
+          path: release/x64
+
+      - name: Merge latest-mac.yml for electron-updater
+        run: |
+          node scripts/merge-latest-mac-yml.js \
+            release/arm64/latest-mac-arm64.yml \
+            release/x64/latest-mac-x64.yml \
+            release/latest-mac.yml
+          ls -la release/arm64 release/x64 release/latest-mac.yml
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/latest-mac.yml
-          draft: false
-          prerelease: ${{ steps.release.outputs.prerelease }}
-          fail_on_unmatched_files: false  # Don't fail if some files are missing
+            release/arm64/*.dmg
+            release/arm64/*.zip
+            release/x64/*.dmg
+            release/x64/*.zip
+            release/latest-mac.yml
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

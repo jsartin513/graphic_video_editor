@@ -139,7 +139,42 @@ electron-builder will:
 xcrun stapler validate "dist/Video Merger-1.0.0.dmg"
 ```
 
-## GitHub Actions Setup (Optional)
+## GitHub Actions signed releases
+
+Tagged releases (`v*`) on `main` build signed, notarized **fat** arm64 and x64 DMGs/zips in `.github/workflows/build.yml` and attach them to the GitHub Release (including merged `latest-mac.yml` for `electron-updater`).
+
+### Repository secrets
+
+| Secret | Description |
+|--------|-------------|
+| `APPLE_CERTIFICATE` | Base64-encoded **Developer ID Application** `.p12` export (certificate + private key) |
+| `APPLE_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` |
+| `CSC_NAME` | Signing identity name only, e.g. `JESSICA L SARTIN (LKF2468HZ2)` — not the `Developer ID Application:` prefix |
+| `APPLE_TEAM_ID` | 10-character Team ID |
+| `APPLE_ID` | Apple ID email used for notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for `notarytool` |
+
+Encode the certificate for GitHub:
+
+```bash
+base64 -i ~/Downloads/DeveloperID.p12 | pbcopy   # paste into APPLE_CERTIFICATE
+```
+
+### Trigger a release build
+
+1. Bump `package.json` version and merge to `main`.
+2. Create and push an annotated tag matching the version:
+
+```bash
+git tag v1.4.0
+git push origin v1.4.0
+```
+
+3. When the workflow finishes, confirm the Release has both fat DMGs, both zips, and `latest-mac.yml`.
+
+Unsigned fat/lite artifacts from pushes to `main` (without a tag) still run for CI validation only.
+
+## GitHub Actions Setup (manual certificate import reference)
 
 To sign builds in GitHub Actions, you need to:
 

@@ -75,7 +75,7 @@ Releases URL: https://github.com/jsartin513/graphic_video_editor/releases/latest
 
 1. Confirm GitHub release has **both** fat DMGs, zips, and **`latest-mac.yml`**.
 2. Give user the friend message (script prints it; or `npm run release:message`).
-3. Do **not** re-enable the disabled CI `release` job in `.github/workflows/build.yml` unless CI signing exists ([FUTURE_RELEASE.md](../../../FUTURE_RELEASE.md)).
+3. Tagged releases (`v*`) can also ship via GitHub Actions when signing secrets are configured (see [CODE_SIGNING_SETUP.md](../../../docs/local/CODE_SIGNING_SETUP.md)).
 
 ## Troubleshooting
 

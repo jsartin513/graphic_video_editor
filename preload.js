@@ -57,7 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   getTestVideosPath: () => ipcRenderer.invoke('get-test-videos-path'),
   checkFFmpeg: () => ipcRenderer.invoke('check-ffmpeg'),
-  installPrerequisites: () => ipcRenderer.invoke('install-prerequisites'),
+  installPrerequisites: (options) => ipcRenderer.invoke('install-prerequisites', options),
   mapError: (error) => ipcRenderer.invoke('map-error', error),
   onPrerequisitesMissing: (callback) => {
     ipcRenderer.on('prerequisites-missing', (event, data) => callback(data));

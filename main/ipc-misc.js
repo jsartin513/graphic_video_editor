@@ -5,7 +5,7 @@
 const path = require('path');
 const { app, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
-const { checkFFmpeg } = require('../src/ffmpeg-resolver');
+const { checkFFmpeg, hasBundledBinariesInApp } = require('../src/ffmpeg-resolver');
 
 function registerMiscIpcHandlers() {
   ipcMain.handle('open-folder', async (event, folderPath) => {
@@ -46,7 +46,24 @@ function registerMiscIpcHandlers() {
     return path.join(__dirname, '..', 'test-videos');
   });
 
-  ipcMain.handle('install-prerequisites', async () => {
+  ipcMain.handle('install-prerequisites', async (_event, options = {}) => {
+    if (hasBundledBinariesInApp()) {
+      return {
+        success: false,
+        notApplicable: true,
+        message:
+          'This build includes bundled ffmpeg. Reinstall the fat (arm64-fat / x64-fat) build from GitHub Releases instead of using Homebrew.'
+      };
+    }
+
+    if (!options.confirmed) {
+      return {
+        success: false,
+        cancelled: true,
+        message: 'Installation was not started. Confirm the Homebrew install prompt to continue.'
+      };
+    }
+
     return new Promise((resolve) => {
       checkFFmpeg().then((status) => {
         if (status.installed) {
@@ -57,31 +74,52 @@ function registerMiscIpcHandlers() {
           resolve({
             success: false,
             needsHomebrew: true,
-            message: 'Homebrew needs to be installed first. Please run the install script manually or install Homebrew from https://brew.sh'
+            message:
+              'Homebrew needs to be installed first. Install Homebrew from https://brew.sh, then try again.'
           });
           return;
         }
+
         const brewInstall = spawn('brew', ['install', 'ffmpeg'], {
           shell: true,
           stdio: ['ignore', 'pipe', 'pipe']
         });
-        let errorOutput = '';
-        brewInstall.stderr.on('data', (data) => { errorOutput += data.toString(); });
+        let stdoutOutput = '';
+        let stderrOutput = '';
+        brewInstall.stdout.on('data', (data) => {
+          stdoutOutput += data.toString();
+        });
+        brewInstall.stderr.on('data', (data) => {
+          stderrOutput += data.toString();
+        });
         brewInstall.on('close', (code) => {
           if (code === 0) {
             checkFFmpeg().then((newStatus) => {
               if (newStatus.installed) {
-                resolve({ success: true, message: 'ffmpeg installed successfully', version: newStatus.ffmpegVersion });
+                resolve({
+                  success: true,
+                  message: 'ffmpeg installed successfully via Homebrew',
+                  version: newStatus.ffmpegVersion
+                });
               } else {
-                resolve({ success: false, message: 'Installation completed but ffmpeg not found. Please restart the app.' });
+                resolve({
+                  success: false,
+                  message: 'Homebrew finished but ffmpeg was not found. Quit and reopen the app, then check again.'
+                });
               }
             });
           } else {
-            resolve({ success: false, message: `Installation failed: ${errorOutput}` });
+            const detail = (stderrOutput || stdoutOutput || '').trim().slice(-2000);
+            resolve({
+              success: false,
+              message: detail
+                ? `Homebrew install failed (exit ${code}): ${detail}`
+                : `Homebrew install failed with exit code ${code}`
+            });
           }
         });
         brewInstall.on('error', (error) => {
-          resolve({ success: false, message: `Failed to start installation: ${error.message}` });
+          resolve({ success: false, message: `Failed to start Homebrew install: ${error.message}` });
         });
       });
     });

@@ -59,7 +59,11 @@ The script:
 3. Merges `latest-mac.yml` for both architectures.
 4. Commits the version bump, tags `vX.Y.Z`, creates the GitHub release, and pushes commit + tag.
 
-CI does **not** publish releases (unsigned artifacts). Friend drops come from this local release flow.
+### CI release (optional)
+
+Pushing a semver tag (`v1.4.0`) on `main` runs the **signed, notarized** fat arm64 + x64 build in GitHub Actions and uploads DMGs, zips, and merged `latest-mac.yml` to that tag’s GitHub Release. Configure repository secrets first (see [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md#github-actions-signed-releases)).
+
+You can still ship from a Mac with `npm run official-release` (useful when iterating on signing or when CI secrets are not configured).
 
 ## How users upgrade
 
