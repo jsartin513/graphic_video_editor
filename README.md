@@ -191,11 +191,37 @@ npm run test:watch
 
 # Generate coverage report
 npm run test:coverage
+
+# End-to-end tests (Playwright + Electron)
+npm run test:e2e
+# On Linux CI and headless dev machines:
+# xvfb-run -a npm run test:e2e
 ```
 
 **Test Coverage**: High coverage across multiple unit and integration test suites (see coverage reports for current metrics).
 
 See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing documentation.
+
+### Continuous integration (local)
+
+GitHub Actions runs the same checks as below on **ubuntu-latest** for every non-draft pull request (see [.github/CI_AUDIT.md](.github/CI_AUDIT.md) for triggers and minute estimates). Run these locally before pushing to avoid CI churn:
+
+```bash
+npm ci
+npm test
+npm run test:e2e          # macOS or desktop with a display
+# Linux without a display:
+xvfb-run -a npm run test:e2e
+```
+
+macOS DMG/ZIP packaging is **not** run on every PR in CI (to save Actions minutes on private repos). Build installers locally when you change packaging:
+
+```bash
+npm run build:fat:arm64   # Apple Silicon
+npm run build:fat:x64     # Intel
+```
+
+Signed and notarized friend releases: [RELEASE.md](RELEASE.md) and [docs/local/CODE_SIGNING_SETUP.md](docs/local/CODE_SIGNING_SETUP.md).
 
 ## Development
 
