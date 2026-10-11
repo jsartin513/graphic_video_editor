@@ -1,5 +1,9 @@
 name: Build Video Editor
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -7,15 +11,85 @@ on:
       - master
     tags:
       - 'v*'
-  workflow_dispatch:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.cursor/**'
+      - 'LICENSE'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.gif'
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     branches:
       - main
       - master
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.cursor/**'
+      - 'LICENSE'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.gif'
+  workflow_dispatch:
+    inputs:
+      mac_packaging:
+        description: Build macOS DMG/ZIP artifacts (unsigned)
+        type: boolean
+        default: true
+
+env:
+  NODE_VERSION: '18'
 
 jobs:
+  packaging-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      mac: ${{ steps.decide.outputs.mac }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+      - uses: dorny/paths-filter@v3
+        id: packaging_paths
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            packaging:
+              - 'build/**'
+              - 'electron-builder.config.js'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'scripts/copy-ffmpeg-binaries.js'
+              - 'scripts/after-pack.js'
+              - 'scripts/verify-fat-build.js'
+              - 'resources/**'
+              - 'main.js'
+              - 'preload.js'
+              - 'main/**'
+              - 'src/**'
+              - 'renderer/**'
+              - '.github/workflows/**'
+      - id: decide
+        run: |
+          mac=false
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            mac=true
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.mac_packaging }}" != "false" ]]; then
+            mac=true
+          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ steps.packaging_paths.outputs.packaging }}" == "true" ]]; then
+            mac=true
+          fi
+          echo "mac=${mac}" >> "$GITHUB_OUTPUT"
+          echo "macOS packaging: ${mac}"
+
   test:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,18 +97,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
+      - name: Run unit tests
         run: npm test
 
-  build-x64-fat:
+  e2e:
+    runs-on: ubuntu-latest
     needs: test
-    runs-on: macos-14  # Apple Silicon runner (can build x64 via Rosetta 2)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,8 +117,54 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install E2E system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libasound2t64 libxtst6
+
+      - name: Run Playwright E2E (Electron on Linux)
+        run: xvfb-run -a npm run test:e2e
+
+  build-x64-fat:
+    needs: [test, e2e, packaging-gate]
+    if: >-
+      needs.packaging-gate.outputs.mac == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-mac-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -107,7 +228,10 @@ jobs:
           retention-days: 30
 
   build-x64-lite:
-    needs: test
+    needs: [test, e2e, packaging-gate]
+    if: >-
+      needs.packaging-gate.outputs.mac == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -116,8 +240,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-mac-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -154,8 +288,11 @@ jobs:
           retention-days: 30
 
   build-arm64-fat:
-    needs: test
-    runs-on: macos-14  # Apple Silicon runner
+    needs: [test, e2e, packaging-gate]
+    if: >-
+      needs.packaging-gate.outputs.mac == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -163,8 +300,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-mac-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -227,7 +374,10 @@ jobs:
           retention-days: 30
 
   build-arm64-lite:
-    needs: test
+    needs: [test, e2e, packaging-gate]
+    if: >-
+      needs.packaging-gate.outputs.mac == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -236,8 +386,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Cache Electron and electron-builder downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-mac-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -282,9 +442,9 @@ jobs:
     runs-on: ubuntu-latest
     if: false
     permissions:
-      contents: write  # Required to create releases
-      id-token: write  # Required for OIDC token
-    
+      contents: write
+      id-token: write
+
     steps:
       - name: Download x64 fat artifacts
         uses: actions/download-artifact@v4
@@ -331,12 +491,10 @@ jobs:
         id: release
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # Use the tag as the release tag
             TAG_NAME="${{ github.ref_name }}"
             RELEASE_NAME="Release ${{ github.ref_name }}"
             IS_PRERELEASE="false"
           else
-            # Use commit SHA for push to main
             TAG_NAME="v${{ github.run_number }}-${{ github.sha }}"
             RELEASE_NAME="Build from main (${{ github.sha }} - Run #${{ github.run_number }})"
             IS_PRERELEASE="true"
@@ -349,7 +507,7 @@ jobs:
           echo "Prerelease: ${IS_PRERELEASE}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag_name }}
           name: ${{ steps.release.outputs.release_name }}
@@ -359,7 +517,6 @@ jobs:
             artifacts/**/latest-mac.yml
           draft: false
           prerelease: ${{ steps.release.outputs.prerelease }}
-          fail_on_unmatched_files: false  # Don't fail if some files are missing
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
