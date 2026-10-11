@@ -135,7 +135,8 @@ jobs:
       - name: Install E2E system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libasound2t64 libxtst6
+          sudo apt-get install -y --no-install-recommends xvfb
+          npx playwright install-deps
 
       - name: Run Playwright E2E (Electron on Linux)
         run: xvfb-run -a npm run test:e2e
