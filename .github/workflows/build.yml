@@ -64,15 +64,6 @@ jobs:
               - 'electron-builder.config.js'
               - 'package.json'
               - 'package-lock.json'
-              - 'scripts/copy-ffmpeg-binaries.js'
-              - 'scripts/after-pack.js'
-              - 'scripts/verify-fat-build.js'
-              - 'resources/**'
-              - 'main.js'
-              - 'preload.js'
-              - 'main/**'
-              - 'src/**'
-              - 'renderer/**'
               - '.github/workflows/**'
       - id: decide
         run: |

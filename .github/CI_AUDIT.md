@@ -14,7 +14,7 @@ There is no separate lint job: the project has no ESLint (or similar) npm script
 
 | Event | Unit + E2E (ubuntu) | macOS packaging (4 jobs) |
 |-------|---------------------|---------------------------|
-| PR (non-draft, non-docs-only) | Yes | Only if packaging-related paths change |
+| PR (non-draft, non-docs-only) | Yes | Only if **packaging-only** paths change (see below) |
 | PR (draft) | Skipped | Skipped |
 | PR (docs-only) | Skipped (paths-ignore) | Skipped |
 | Push to `main` / `master` (non-docs) | Yes | No |
@@ -22,6 +22,18 @@ There is no separate lint job: the project has no ESLint (or similar) npm script
 | `workflow_dispatch` | Yes | Yes (optional via input) |
 
 macOS jobs use `CSC_IDENTITY_AUTO_DISCOVERY=false` (unsigned). Signed/notarized friend releases remain local per [RELEASE.md](../RELEASE.md).
+
+### Paths that enable macOS packaging on pull requests
+
+The `packaging-gate` job uses [dorny/paths-filter](https://github.com/dorny/paths-filter) with **only** these paths (app source under `src/`, `main/`, `renderer/`, etc. does **not** trigger macOS builds):
+
+- `build/**` (includes `build/entitlements.mac.plist`)
+- `electron-builder.config.js`
+- `package.json`
+- `package-lock.json`
+- `.github/workflows/**`
+
+Tags `v*`, `workflow_dispatch` (with mac packaging enabled), and non-draft PRs that touch the paths above still run all four macOS jobs.
 
 ## Runners and rough per-run cost
 
@@ -54,11 +66,12 @@ Estimates below use typical wall-clock times from this repo (Jest ~2 min, E2E ~6
 |----------|------------------------|
 | PR touching only `*.md` / `docs/` | **0** (workflow not triggered) |
 | Draft PR | **0** |
-| PR changing `package.json` or `build/` (packaging gate) | **~12 + ~800** ≈ **812** (same mac cost as before, but intentional) |
+| PR changing only app code (`src/`, `renderer/`, `main.js`, …) | **~12** (Linux CI only) |
+| PR changing packaging paths (`package.json`, `build/`, workflow, …) | **~12 + ~800** ≈ **812** (intentional) |
 | Tag `v*` release | **~12 + ~800** ≈ **812** |
 | Push to `main` (no tag) | **~12** |
 
-**Typical feature PR savings: ~803 → ~12 billed minutes (~98% reduction).**
+**Typical app-only PR: ~803 → ~12 billed minutes (~98% reduction).** Packaging-path or release PRs still pay for macOS jobs when needed.
 
 ## Concurrency and caches
 
