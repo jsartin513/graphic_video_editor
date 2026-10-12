@@ -108,6 +108,10 @@ describe('ffmpeg-resolver', () => {
   });
 
   describe('checkFFmpeg', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('resolves with installed=true when bundled binaries succeed', async () => {
       // In the test env, getBundledBinaryPath returns ffmpeg-static / ffprobe-static paths,
       // so the bundled branch is taken. Mock three spawn calls: ffmpeg, ffprobe, brew.
@@ -214,6 +218,10 @@ describe('ffmpeg-resolver', () => {
   describe('with system binaries (no bundled ffmpeg)', () => {
     const localSpawnMock = jest.fn();
     const localExecSyncMock = jest.fn();
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
     beforeEach(() => {
       jest.resetModules();

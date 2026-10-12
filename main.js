@@ -231,7 +231,7 @@ app.on('window-all-closed', () => {
  * Initialize SD card detection
  */
 async function initializeSDCardDetection() {
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' && process.platform !== 'win32') {
     return;
   }
   try {
