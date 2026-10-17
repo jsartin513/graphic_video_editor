@@ -52,6 +52,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelSplit: () => ipcRenderer.invoke('cancel-split'),
   trimVideo: (options) => ipcRenderer.invoke('trim-video', options),
   getOutputDirectory: (inputPath) => ipcRenderer.invoke('get-output-directory', inputPath),
+  getMergeOutputPlan: (payload) => ipcRenderer.invoke('get-merge-output-plan', payload),
+  createMoviesMergeOutput: (folderName, options) =>
+    ipcRenderer.invoke('create-movies-merge-output', folderName, options),
   selectOutputDestination: (dirPath) => ipcRenderer.invoke('select-output-destination', dirPath),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

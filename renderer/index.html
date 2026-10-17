@@ -293,6 +293,9 @@
             <p id="outputDestinationHelp" class="form-hint merge-output-hint">
               Merged files go in <strong>merged_videos</strong> next to the first selected source clip unless you pick another folder.
             </p>
+            <p id="moviesOutputHint" class="form-hint merge-output-hint" hidden>
+              Clips are on removable storage. When you merge, you will name a new folder in <strong>Movies</strong> (faster than writing back to the card).
+            </p>
             <div class="merge-sticky-destination">
               <button id="selectOutputDestinationBtn" class="btn btn-text btn-small" type="button" aria-label="Choose output folder">
                 Change folder
@@ -707,6 +710,30 @@
       <div class="modal-footer">
         <button type="button" id="bugReportCancelBtn" class="btn btn-secondary">Cancel</button>
         <button type="button" id="bugReportSubmitBtn" class="btn btn-primary">Open GitHub issue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Movies output folder (SD card merge) -->
+  <div id="moviesOutputModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="moviesOutputModalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="moviesOutputModalTitle">Save merged videos to Movies</h2>
+        <button type="button" id="moviesOutputModalCloseBtn" class="modal-close-btn" aria-label="Cancel merge">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint">Your clips are on removable storage. Save merged files on your Mac instead of writing back to the card.</p>
+        <div class="form-group">
+          <label for="moviesOutputFolderNameInput">New folder in Movies</label>
+          <input type="text" id="moviesOutputFolderNameInput" class="filename-input" autocomplete="off" spellcheck="false" />
+          <small id="moviesOutputPathPreview" class="form-hint"></small>
+          <small id="moviesOutputError" class="form-hint" role="alert" hidden></small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="moviesOutputChooseOtherBtn" class="btn btn-secondary">Choose another folder…</button>
+        <button type="button" id="moviesOutputCancelBtn" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="moviesOutputConfirmBtn" class="btn btn-primary">Create folder &amp; merge</button>
       </div>
     </div>
   </div>

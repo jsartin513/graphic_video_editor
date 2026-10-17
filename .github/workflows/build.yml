@@ -44,7 +44,7 @@ on:
         default: true
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   packaging-gate:

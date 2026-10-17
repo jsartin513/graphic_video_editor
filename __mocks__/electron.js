@@ -7,6 +7,7 @@ const os = require('os');
 const app = {
   getPath: jest.fn((name) => {
     if (name === 'userData') return path.join(os.tmpdir(), 'test-user-data');
+    if (name === 'videos') return path.join(os.homedir(), 'Movies');
     return os.tmpdir();
   }),
   getVersion: jest.fn(() => '1.0.0'),
