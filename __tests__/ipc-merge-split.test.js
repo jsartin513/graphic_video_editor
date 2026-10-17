@@ -6,6 +6,17 @@ const { ipcMain } = require('electron');
 const { spawn } = require('child_process');
 
 jest.mock('../src/logger', () => ({ logger: { error: jest.fn(), info: jest.fn(), debug: jest.fn() } }));
+const mockLoadPreferences = jest.fn().mockResolvedValue({
+  preferredDateFormat: 'YYYY-MM-DD',
+  knownSDCardPaths: ['/Volumes/GOPRO']
+});
+jest.mock('../src/preferences', () => {
+  const actual = jest.requireActual('../src/preferences');
+  return {
+    ...actual,
+    loadPreferences: (...args) => mockLoadPreferences(...args)
+  };
+});
 jest.mock('../src/error-mapper', () => ({ mapError: jest.fn((e) => ({ userMessage: String(e), code: 'MAPPED' })) }));
 jest.mock('../src/ffmpeg-resolver', () => ({ getFFmpegPath: () => '/usr/bin/ffmpeg', getFFprobePath: () => '/usr/bin/ffprobe' }));
 jest.mock('child_process', () => {
@@ -116,6 +127,53 @@ describe('ipc-merge-split', () => {
       const handler = getHandler('trim-video');
       await expect(handler(null, { outputPath: '/out.mp4' })).rejects.toThrow('Input and output paths are required');
       await expect(handler(null, { inputPath: '/in.mp4' })).rejects.toThrow('Input and output paths are required');
+    });
+  });
+
+  describe('merge output plan', () => {
+    it('prompts for Movies when sources are on /Volumes', async () => {
+      const handler = getHandler('get-merge-output-plan');
+      const plan = await handler(null, {
+        filePaths: ['/Volumes/GOPRO/DCIM/GX010001.MP4'],
+        creationTimesMs: [Date.parse('2026-10-17T12:00:00Z')]
+      });
+      expect(plan.shouldPromptForMoviesFolder).toBe(true);
+      expect(plan.defaultFolderName).toContain('2026-10-17');
+      expect(plan.moviesDirectory).toContain('Movies');
+    });
+
+    it('does not prompt for local sources', async () => {
+      const handler = getHandler('get-merge-output-plan');
+      const plan = await handler(null, {
+        filePaths: ['/Users/me/clips/GX010001.MP4'],
+        creationTimesMs: [Date.parse('2026-10-17T12:00:00Z')]
+      });
+      expect(plan.shouldPromptForMoviesFolder).toBe(false);
+    });
+  });
+
+  describe('create-movies-merge-output', () => {
+    const fsSync = require('fs');
+
+    beforeEach(() => {
+      jest.spyOn(fsSync, 'existsSync').mockReturnValue(false);
+    });
+
+    afterEach(() => {
+      fsSync.existsSync.mockRestore();
+    });
+
+    it('creates a sanitized folder under Movies', async () => {
+      const handler = getHandler('create-movies-merge-output');
+      const result = await handler(null, '2026-10-17 GOPRO', { makeUnique: true });
+      expect(result.folderName).toBe('2026-10-17 GOPRO');
+      expect(result.path).toContain('Movies');
+      expect(fs.mkdir).toHaveBeenCalled();
+    });
+
+    it('rejects empty folder names', async () => {
+      const handler = getHandler('create-movies-merge-output');
+      await expect(handler(null, '   ', { makeUnique: true })).rejects.toThrow('valid folder name');
     });
   });
 

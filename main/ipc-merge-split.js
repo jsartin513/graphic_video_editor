@@ -3,7 +3,9 @@
  */
 
 const path = require('path');
-const { ipcMain } = require('electron');
+const fsSync = require('fs');
+const os = require('os');
+const { ipcMain, app } = require('electron');
 const { showOpenDialog } = require('./dialog-utils');
 const { logger } = require('../src/logger');
 const { spawn } = require('child_process');
@@ -19,6 +21,15 @@ const {
 const { buildMergeLogEntryForCompletedMerge, appendMergeLogEntry } = require('../src/merge-log');
 const { createStallWatchdog } = require('../src/stall-watchdog');
 const { resolveCombinedMergePaths, killActiveGapPrepProcess } = require('../src/gap-merge');
+const { loadPreferences } = require('../src/preferences');
+const {
+  anySourceOnRemovableVolume,
+  deriveRecordingDateFolderName,
+  buildDefaultMoviesFolderName,
+  extractVolumeNameFromPath,
+  resolveUniqueDirectoryPath,
+  sanitizeFolderName
+} = require('../src/merge-output-destination');
 
 const MERGE_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -397,6 +408,83 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
       return outputDir;
     } catch (error) {
       throw new Error(`Failed to create output directory: ${error.message}`);
+    }
+  });
+
+  ipcMain.handle('get-merge-output-plan', async (event, payload = {}) => {
+    const filePaths = Array.isArray(payload.filePaths) ? payload.filePaths : [];
+    const creationTimesMs = Array.isArray(payload.creationTimesMs) ? payload.creationTimesMs : [];
+
+    const preferences = await loadPreferences();
+    const knownRemovableRoots = preferences.knownSDCardPaths || [];
+    const dateFormat = payload.dateFormat || preferences.preferredDateFormat || 'YYYY-MM-DD';
+
+    const shouldPromptForMoviesFolder = anySourceOnRemovableVolume(filePaths, {
+      knownRemovableRoots
+    });
+
+    let moviesDirectory = null;
+    try {
+      moviesDirectory = app.getPath('videos');
+    } catch {
+      moviesDirectory = path.join(os.homedir(), 'Movies');
+    }
+
+    const recordingDateName = deriveRecordingDateFolderName(creationTimesMs, dateFormat);
+    const volumeName = filePaths.length > 0
+      ? extractVolumeNameFromPath(filePaths[0])
+      : null;
+    const defaultFolderName = buildDefaultMoviesFolderName(recordingDateName, volumeName);
+
+    return {
+      shouldPromptForMoviesFolder,
+      moviesDirectory,
+      defaultFolderName,
+      volumeName
+    };
+  });
+
+  ipcMain.handle('create-movies-merge-output', async (event, folderName, options = {}) => {
+    const makeUnique = options.makeUnique !== false;
+    let moviesDirectory = null;
+    try {
+      moviesDirectory = app.getPath('videos');
+    } catch {
+      moviesDirectory = path.join(os.homedir(), 'Movies');
+    }
+
+    const trimmedName = typeof folderName === 'string' ? folderName.trim() : '';
+    if (!trimmedName) {
+      throw new Error('Enter a valid folder name');
+    }
+    const sanitized = sanitizeFolderName(trimmedName);
+    if (!sanitized) {
+      throw new Error('Enter a valid folder name');
+    }
+
+    let targetDir;
+    let resolvedName;
+    if (makeUnique) {
+      const resolved = resolveUniqueDirectoryPath(
+        moviesDirectory,
+        sanitized,
+        (candidatePath) => fsSync.existsSync(candidatePath)
+      );
+      targetDir = resolved.dirPath;
+      resolvedName = resolved.folderName;
+    } else {
+      targetDir = path.join(moviesDirectory, sanitized);
+      resolvedName = sanitized;
+      if (fsSync.existsSync(targetDir)) {
+        throw new Error(`A folder named "${resolvedName}" already exists in Movies`);
+      }
+    }
+
+    try {
+      await fs.mkdir(targetDir, { recursive: true });
+      return { path: targetDir, folderName: resolvedName };
+    } catch (error) {
+      throw new Error(`Failed to create output folder: ${error.message}`);
     }
   });
 

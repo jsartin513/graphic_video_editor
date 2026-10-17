@@ -86,6 +86,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     progressDetails,
     cancelMergeBtn,
     outputDestinationPath,
+    outputDestinationHelp,
+    moviesOutputHint,
     selectOutputDestinationBtn,
     useDefaultDestinationBtn,
     qualitySelect,
@@ -262,6 +264,8 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   
   // Initialize preferences
   loadUserPreferences();
+
+  let mergeOutputPlanHint = null;
 
   let normalizeAudio = false; // Audio normalization option
   let gapIndicatorOptions = [];
@@ -591,6 +595,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
 
     updateBatchControls();
     refreshCombineSessionsUi();
+    refreshMergeOutputPlanHint().then(() => updateOutputDestinationDisplay());
   }
 
   // Show preview screen
@@ -605,6 +610,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     } else {
       state.selectedOutputDestination = null;
     }
+    await refreshMergeOutputPlanHint();
     updateOutputDestinationDisplay();
     
     // Check if we have multiple directories (for display purposes)
@@ -1007,6 +1013,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       const result = await window.electronAPI.selectOutputDestination();
       if (!result.canceled && result.path) {
         state.selectedOutputDestination = result.path;
+        await refreshMergeOutputPlanHint();
         updateOutputDestinationDisplay();
         
         // Save the selected output destination to preferences
@@ -1028,6 +1035,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
   // Handle use default destination
   async function handleUseDefaultDestination() {
     state.selectedOutputDestination = null;
+    await refreshMergeOutputPlanHint();
     updateOutputDestinationDisplay();
     
     // Clear the saved output destination preference
@@ -1039,17 +1047,60 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
     }
   }
 
+  async function refreshMergeOutputPlanHint(indicesToMerge = null) {
+    if (!window.electronAPI.getMergeOutputPlan || !state.videoGroups?.length) {
+      mergeOutputPlanHint = null;
+      return null;
+    }
+    const indices = indicesToMerge || Array.from(state.selectedGroups);
+    if (!indices.length) {
+      mergeOutputPlanHint = null;
+      return null;
+    }
+    const filePaths = indices.flatMap((index) => state.videoGroups[index]?.files || []);
+    const creationTimesMs = indices.map((index) => state.videoGroups[index]?.creationTimeMs);
+    const dateFormat = userPreferences?.preferredDateFormat || 'YYYY-MM-DD';
+    try {
+      mergeOutputPlanHint = await window.electronAPI.getMergeOutputPlan({
+        filePaths,
+        creationTimesMs,
+        dateFormat
+      });
+    } catch (error) {
+      console.error('Error loading merge output plan:', error);
+      mergeOutputPlanHint = null;
+    }
+    return mergeOutputPlanHint;
+  }
+
+  function updateMergeOutputHintText() {
+    const showMoviesHint = Boolean(
+      mergeOutputPlanHint?.shouldPromptForMoviesFolder && !state.selectedOutputDestination
+    );
+    if (moviesOutputHint) {
+      moviesOutputHint.hidden = !showMoviesHint;
+    }
+    if (outputDestinationHelp) {
+      outputDestinationHelp.hidden = showMoviesHint;
+    }
+  }
+
   // Update output destination display
   function updateOutputDestinationDisplay() {
     if (state.selectedOutputDestination) {
       outputDestinationPath.textContent = state.selectedOutputDestination;
       outputDestinationPath.classList.add('custom-path');
       useDefaultDestinationBtn.style.display = 'inline-block';
+    } else if (mergeOutputPlanHint?.shouldPromptForMoviesFolder) {
+      outputDestinationPath.textContent = 'Movies (name folder when merging)';
+      outputDestinationPath.classList.remove('custom-path');
+      useDefaultDestinationBtn.style.display = 'none';
     } else {
       outputDestinationPath.textContent = 'merged_videos (default)';
       outputDestinationPath.classList.remove('custom-path');
       useDefaultDestinationBtn.style.display = 'none';
     }
+    updateMergeOutputHintText();
     updateMergeSummary();
   }
 
@@ -1058,7 +1109,138 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       const parts = state.selectedOutputDestination.split(/[/\\]/).filter(Boolean);
       return parts.length > 0 ? parts[parts.length - 1] : state.selectedOutputDestination;
     }
+    if (mergeOutputPlanHint?.shouldPromptForMoviesFolder) {
+      return 'Movies';
+    }
     return 'merged_videos';
+  }
+
+  function promptMoviesOutputFolder(plan) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('moviesOutputModal');
+      const input = document.getElementById('moviesOutputFolderNameInput');
+      const preview = document.getElementById('moviesOutputPathPreview');
+      const errorEl = document.getElementById('moviesOutputError');
+      const confirmBtn = document.getElementById('moviesOutputConfirmBtn');
+      const cancelBtn = document.getElementById('moviesOutputCancelBtn');
+      const chooseOtherBtn = document.getElementById('moviesOutputChooseOtherBtn');
+      const closeBtn = document.getElementById('moviesOutputModalCloseBtn');
+
+      if (!modal || !input || !confirmBtn || !cancelBtn) {
+        resolve({ canceled: true });
+        return;
+      }
+
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        modal.style.display = 'none';
+        document.removeEventListener('keydown', onKeyDown);
+        resolve(result);
+      };
+
+      const showErrorMessage = (message) => {
+        if (errorEl) {
+          errorEl.textContent = message;
+          errorEl.hidden = !message;
+        }
+      };
+
+      const updatePreview = () => {
+        if (preview && plan?.moviesDirectory) {
+          const name = input.value.trim() || plan.defaultFolderName || '';
+          preview.textContent = name
+            ? `${plan.moviesDirectory}/${name}`
+            : plan.moviesDirectory;
+        }
+      };
+
+      input.value = plan?.defaultFolderName || '';
+      showErrorMessage('');
+      updatePreview();
+
+      const onKeyDown = (event) => {
+        if (event.key === 'Escape') {
+          finish({ canceled: true });
+        }
+      };
+
+      const onInput = () => {
+        showErrorMessage('');
+        updatePreview();
+      };
+
+      input.oninput = onInput;
+
+      confirmBtn.onclick = async () => {
+        const folderName = input.value.trim();
+        if (!folderName) {
+          showErrorMessage('Enter a folder name.');
+          input.focus();
+          return;
+        }
+        confirmBtn.disabled = true;
+        try {
+          const created = await window.electronAPI.createMoviesMergeOutput(folderName, { makeUnique: true });
+          finish({ canceled: false, path: created.path, folderName: created.folderName });
+        } catch (error) {
+          showErrorMessage(error.message || 'Could not create folder.');
+        } finally {
+          confirmBtn.disabled = false;
+        }
+      };
+
+      cancelBtn.onclick = () => finish({ canceled: true });
+      closeBtn.onclick = () => finish({ canceled: true });
+      chooseOtherBtn.onclick = () => finish({ canceled: false, chooseOther: true });
+
+      modal.onclick = (event) => {
+        if (event.target === modal) {
+          finish({ canceled: true });
+        }
+      };
+
+      modal.style.display = 'flex';
+      document.addEventListener('keydown', onKeyDown);
+      input.focus();
+      input.select();
+    });
+  }
+
+  async function resolveOutputDirectoryForMerge(indicesToMerge) {
+    if (state.selectedOutputDestination) {
+      return state.selectedOutputDestination;
+    }
+
+    const plan = await refreshMergeOutputPlanHint(indicesToMerge);
+    updateOutputDestinationDisplay();
+
+    if (plan?.shouldPromptForMoviesFolder) {
+      const choice = await promptMoviesOutputFolder(plan);
+      if (choice.canceled) {
+        return null;
+      }
+      if (choice.chooseOther) {
+        await handleSelectOutputDestination();
+        if (!state.selectedOutputDestination) {
+          return null;
+        }
+        return state.selectedOutputDestination;
+      }
+      if (choice.path) {
+        try {
+          await window.electronAPI.setLastOutputDestination(choice.path);
+          if (userPreferences) userPreferences.lastOutputDestination = choice.path;
+        } catch (prefError) {
+          console.error('Error saving Movies output preference:', prefError);
+        }
+        return choice.path;
+      }
+      return null;
+    }
+
+    return window.electronAPI.getOutputDirectory(state.videoGroups[indicesToMerge[0]].files[0]);
   }
 
   function updateMergeSummary() {
@@ -1288,15 +1470,11 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
       }
     }
     
-    // Get output directory (use custom if selected, otherwise default)
     let outputDir;
     try {
-      if (state.selectedOutputDestination) {
-        // Use custom output destination (already ensured to exist by dialog)
-        outputDir = state.selectedOutputDestination;
-      } else {
-        // Use default (merged_videos subfolder)
-        outputDir = await window.electronAPI.getOutputDirectory(state.videoGroups[indicesToMerge[0]].files[0]);
+      outputDir = await resolveOutputDirectoryForMerge(indicesToMerge);
+      if (!outputDir) {
+        return;
       }
     } catch (error) {
       const mappedError = await window.electronAPI.mapError(error.message || String(error));

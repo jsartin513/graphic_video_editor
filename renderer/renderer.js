@@ -74,6 +74,8 @@ const domElements = {
   
   // Output destination
   outputDestinationPath: document.getElementById('outputDestinationPath'),
+  outputDestinationHelp: document.getElementById('outputDestinationHelp'),
+  moviesOutputHint: document.getElementById('moviesOutputHint'),
   selectOutputDestinationBtn: document.getElementById('selectOutputDestinationBtn'),
   useDefaultDestinationBtn: document.getElementById('useDefaultDestinationBtn'),
   
