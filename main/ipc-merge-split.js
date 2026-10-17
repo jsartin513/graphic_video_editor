@@ -30,6 +30,13 @@ const {
   resolveUniqueDirectoryPath,
   sanitizeFolderName
 } = require('../src/merge-output-destination');
+const {
+  isE2eEnabled,
+  getE2eMoviesDirectory,
+  getE2eVolumeLabel,
+  getE2eOutputPickerDirectory,
+  anyE2eRemovableSource
+} = require('../src/e2e-test-hooks');
 
 const MERGE_STALL_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -421,19 +428,27 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
     const shouldPromptForMoviesFolder = anySourceOnRemovableVolume(filePaths, {
       knownRemovableRoots
-    });
+    }) || anyE2eRemovableSource(filePaths);
 
     let moviesDirectory = null;
-    try {
-      moviesDirectory = app.getPath('videos');
-    } catch {
-      moviesDirectory = path.join(os.homedir(), 'Movies');
+    const e2eMoviesDir = getE2eMoviesDirectory();
+    if (e2eMoviesDir) {
+      moviesDirectory = e2eMoviesDir;
+    } else {
+      try {
+        moviesDirectory = app.getPath('videos');
+      } catch {
+        moviesDirectory = path.join(os.homedir(), 'Movies');
+      }
     }
 
     const recordingDateName = deriveRecordingDateFolderName(creationTimesMs, dateFormat);
-    const volumeName = filePaths.length > 0
+    let volumeName = filePaths.length > 0
       ? extractVolumeNameFromPath(filePaths[0])
       : null;
+    if (!volumeName && isE2eEnabled()) {
+      volumeName = getE2eVolumeLabel();
+    }
     const defaultFolderName = buildDefaultMoviesFolderName(recordingDateName, volumeName);
 
     return {
@@ -447,10 +462,15 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
   ipcMain.handle('create-movies-merge-output', async (event, folderName, options = {}) => {
     const makeUnique = options.makeUnique !== false;
     let moviesDirectory = null;
-    try {
-      moviesDirectory = app.getPath('videos');
-    } catch {
-      moviesDirectory = path.join(os.homedir(), 'Movies');
+    const e2eMoviesDir = getE2eMoviesDirectory();
+    if (e2eMoviesDir) {
+      moviesDirectory = e2eMoviesDir;
+    } else {
+      try {
+        moviesDirectory = app.getPath('videos');
+      } catch {
+        moviesDirectory = path.join(os.homedir(), 'Movies');
+      }
     }
 
     const trimmedName = typeof folderName === 'string' ? folderName.trim() : '';
@@ -649,6 +669,12 @@ function registerMergeSplitIpcHandlers(getMainWindow) {
 
   ipcMain.handle('select-output-destination', async (event, dirPath) => {
     let selectedPath = typeof dirPath === 'string' ? dirPath.trim() : '';
+    if (!selectedPath && isE2eEnabled()) {
+      const forcedPickerDir = getE2eOutputPickerDirectory();
+      if (forcedPickerDir) {
+        selectedPath = forcedPickerDir;
+      }
+    }
     if (!selectedPath) {
       const result = await showOpenDialog(getMainWindow(), {
         properties: ['openDirectory', 'createDirectory'],
