@@ -6,7 +6,8 @@ const {
   resolveUniqueDirectoryPath,
   buildDefaultMoviesFolderName,
   extractVolumeNameFromPath,
-  sanitizeFolderName
+  sanitizeFolderName,
+  shouldPersistLastOutputDestination
 } = require('../src/merge-output-destination');
 
 describe('merge-output-destination', () => {
@@ -89,6 +90,13 @@ describe('merge-output-destination', () => {
   describe('sanitizeFolderName', () => {
     it('rejects empty names after sanitization', () => {
       expect(sanitizeFolderName('   ')).toBe('output');
+    });
+  });
+
+  describe('shouldPersistLastOutputDestination', () => {
+    it('persists only explicit Change folder / picker choices', () => {
+      expect(shouldPersistLastOutputDestination('user-picker')).toBe(true);
+      expect(shouldPersistLastOutputDestination('movies-modal')).toBe(false);
     });
   });
 });

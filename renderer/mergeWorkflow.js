@@ -1229,12 +1229,7 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         return state.selectedOutputDestination;
       }
       if (choice.path) {
-        try {
-          await window.electronAPI.setLastOutputDestination(choice.path);
-          if (userPreferences) userPreferences.lastOutputDestination = choice.path;
-        } catch (prefError) {
-          console.error('Error saving Movies output preference:', prefError);
-        }
+        // Session-only: do not persist auto-created Movies folders (see shouldPersistLastOutputDestination).
         return choice.path;
       }
       return null;

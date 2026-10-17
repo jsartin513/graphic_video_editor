@@ -149,6 +149,18 @@ function buildDefaultMoviesFolderName(folderName, volumeName = null) {
   return sanitizeFolderName(`${sanitized} ${vol}`);
 }
 
+/** @typedef {'user-picker' | 'movies-modal'} OutputDestinationSelectionSource */
+
+/**
+ * Only folders chosen via the output picker should be stored in lastOutputDestination.
+ * Auto-created Movies folders from the SD-card prompt are session-only.
+ * @param {OutputDestinationSelectionSource} source
+ * @returns {boolean}
+ */
+function shouldPersistLastOutputDestination(source) {
+  return source === 'user-picker';
+}
+
 module.exports = {
   DEFAULT_VOLUMES_ROOT,
   normalizeAbsolutePath,
@@ -158,5 +170,6 @@ module.exports = {
   deriveRecordingDateFolderName,
   sanitizeFolderName,
   resolveUniqueDirectoryPath,
-  buildDefaultMoviesFolderName
+  buildDefaultMoviesFolderName,
+  shouldPersistLastOutputDestination
 };
