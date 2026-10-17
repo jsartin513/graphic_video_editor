@@ -34,7 +34,7 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - **No ffmpeg installation needed** - included in fat builds (recommended)
 
 **For Building/Developing:**
-- Node.js (v14 or higher) - only needed for development/building
+- Node.js (v20 or higher) - only needed for development/building
 - npm - only needed for development/building
 
 ### Installing Prerequisites
@@ -231,7 +231,7 @@ The application uses Electron with context isolation for security. File operatio
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v20 or higher)
 - npm
 - ffmpeg (only needed if building "lite" version without bundled dependencies)
 
