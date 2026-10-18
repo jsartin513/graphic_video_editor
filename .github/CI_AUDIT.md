@@ -18,7 +18,8 @@ There is no separate lint job: the project has no ESLint (or similar) npm script
 | PR (draft) | Skipped | Skipped |
 | PR (docs-only) | Skipped (paths-ignore) | Skipped |
 | Push to `main` / `master` (non-docs) | Yes | No |
-| Tag `v*` | Yes | Yes |
+| Push of `v*` tag | **No** (not a workflow trigger) | **No** |
+| Local release commit (`Release X.Y.Z [skip ci]`) | **No** (`[skip ci]` on push) | **No** |
 | `workflow_dispatch` | Yes | Yes (optional via input) |
 
 macOS jobs use `CSC_IDENTITY_AUTO_DISCOVERY=false` (unsigned). Signed/notarized friend releases remain local per [RELEASE.md](../RELEASE.md).
@@ -33,7 +34,7 @@ The `packaging-gate` job uses [dorny/paths-filter](https://github.com/dorny/path
 - `package-lock.json`
 - `.github/workflows/**`
 
-Tags `v*`, `workflow_dispatch` (with mac packaging enabled), and non-draft PRs that touch the paths above still run all four macOS jobs.
+`workflow_dispatch` (with mac packaging enabled) and non-draft PRs that touch the paths above still run all four macOS jobs. Version tags from local release are pushed for GitHub Releases and auto-update metadata only — they do not start this workflow.
 
 ## Runners and rough per-run cost
 
@@ -68,7 +69,8 @@ Estimates below use typical wall-clock times from this repo (Jest ~2 min, E2E ~6
 | Draft PR | **0** |
 | PR changing only app code (`src/`, `renderer/`, `main.js`, …) | **~12** (Linux CI only) |
 | PR changing packaging paths (`package.json`, `build/`, workflow, …) | **~12 + ~800** ≈ **812** (intentional) |
-| Tag `v*` release | **~12 + ~800** ≈ **812** |
+| Local `npm run release` (commit + tag push) | **0** |
+| `workflow_dispatch` (mac packaging on) | **~12 + ~800** ≈ **812** |
 | Push to `main` (no tag) | **~12** |
 
 **Typical app-only PR: ~803 → ~12 billed minutes (~98% reduction).** Packaging-path or release PRs still pay for macOS jobs when needed.

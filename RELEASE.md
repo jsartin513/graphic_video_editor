@@ -57,9 +57,9 @@ The script:
 1. Runs tests and bumps `package.json` (this is the version `electron-updater` compares).
 2. Builds **signed, notarized fat** arm64 and x64 DMGs/zips with update metadata (`PUBLISH_TO_GITHUB=true`, `--publish never`).
 3. Merges `latest-mac.yml` for both architectures.
-4. Commits the version bump, tags `vX.Y.Z`, creates the GitHub release, and pushes commit + tag.
+4. Commits the version bump with **`[skip ci]`** (so the push to `main` does not start Actions), tags `vX.Y.Z`, creates the GitHub release, and pushes commit + tag.
 
-CI does **not** publish releases (unsigned artifacts). Friend drops come from this local release flow.
+CI does **not** publish releases (unsigned artifacts). Friend drops come from this local release flow. The workflow does **not** listen for `v*` tag pushes, so a local release should use **zero GitHub Actions minutes**. To run unsigned macOS packaging in CI, use **Actions → Build Video Editor → Run workflow** (`workflow_dispatch`, optional `mac_packaging` input).
 
 ## How users upgrade
 

@@ -51,7 +51,7 @@ Lower-level (no preflight): `npm run release -- patch`
 3. Bump `package.json` (this is the version **electron-updater** uses).
 4. Signed + notarized **fat** arm64 and x64 with `PUBLISH_TO_GITHUB=true` and `--publish never`.
 5. Merge `latest-mac.yml` for both architectures.
-6. Commit `Release X.Y.Z`, tag `vX.Y.Z`, push commit + tag, then `gh release create` with assets (unless `--no-push`).
+6. Commit `Release X.Y.Z [skip ci]`, tag `vX.Y.Z`, push commit + tag, then `gh release create` with assets (unless `--no-push`). Tag pushes do not trigger CI; the release commit skips CI on `main`.
 8. Print **friend message** via `scripts/print-friend-release-message.sh`.
 
 Re-run friend text anytime: `npm run release:message`
@@ -75,7 +75,7 @@ Releases URL: https://github.com/jsartin513/graphic_video_editor/releases/latest
 
 1. Confirm GitHub release has **both** fat DMGs, zips, and **`latest-mac.yml`**.
 2. Give user the friend message (script prints it; or `npm run release:message`).
-3. Do **not** re-enable the disabled CI `release` job in `.github/workflows/build.yml` unless CI signing exists ([FUTURE_RELEASE.md](../../../FUTURE_RELEASE.md)).
+3. Do **not** re-enable the disabled CI `release` job or re-add `on.push.tags: v*` in `.github/workflows/build.yml` unless CI signing exists ([FUTURE_RELEASE.md](../../../FUTURE_RELEASE.md)). Local releases must stay off the Actions budget.
 
 ## Troubleshooting
 

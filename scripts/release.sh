@@ -131,7 +131,7 @@ git add package.json package-lock.json
 if git diff --cached --quiet; then
   echo "No package.json changes to commit; tagging current HEAD for ${NEW_VERSION}."
 else
-  git commit -m "Release ${NEW_VERSION}"
+  git commit -m "Release ${NEW_VERSION} [skip ci]"
 fi
 
 if git rev-parse "$TAG" >/dev/null 2>&1; then
