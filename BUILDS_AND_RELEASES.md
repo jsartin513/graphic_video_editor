@@ -113,79 +113,28 @@ The `checkFFmpeg()` function:
 
 **Why direct spawn?**: Using `which` doesn't work for non-PATH binaries.
 
-## GitHub Actions Release Workflow
+## GitHub Actions workflow (tests + optional mac packaging)
 
-### Triggering Releases
+Friend-facing **GitHub Releases** (signed DMGs, `latest-mac.yml`) come from **`npm run official-release`** / **`npm run release`** locally — see [RELEASE.md](RELEASE.md). CI does not publish releases.
 
-Releases are created automatically on:
-1. **Push to main/master**: Creates a **prerelease** with tag like `v{run_number}-{sha}`
-2. **Tag push** (e.g., `v1.0.0`): Creates a **full release** with the tag name
+### What triggers CI (`.github/workflows/build.yml`)
 
-### Workflow Structure
+| Event | Linux `test` + `e2e` | macOS packaging (4 jobs) |
+|-------|----------------------|---------------------------|
+| PR (non-draft, non-docs-only) | Yes | Only if packaging paths change (`build/**`, `package.json`, workflow, …) |
+| Push to `main` / `master` (non-docs) | Yes | No |
+| Push of `v*` tag | **No** (not in workflow `on.push`) | **No** |
+| `workflow_dispatch` | Yes | Yes (unless `mac_packaging: false`) |
 
-```yaml
-jobs:
-  # Build jobs (run in parallel)
-  build-x64-fat:
-  build-x64-lite:
-  build-arm64-fat:
-  build-arm64-lite:
-  
-  # Release job (waits for all builds)
-  release:
-    needs: [build-x64-fat, build-x64-lite, build-arm64-fat, build-arm64-lite]
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
-    permissions:
-      contents: write  # Required!
-      id-token: write
-```
+Local release commits use message `Release X.Y.Z [skip ci]`, so the version-bump push to `main` does not start a workflow run. Tag pushes are not workflow triggers.
 
-### Required Permissions
+### macOS jobs in CI
 
-**Critical**: The release job MUST have `contents: write` permission, otherwise you'll get:
-```
-Error: Resource not accessible by integration
-```
+Unsigned DMG/ZIP builds run only when `packaging-gate` sets `mac=true` (packaging-path PRs or manual dispatch). They upload **artifacts** only; the `release` job is **`if: false`** until CI signing exists ([FUTURE_RELEASE.md](FUTURE_RELEASE.md)).
 
-Add to the release job:
-```yaml
-permissions:
-  contents: write
-  id-token: write
-```
+### Historical note (disabled `release` job)
 
-### File Patterns
-
-**Problem**: ZIP files may not always be created, causing pattern matching failures.
-
-**Solution**: Use wildcard patterns and don't fail on missing files:
-
-```yaml
-files: |
-  artifacts/**/*.dmg
-  artifacts/**/*.zip
-fail_on_unmatched_files: false
-```
-
-### Dynamic Release Names
-
-Releases from pushes vs tags need different naming:
-
-```yaml
-- name: Determine release tag and name
-  run: |
-    if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-      # Tag push: Use tag name
-      TAG_NAME="${{ github.ref_name }}"
-      RELEASE_NAME="Release ${{ github.ref_name }}"
-      IS_PRERELEASE="false"
-    else
-      # Push to main: Use run number + SHA
-      TAG_NAME="v${{ github.run_number }}-${{ github.sha }}"
-      RELEASE_NAME="Build from main (${{ github.sha }} - Run #${{ github.run_number }})"
-      IS_PRERELEASE="true"
-    fi
-```
+The workflow still contains a disabled `release` job with `contents: write` and wildcard artifact upload patterns (`fail_on_unmatched_files: false`) for a possible future when CI can sign and publish. Do not re-enable without Apple signing secrets in GitHub.
 
 ## Testing Strategy
 
@@ -612,10 +561,9 @@ permissions:
 
 ### Distribution
 
-1. **Tag releases** for stable versions: `git tag v1.0.0 && git push origin v1.0.0`
-2. **Pushes to main** create prereleases for testing
-3. **Share release links**: `https://github.com/owner/repo/releases/latest`
-4. **Include installation instructions** for non-technical users
+1. **Ship friend releases** with `npm run official-release` (tags `vX.Y.Z`, GitHub Release assets, `[skip ci]` on the version commit — no CI cost).
+2. **Share release links**: `https://github.com/jsartin513/graphic_video_editor/releases/latest`
+3. **Include installation instructions** for non-technical users ([DISTRIBUTION_GUIDE.md](DISTRIBUTION_GUIDE.md))
 
 ## Key Files Reference
 
