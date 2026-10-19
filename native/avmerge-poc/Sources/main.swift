@@ -36,6 +36,14 @@ struct AvMergePOC {
             try await mergeCommand(args: args)
         case "probe":
             try await probeCommand(args: args)
+        case "investigate":
+            try await investigateCommand(args: args)
+        case "gpmd-index":
+            try gpmdIndexCommand(args: args)
+        case "gpmd-plan":
+            try gpmdPlanCommand(args: args)
+        case "gpmd-boundary":
+            try gpmdBoundaryCommand(args: args)
         case "help", "-h", "--help":
             print(usageText)
         default:
@@ -49,6 +57,10 @@ struct AvMergePOC {
     Usage:
       avmerge-poc merge [--output PATH] [--engine export|writer] [--trim-start SEC] [--trim-end SEC] INPUT ...
       avmerge-poc probe INPUT
+      avmerge-poc investigate [--precise] INPUT
+      avmerge-poc gpmd-index INPUT
+      avmerge-poc gpmd-plan INPUT ...
+      avmerge-poc gpmd-boundary CLIP_A CLIP_B
 
     Options:
       --engine export   AVAssetExportSession + AVAssetExportPresetPassthrough (default)
@@ -183,5 +195,73 @@ struct AvMergePOC {
         )
         let data = try JSONEncoder().encode(result)
         print(String(data: data, encoding: .utf8)!)
+    }
+
+    static func investigateCommand(args: [String]) async throws {
+        var preferPrecise = false
+        var path: String?
+        for arg in args {
+            if arg == "--precise" { preferPrecise = true }
+            else if !arg.hasPrefix("-") { path = arg }
+        }
+        guard let path else { throw CLIError.usage("investigate requires INPUT\n\n\(usageText)") }
+        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: false)
+        let report = try await GpmdInvestigation.investigate(url: url, preferPreciseDuration: preferPrecise)
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        print(String(data: try enc.encode(report), encoding: .utf8)!)
+    }
+
+    static func gpmdIndexCommand(args: [String]) throws {
+        guard let path = args.first(where: { !$0.hasPrefix("-") }) else {
+            throw CLIError.usage("gpmd-index requires INPUT\n\n\(usageText)")
+        }
+        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: false)
+        let idx = try GpmdMP4.indexFile(at: url)
+        struct Out: Codable {
+            let path: String
+            let durationSeconds: Double?
+            let gpmdSampleCount: Int?
+            let gpmdTimescale: UInt32?
+            let gpmdHandlerName: String?
+            let gpmdFirstPayloadHex: String?
+            let tmcdTrackID: UInt32?
+        }
+        let hex = try? GpmdMP4.firstGpmdPayloadHex(at: url)
+        let out = Out(
+            path: idx.path,
+            durationSeconds: idx.durationSeconds,
+            gpmdSampleCount: idx.gpmd?.samples.count,
+            gpmdTimescale: idx.gpmd?.timescale,
+            gpmdHandlerName: idx.gpmd?.handlerName,
+            gpmdFirstPayloadHex: hex,
+            tmcdTrackID: idx.tmcdTrackID
+        )
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        print(String(data: try enc.encode(out), encoding: .utf8)!)
+    }
+
+    static func gpmdPlanCommand(args: [String]) throws {
+        let paths = args.filter { !$0.hasPrefix("-") }
+        guard paths.count >= 1 else { throw CLIError.usage("gpmd-plan requires INPUT ...\n\n\(usageText)") }
+        let urls = paths.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: false) }
+        let plan = try GpmdMP4.planGpmdConcat(inputs: urls)
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        print(String(data: try enc.encode(plan), encoding: .utf8)!)
+    }
+
+    static func gpmdBoundaryCommand(args: [String]) throws {
+        let paths = args.filter { !$0.hasPrefix("-") }
+        guard paths.count == 2 else {
+            throw CLIError.usage("gpmd-boundary requires CLIP_A CLIP_B\n\n\(usageText)")
+        }
+        let a = URL(fileURLWithPath: (paths[0] as NSString).expandingTildeInPath, isDirectory: false)
+        let b = URL(fileURLWithPath: (paths[1] as NSString).expandingTildeInPath, isDirectory: false)
+        let report = try GpmdVerify.boundaryReport(clipA: a, clipB: b)
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        print(String(data: try enc.encode(report), encoding: .utf8)!)
     }
 }

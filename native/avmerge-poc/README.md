@@ -91,6 +91,8 @@ $FP -hide_banner -show_streams "$OUT/merged-ffmpeg.mp4"
 
 ### 2. GPMF (`gpmd`) and timecode (`tmcd`)
 
+> **Deep dive (2026-10-18 follow-up):** [`GPMD_INVESTIGATION.md`](GPMD_INVESTIGATION.md) — AVFoundation cannot see or merge `gpmd`; hybrid Swift BMFF stitch documented; current FFmpeg app merge also drops GPMF.
+
 **Source clip (ffprobe)** — four streams:
 
 ```
