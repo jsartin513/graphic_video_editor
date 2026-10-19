@@ -384,57 +384,73 @@ private struct Atom {
 private struct AtomReader {
     let data: Data
 
+    private struct BoxHeader {
+        let name: String
+        let headerSize: Int
+        let totalSize: Int
+    }
+
     func firstTopLevelAtom(named target: String) -> Atom? {
         parse(offset: 0, end: data.count)?.children.first { $0.name == target }
     }
 
     private func parse(offset: Int, end: Int) -> Atom? {
-        var children: [Atom] = []
-        var pos = offset
-        while pos + 8 <= end {
-            let size = Int(readU32(pos))
-            let name = fourCC(pos + 4)
-            guard size >= 8, pos + size <= end else { break }
-            let payloadStart = pos + 8
-            let payloadEnd = pos + size
-            let containerTypes = ["moov", "trak", "mdia", "minf", "stbl", "gmhd", "edts"]
-            let childAtoms: [Atom]
-            if containerTypes.contains(name) {
-                childAtoms = parseChildren(start: payloadStart, end: payloadEnd)
-            } else {
-                childAtoms = []
-            }
-            let payload = data[payloadStart..<payloadEnd]
-            children.append(Atom(name: name, data: Data(payload), children: childAtoms))
-            pos += size
-        }
-        return Atom(name: "root", data: Data(), children: children)
+        Atom(name: "root", data: Data(), children: parseChildren(start: offset, end: end))
     }
 
     private func parseChildren(start: Int, end: Int) -> [Atom] {
         var children: [Atom] = []
         var pos = start
-        while pos + 8 <= end {
-            let size = Int(readU32(pos))
-            let name = fourCC(pos + 4)
-            guard size >= 8, pos + size <= end else { break }
-            let payloadStart = pos + 8
-            let payloadEnd = pos + size
+        while pos < end {
+            guard let header = readBoxHeader(at: pos, containerEnd: end) else { break }
+            let payloadStart = pos + header.headerSize
+            let boxEnd = pos + header.totalSize
             let containerTypes = ["moov", "trak", "mdia", "minf", "stbl", "gmhd", "edts"]
             let childAtoms: [Atom]
-            if containerTypes.contains(name) {
-                childAtoms = parseChildren(start: payloadStart, end: payloadEnd)
+            if containerTypes.contains(header.name) {
+                childAtoms = parseChildren(start: payloadStart, end: boxEnd)
             } else {
                 childAtoms = []
             }
-            children.append(Atom(name: name, data: Data(data[payloadStart..<payloadEnd]), children: childAtoms))
-            pos += size
+            let payload = data[payloadStart..<boxEnd]
+            children.append(Atom(name: header.name, data: Data(payload), children: childAtoms))
+            pos = boxEnd
         }
         return children
     }
 
+    /// ISO BMFF box header: size 0 → to container end; size 1 → 64-bit `largesize` after type.
+    private func readBoxHeader(at pos: Int, containerEnd: Int) -> BoxHeader? {
+        guard pos + 8 <= containerEnd else { return nil }
+        let size32 = readU32(pos)
+        let name = fourCC(pos + 4)
+
+        if size32 == 0 {
+            let total = containerEnd - pos
+            guard total >= 8 else { return nil }
+            return BoxHeader(name: name, headerSize: 8, totalSize: total)
+        }
+
+        if size32 == 1 {
+            guard pos + 16 <= containerEnd else { return nil }
+            let largeSize = readU64(pos + 8)
+            guard largeSize >= 16 else { return nil }
+            let total = Int(largeSize)
+            guard total >= 16, pos + total <= containerEnd else { return nil }
+            return BoxHeader(name: name, headerSize: 16, totalSize: total)
+        }
+
+        let total = Int(size32)
+        guard total >= 8, pos + total <= containerEnd else { return nil }
+        return BoxHeader(name: name, headerSize: 8, totalSize: total)
+    }
+
     private func readU32(_ offset: Int) -> UInt32 {
         UInt32(data[offset]) << 24 | UInt32(data[offset + 1]) << 16 | UInt32(data[offset + 2]) << 8 | UInt32(data[offset + 3])
+    }
+
+    private func readU64(_ offset: Int) -> UInt64 {
+        (UInt64(readU32(offset)) << 32) | UInt64(readU32(offset + 4))
     }
 
     private func fourCC(_ offset: Int) -> String {

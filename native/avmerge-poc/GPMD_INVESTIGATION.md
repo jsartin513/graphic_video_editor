@@ -29,7 +29,7 @@ Stream #0:2: Data gpmd (GoPro MET)
 Stream #0:3: Data tmcd
 ```
 
-**Pure Swift BMFF index** (`avmerge-poc gpmd-index`) finds the track Apple omits:
+**Pure Swift BMFF index** (`avmerge-poc gpmd-index`) finds the track Apple omits (120 s test clip):
 
 ```json
 {
@@ -39,6 +39,8 @@ Stream #0:3: Data tmcd
   "gpmdFirstPayloadHex": "44 45 56 43 ... DEVC ... ACCL ..."
 }
 ```
+
+**Full chapter (17 GB `GX015357`, read-only):** after fixing ISO BMFF **`largesize` (size==1)** and **size==0** handling in `GpmdMP4.swift`, `gpmd-index` reaches trailing `moov` and reports **`gpmdSampleCount`: 1216**, **`durationSeconds`: 1217.216**, handler **`GoPro MET`**. An earlier parser revision stopped at the first `mdat` largesize box and incorrectly returned “no moov”; AVFoundation/`ffprobe` conclusions in this doc did not depend on that bug, but **Swift-only GPMF read paths must support 64-bit box sizes** for real GoPro files.
 
 GoPro stores GPMF in a **`meta` handler** track with sample description **`gpmd`** (see [GPMF MP4 structure](https://gopro.github.io/gpmf-parser/)). AVFoundation exposes **`tmcd`** but **does not surface the `meta`/`gpmd` track** as an `AVAssetTrack`.
 
