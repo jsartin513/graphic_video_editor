@@ -33,6 +33,8 @@ IPC handlers are organized into modules under `main/`:
 | `video-grouping.js` | Group videos by session ID for merge workflow |
 | `video-scanner.js` | Recursively scan directories for video files |
 | `ffmpeg-resolver.js` | Resolve FFmpeg/FFprobe paths (bundled or system) |
+
+Mac App Store / AVFoundation migration plan: [docs/avfoundation/README.md](docs/avfoundation/README.md).
 | `quality-utils.js` | Quality presets and validation for merge |
 | `error-mapper.js` | Map technical errors to user-friendly messages |
 | `renderer-utils.js` | Pure formatting helpers (duration, paths, bitrate, etc.) |
