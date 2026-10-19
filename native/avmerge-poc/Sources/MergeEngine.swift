@@ -23,6 +23,21 @@ struct MergeReport: Codable {
 struct TrimReport: Codable {
     let startSeconds: Double?
     let endSeconds: Double?
+
+    /// Open-ended trim uses `positiveInfinity` in `CMTimeRange`; JSON cannot represent `inf`.
+    static func from(timeRange: CMTimeRange) -> TrimReport {
+        TrimReport(
+            startSeconds: Self.jsonSeconds(timeRange.start),
+            endSeconds: Self.jsonSeconds(timeRange.end)
+        )
+    }
+
+    private static func jsonSeconds(_ time: CMTime) -> Double? {
+        guard time.isValid, !time.isIndefinite else { return nil }
+        let seconds = CMTimeGetSeconds(time)
+        guard seconds.isFinite else { return nil }
+        return seconds
+    }
 }
 
 struct CompositionTrackReport: Codable {
@@ -61,12 +76,7 @@ enum Merger {
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
 
         let fileType = outputFileType(for: outputURL)
-        let trimReport: TrimReport? = trimRange.map {
-            TrimReport(
-                startSeconds: $0.start.isValid ? $0.start.seconds : nil,
-                endSeconds: $0.end.isValid ? $0.end.seconds : nil
-            )
-        }
+        let trimReport: TrimReport? = trimRange.map { TrimReport.from(timeRange: $0) }
 
         switch engine {
         case .exportSession:
@@ -274,10 +284,15 @@ enum Merger {
         reader.startReading()
         writer.startSession(atSourceTime: timeRange.start)
 
+        let session = WriterPumpSession(reader: reader, writer: writer)
         try await withThrowingTaskGroup(of: Void.self) { group in
             for pipe in pipes {
                 group.addTask {
-                    try await pump(from: pipe.output, to: pipe.input, reader: reader, writer: writer)
+                    try await pump(
+                        from: pipe.output,
+                        to: pipe.input,
+                        session: session
+                    )
                 }
             }
             try await group.waitForAll()
@@ -298,32 +313,113 @@ enum Merger {
     static func pump(
         from output: AVAssetReaderTrackOutput,
         to input: AVAssetWriterInput,
-        reader: AVAssetReader,
-        writer: AVAssetWriter
+        session: WriterPumpSession
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let resumeOnce = PumpResumeOnce(continuation: continuation)
             let queue = DispatchQueue(label: "avmerge-poc.pump")
             input.requestMediaDataWhenReady(on: queue) {
+                if let failure = session.failureError() {
+                    input.markAsFinished()
+                    resumeOnce.fail(failure)
+                    return
+                }
                 while input.isReadyForMoreMediaData {
-                    if reader.status == .failed {
+                    if let failure = session.failureError() {
                         input.markAsFinished()
-                        continuation.resume(throwing: reader.error ?? NSError(domain: "avmerge-poc", code: 9, userInfo: nil))
+                        resumeOnce.fail(failure)
+                        return
+                    }
+                    if session.reader.status == .failed {
+                        let error = session.reader.error ?? NSError(domain: "avmerge-poc", code: 9, userInfo: nil)
+                        input.markAsFinished()
+                        session.recordFailure(error)
+                        resumeOnce.fail(error)
                         return
                     }
                     if let sample = output.copyNextSampleBuffer() {
                         if !input.append(sample) {
+                            let error = session.writer.error ?? NSError(
+                                domain: "avmerge-poc",
+                                code: 10,
+                                userInfo: [NSLocalizedDescriptionKey: "append failed"]
+                            )
                             input.markAsFinished()
-                            continuation.resume(throwing: writer.error ?? NSError(domain: "avmerge-poc", code: 10, userInfo: [NSLocalizedDescriptionKey: "append failed"]))
+                            session.recordFailure(error)
+                            resumeOnce.fail(error)
                             return
                         }
                     } else {
                         input.markAsFinished()
-                        continuation.resume()
+                        resumeOnce.finish()
                         return
                     }
                 }
             }
         }
+    }
+}
+
+/// Shared writer session state so one pump failure unblocks the rest.
+final class WriterPumpSession: @unchecked Sendable {
+    let reader: AVAssetReader
+    let writer: AVAssetWriter
+    private let lock = NSLock()
+    private var failure: Error?
+
+    init(reader: AVAssetReader, writer: AVAssetWriter) {
+        self.reader = reader
+        self.writer = writer
+    }
+
+    func failureError() -> Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return failure
+    }
+
+    func recordFailure(_ error: Error) {
+        lock.lock()
+        let alreadyFailed = failure != nil
+        if failure == nil {
+            failure = error
+        }
+        lock.unlock()
+        guard !alreadyFailed else { return }
+        reader.cancelReading()
+        writer.cancelWriting()
+    }
+}
+
+/// Ensures `CheckedContinuation` is resumed at most once (requestMediaDataWhenReady may fire repeatedly).
+final class PumpResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(continuation: CheckedContinuation<Void, Error>) {
+        self.continuation = continuation
+    }
+
+    func finish() {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume()
+    }
+
+    func fail(_ error: Error) {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return
+        }
+        self.continuation = nil
+        lock.unlock()
+        continuation.resume(throwing: error)
     }
 }
 
