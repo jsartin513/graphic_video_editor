@@ -29,8 +29,8 @@ function archFromName(name) {
 }
 
 function extFromName(name) {
-  const m = name.match(/\.(dmg|zip)(?:\.blockmap)?$/);
-  return m ? m[1] : null;
+  const m = name.match(/\.(dmg|zip|exe)(?:\.blockmap)?$/i);
+  return m ? m[1].toLowerCase() : null;
 }
 
 function findSourceFile(distDir, version, targetUrl) {
@@ -99,8 +99,9 @@ function main() {
     }
   }
 
-  fs.copyFileSync(resolvedYml, path.join(path.resolve(outDir), 'latest-mac.yml'));
-  console.log(`Staged ${staged.size} artifacts + latest-mac.yml in ${outDir}`);
+  const ymlBasename = path.basename(resolvedYml);
+  fs.copyFileSync(resolvedYml, path.join(path.resolve(outDir), ymlBasename));
+  console.log(`Staged ${staged.size} artifacts + ${ymlBasename} in ${outDir}`);
 }
 
 main();

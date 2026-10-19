@@ -7,104 +7,63 @@ const fsSync = require('fs');
 const { spawn, execSync } = require('child_process');
 const { app } = require('electron');
 const { logger } = require('./logger');
+const { bundledBinaryFileName, getPackagedResourcesBasePath } = require('./ffmpeg-binary-utils');
 
 let ffmpegPath = null;
 let ffprobePath = null;
 
+function chmodExecutableIfSupported(filePath) {
+  if (process.platform === 'win32') {
+    return;
+  }
+  try {
+    fsSync.chmodSync(filePath, 0o755);
+  } catch (e) {
+    logger.warn('chmodExecutableIfSupported failed', { filePath, error: e.message });
+  }
+}
+
 function getBundledBinaryPath(binaryName) {
   try {
+    const fileName = bundledBinaryFileName(binaryName, process.platform);
+
     if (app.isPackaged) {
-      let resourcesPath = process.resourcesPath;
+      const resourcesPath = getPackagedResourcesBasePath(app);
+      const candidateNames = process.platform === 'win32'
+        ? [fileName, binaryName]
+        : [fileName, `${binaryName}.exe`];
 
-      if (!resourcesPath) {
-        try {
-          resourcesPath = app.getPath('resources');
-        } catch (e) {
-          try {
-            const exePath = app.getPath('exe');
-            resourcesPath = path.join(path.dirname(exePath), '..', 'Resources');
-          } catch (exeError) {
-            logger.error('getBundledBinaryPath: Error getting resources path', {
-              resourcesPathError: e.message,
-              exePathError: exeError.message
-            });
-            resourcesPath = path.join(__dirname, '..');
+      const searchRoots = [
+        path.join(resourcesPath, 'resources'),
+        resourcesPath
+      ];
+
+      for (const root of searchRoots) {
+        for (const name of candidateNames) {
+          const binaryPath = path.join(root, name);
+          if (fsSync.existsSync(binaryPath)) {
+            chmodExecutableIfSupported(binaryPath);
+            const stats = fsSync.statSync(binaryPath);
+            logger.info('getBundledBinaryPath: Found binary', { binaryName, binaryPath, size: stats.size });
+            return binaryPath;
           }
         }
       }
 
-      const binaryPath = path.join(resourcesPath, 'resources', binaryName);
+      logger.warn('getBundledBinaryPath: Binary not found in any location', { binaryName, resourcesPath });
+      return null;
+    }
 
-      logger.debug('getBundledBinaryPath: Looking for binary', {
-        binaryName,
-        binaryPath,
-        resourcesPath,
-        processResourcesPath: process.resourcesPath || 'undefined'
-      });
-
-      if (fsSync.existsSync(binaryPath)) {
-        try {
-          fsSync.chmodSync(binaryPath, 0o755);
-          const stats = fsSync.statSync(binaryPath);
-          logger.info('getBundledBinaryPath: Found binary', { binaryName, binaryPath, size: stats.size });
-          return binaryPath;
-        } catch (e) {
-          logger.warn('getBundledBinaryPath: Failed to set executable permissions', { binaryPath, error: e.message });
-          return binaryPath;
-        }
-      } else {
-        logger.debug('getBundledBinaryPath: Binary not found at expected path', {
-          binaryName,
-          binaryPath,
-          resourcesDirExists: fsSync.existsSync(resourcesPath)
-        });
-
-        if (fsSync.existsSync(resourcesPath)) {
-          const contents = fsSync.readdirSync(resourcesPath);
-          logger.debug('getBundledBinaryPath: Resources directory contents', { contents });
-          const resourcesSubdir = path.join(resourcesPath, 'resources');
-          if (fsSync.existsSync(resourcesSubdir)) {
-            const subdirContents = fsSync.readdirSync(resourcesSubdir);
-            logger.debug('getBundledBinaryPath: Resources subdirectory contents', { subdirContents });
-          }
-        }
-
-        const altPaths = [
-          path.join(resourcesPath, binaryName),
-          process.resourcesPath ? path.join(process.resourcesPath, 'resources', binaryName) : null
-        ];
-        try {
-          altPaths.push(path.join(app.getPath('resources'), 'resources', binaryName));
-        } catch (e) {
-          // app.getPath('resources') not available, skip
-        }
-        const validAltPaths = altPaths.filter(p => p !== null);
-
-        for (const altPath of validAltPaths) {
-          if (fsSync.existsSync(altPath)) {
-            logger.info('getBundledBinaryPath: Found binary at alternative location', { binaryName, altPath });
-            try {
-              fsSync.chmodSync(altPath, 0o755);
-            } catch (e) {
-              logger.warn('getBundledBinaryPath: Failed to chmod alternative path', { altPath, error: e.message });
-            }
-            return altPath;
-          }
-        }
-        logger.warn('getBundledBinaryPath: Binary not found in any location', { binaryName });
-        return null;
+    try {
+      if (binaryName === 'ffmpeg') {
+        return require('ffmpeg-static');
       }
-    } else {
-      try {
-        if (binaryName === 'ffmpeg') {
-          return require('ffmpeg-static');
-        } else if (binaryName === 'ffprobe') {
-          const ffprobeStatic = require('ffprobe-static');
-          return ffprobeStatic.path || ffprobeStatic;
-        }
-      } catch (e) {
-        return null;
+      if (binaryName === 'ffprobe') {
+        const ffprobeStatic = require('ffprobe-static');
+        return ffprobeStatic.path || ffprobeStatic;
       }
+    } catch (e) {
+      return null;
     }
 
     return null;
@@ -115,38 +74,94 @@ function getBundledBinaryPath(binaryName) {
 }
 
 function findSystemExecutablePath(command) {
-  try {
-    const commonPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
+  const commandWithExt = process.platform === 'win32' && !command.endsWith('.exe')
+    ? `${command}.exe`
+    : command;
 
+  if (process.platform === 'win32') {
     try {
-      const envPath = process.env.PATH || '';
-      const fullPath = [envPath, ...commonPaths].filter(p => p).join(':');
-      const result = execSync(`which ${command}`, {
+      const result = execSync(`where ${commandWithExt}`, {
         encoding: 'utf8',
-        env: { ...process.env, PATH: fullPath },
-        shell: '/bin/bash'
+        shell: true,
+        stdio: ['ignore', 'pipe', 'ignore']
       }).trim();
-      if (result && result.length > 0) {
-        return result;
+      const firstLine = result.split(/\r?\n/).find((line) => line.trim().length > 0);
+      if (firstLine && fsSync.existsSync(firstLine.trim())) {
+        return firstLine.trim();
       }
     } catch (e) {
-      // which failed, try direct paths
+      // where failed
     }
 
-    for (const basePath of commonPaths) {
-      const fullCommandPath = path.join(basePath, command);
+    const pathEnv = process.env.PATH || '';
+    const segments = pathEnv.split(path.delimiter).filter(Boolean);
+    for (const segment of segments) {
+      const full = path.join(segment, commandWithExt);
       try {
-        fsSync.accessSync(fullCommandPath, fsSync.constants.F_OK);
-        return fullCommandPath;
-      } catch (e) {
-        // File doesn't exist, continue
+        fsSync.accessSync(full, fsSync.constants.F_OK);
+        return full;
+      } catch (err) {
+        // continue
       }
     }
-
-    return null;
-  } catch (error) {
     return null;
   }
+
+  const commonPaths = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
+
+  try {
+    const envPath = process.env.PATH || '';
+    const fullPath = [envPath, ...commonPaths].filter((p) => p).join(':');
+    const result = execSync(`which ${command}`, {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: fullPath },
+      shell: '/bin/bash'
+    }).trim();
+    if (result && result.length > 0) {
+      return result;
+    }
+  } catch (e) {
+    // which failed
+  }
+
+  for (const basePath of commonPaths) {
+    const fullCommandPath = path.join(basePath, command);
+    try {
+      fsSync.accessSync(fullCommandPath, fsSync.constants.F_OK);
+      return fullCommandPath;
+    } catch (e) {
+      // continue
+    }
+  }
+
+  return null;
+}
+
+function detectPackageManager() {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      const winget = spawn('where', ['winget'], { shell: true });
+      winget.on('close', (code) => resolve({ brewFound: false, wingetFound: code === 0 }));
+      winget.on('error', () => resolve({ brewFound: false, wingetFound: false }));
+      return;
+    }
+    const brewCheck = spawn('which', ['brew'], {
+      shell: true,
+      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+    });
+    brewCheck.on('close', (code) => resolve({ brewFound: code === 0, wingetFound: false }));
+    brewCheck.on('error', () => resolve({ brewFound: false, wingetFound: false }));
+  });
+}
+
+function spawnWhich(command) {
+  if (process.platform === 'win32') {
+    return spawn('where', [command.endsWith('.exe') ? command : `${command}.exe`], { shell: true });
+  }
+  return spawn('which', [command], {
+    shell: true,
+    env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
+  });
 }
 
 function getFFmpegPath() {
@@ -193,35 +208,44 @@ async function checkFFmpeg() {
     let ffmpegFound = false;
     let ffprobeFound = false;
     let brewFound = false;
+    let wingetFound = false;
     let ffmpegVersion = null;
     let checksDone = 0;
     let versionCheckDone = false;
+
+    function finishResult() {
+      resolve({
+        installed: ffmpegFound && ffprobeFound,
+        ffmpegFound,
+        ffprobeFound,
+        brewFound,
+        wingetFound,
+        ffmpegVersion
+      });
+    }
 
     function checkComplete() {
       checksDone++;
       if (checksDone === 3 && versionCheckDone) {
         logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
-        resolve({
-          installed: ffmpegFound && ffprobeFound,
-          ffmpegFound,
-          ffprobeFound,
-          brewFound,
-          ffmpegVersion
-        });
+        finishResult();
       }
     }
 
     if (bundledFFmpeg && bundledFFprobe) {
       logger.debug('checkFFmpeg: Testing bundled binaries directly');
 
-      function bundledDone() {
-        logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
-        resolve({
-          installed: ffmpegFound && ffprobeFound,
-          ffmpegFound,
-          ffprobeFound,
-          brewFound,
-          ffmpegVersion
+      function bundledDone(includePackageManager = true) {
+        if (!includePackageManager) {
+          logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
+          finishResult();
+          return;
+        }
+        detectPackageManager().then(({ brewFound: brew, wingetFound: winget }) => {
+          brewFound = brew;
+          wingetFound = winget;
+          logger.info('checkFFmpeg: Final result', { ffmpegFound, ffprobeFound, installed: ffmpegFound && ffprobeFound });
+          finishResult();
         });
       }
 
@@ -240,62 +264,39 @@ async function checkFFmpeg() {
             if (match) {
               ffmpegVersion = match[1];
             }
-          } else {
-            logger.debug('checkFFmpeg: Bundled ffmpeg test failed', { code });
           }
 
           try {
             const testFFprobe = spawn(bundledFFprobe, ['-version']);
             const ffprobeTimer = setTimeout(() => testFFprobe.kill(), 5000);
-            testFFprobe.on('close', (code) => {
+            testFFprobe.on('close', (probeCode) => {
               clearTimeout(ffprobeTimer);
-              ffprobeFound = code === 0;
-              if (!ffprobeFound) {
-                logger.debug('checkFFmpeg: Bundled ffprobe test failed', { code });
-              }
-
-              const brewCheck = spawn('which', ['brew'], {
-                shell: true,
-                env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-              });
-              brewCheck.on('close', (code) => {
-                brewFound = code === 0;
-                bundledDone();
-              });
-              brewCheck.on('error', () => {
-                bundledDone();
-              });
-            });
-            testFFprobe.on('error', (err) => {
-              clearTimeout(ffprobeTimer);
-              logger.error('checkFFmpeg: Error testing bundled ffprobe', { error: err.message });
-              ffprobeFound = false;
+              ffprobeFound = probeCode === 0;
               bundledDone();
             });
+            testFFprobe.on('error', () => {
+              clearTimeout(ffprobeTimer);
+              ffprobeFound = false;
+              bundledDone(false);
+            });
           } catch (err) {
-            logger.error('checkFFmpeg: Error spawning bundled ffprobe test', { error: err.message });
             ffprobeFound = false;
-            bundledDone();
+            bundledDone(false);
           }
         });
-        testFFmpeg.on('error', (err) => {
+        testFFmpeg.on('error', () => {
           clearTimeout(ffmpegTimer);
-          logger.error('checkFFmpeg: Error testing bundled ffmpeg', { error: err.message });
           ffmpegFound = false;
-          bundledDone();
+          bundledDone(false);
         });
       } catch (err) {
-        logger.error('checkFFmpeg: Error spawning bundled ffmpeg test', { error: err.message });
         ffmpegFound = false;
-        bundledDone();
+        bundledDone(false);
       }
       return;
     }
 
-    const ffmpegCheck = spawn('which', ['ffmpeg'], {
-      shell: true,
-      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-    });
+    const ffmpegCheck = spawnWhich('ffmpeg');
     ffmpegCheck.on('close', (code) => {
       ffmpegFound = code === 0 || foundFFmpegPath !== null;
       if (ffmpegFound && foundFFmpegPath) {
@@ -326,10 +327,7 @@ async function checkFFmpeg() {
       checkComplete();
     });
 
-    const ffprobeCheck = spawn('which', ['ffprobe'], {
-      shell: true,
-      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-    });
+    const ffprobeCheck = spawnWhich('ffprobe');
     ffprobeCheck.on('close', (code) => {
       ffprobeFound = code === 0 || foundFFprobePath !== null;
       checkComplete();
@@ -338,15 +336,9 @@ async function checkFFmpeg() {
       checkComplete();
     });
 
-    const brewCheck = spawn('which', ['brew'], {
-      shell: true,
-      env: { ...process.env, PATH: process.env.PATH || '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' }
-    });
-    brewCheck.on('close', (code) => {
-      brewFound = code === 0;
-      checkComplete();
-    });
-    brewCheck.on('error', () => {
+    detectPackageManager().then(({ brewFound: brew, wingetFound: winget }) => {
+      brewFound = brew;
+      wingetFound = winget;
       checkComplete();
     });
   });

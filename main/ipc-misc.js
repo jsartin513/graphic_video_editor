@@ -6,6 +6,16 @@ const path = require('path');
 const { app, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const { checkFFmpeg } = require('../src/ffmpeg-resolver');
+const { getPackagedResourcesBasePath } = require('../src/ffmpeg-binary-utils');
+
+const FFMPEG_WINGET_HINT = 'winget install --id Gyan.FFmpeg -e';
+
+function getManualInstallMessage() {
+  if (process.platform === 'win32') {
+    return `Install FFmpeg with ${FFMPEG_WINGET_HINT}, or use a fat Windows installer that bundles FFmpeg. See https://ffmpeg.org/download.html`;
+  }
+  return 'Install Homebrew from https://brew.sh, then run: brew install ffmpeg';
+}
 
 function registerMiscIpcHandlers() {
   ipcMain.handle('open-folder', async (event, folderPath) => {
@@ -40,7 +50,7 @@ function registerMiscIpcHandlers() {
 
   ipcMain.handle('get-test-videos-path', async () => {
     if (app.isPackaged) {
-      const resourcesPath = process.resourcesPath || path.join(path.dirname(app.getPath('exe')), '..', 'Resources');
+      const resourcesPath = getPackagedResourcesBasePath(app);
       return path.join(resourcesPath, 'test-videos');
     }
     return path.join(__dirname, '..', 'test-videos');
@@ -53,6 +63,52 @@ function registerMiscIpcHandlers() {
           resolve({ success: true, message: 'ffmpeg is already installed' });
           return;
         }
+
+        if (process.platform === 'win32') {
+          if (status.wingetFound) {
+            const wingetInstall = spawn('winget', ['install', '--id', 'Gyan.FFmpeg', '-e', '--accept-package-agreements', '--accept-source-agreements'], {
+              shell: true,
+              stdio: ['ignore', 'pipe', 'pipe']
+            });
+            let errorOutput = '';
+            wingetInstall.stderr.on('data', (data) => { errorOutput += data.toString(); });
+            wingetInstall.on('close', (code) => {
+              if (code === 0) {
+                checkFFmpeg().then((newStatus) => {
+                  if (newStatus.installed) {
+                    resolve({ success: true, message: 'ffmpeg installed successfully', version: newStatus.ffmpegVersion });
+                  } else {
+                    resolve({
+                      success: false,
+                      message: `Installation finished but ffmpeg was not found. Restart the app or run manually: ${FFMPEG_WINGET_HINT}`
+                    });
+                  }
+                });
+              } else {
+                resolve({
+                  success: false,
+                  message: errorOutput.trim() || `winget install failed (exit ${code}). Try: ${FFMPEG_WINGET_HINT}`
+                });
+              }
+            });
+            wingetInstall.on('error', (error) => {
+              resolve({
+                success: false,
+                needsWinget: true,
+                message: `Could not run winget (${error.message}). ${getManualInstallMessage()}`
+              });
+            });
+            return;
+          }
+
+          resolve({
+            success: false,
+            needsWinget: true,
+            message: getManualInstallMessage()
+          });
+          return;
+        }
+
         if (!status.brewFound) {
           resolve({
             success: false,

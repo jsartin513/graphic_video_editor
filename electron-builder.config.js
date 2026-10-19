@@ -40,11 +40,23 @@ function isValidExecutable(filePath) {
 }
 
 const resourcesDir = path.join(__dirname, 'resources');
-const ffmpegPath = path.join(resourcesDir, 'ffmpeg');
-const ffprobePath = path.join(resourcesDir, 'ffprobe');
-const resourcesExist = fs.existsSync(resourcesDir) && 
-  isValidExecutable(ffmpegPath) &&
-  isValidExecutable(ffprobePath);
+
+function hasBundledFfmpegResources() {
+  if (!fs.existsSync(resourcesDir)) {
+    return false;
+  }
+  const namePairs = [
+    ['ffmpeg', 'ffprobe'],
+    ['ffmpeg.exe', 'ffprobe.exe']
+  ];
+  return namePairs.some(
+    ([ffmpegName, ffprobeName]) =>
+      isValidExecutable(path.join(resourcesDir, ffmpegName)) &&
+      isValidExecutable(path.join(resourcesDir, ffprobeName))
+  );
+}
+
+const resourcesExist = hasBundledFfmpegResources();
 
 // Configure publish for auto-updates (generates latest-mac.yml when PUBLISH_TO_GITHUB=true)
 const publishConfig = process.env.PUBLISH_TO_GITHUB === 'true' ? {
@@ -79,6 +91,23 @@ function normalizeSigningIdentity(name) {
 
 const signingIdentity = normalizeSigningIdentity(process.env.CSC_NAME);
 
+const winIconPath = path.join(__dirname, 'build', 'icon.ico');
+const winIcon = fs.existsSync(winIconPath) ? winIconPath : undefined;
+if (!winIcon) {
+  console.warn('⚠️  Warning: build/icon.ico not found — run node scripts/create-win-icon.js');
+}
+
+const winConfig = {
+  target: [
+    {
+      target: 'nsis',
+      arch: ['x64']
+    }
+  ],
+  ...(winIcon && { icon: winIcon }),
+  ...(process.env.WIN_CSC_SUBJECT && { certificateSubjectName: process.env.WIN_CSC_SUBJECT })
+};
+
 const baseConfig = {
   appId: "com.videomerger.app",
   productName: "Video Merger",
@@ -102,6 +131,14 @@ const baseConfig = {
     notarize: process.env.APPLE_TEAM_ID
       ? { teamId: process.env.APPLE_TEAM_ID }
       : false
+  },
+  win: winConfig,
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    artifactName: process.env.BUNDLE_FFMPEG === 'false'
+      ? 'Video-Merger-${version}-${arch}-lite.${ext}'
+      : 'Video-Merger-${version}-${arch}-fat.${ext}'
   },
   // Only pack listed app files plus electron-updater (and its nested deps).
   // Do not require() other npm packages from main/ — they will be missing in asar.

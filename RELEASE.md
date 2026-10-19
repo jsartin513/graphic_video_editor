@@ -61,6 +61,8 @@ The script:
 
 CI does **not** publish releases (unsigned artifacts). Friend drops come from this local release flow. The workflow does **not** listen for `v*` tag pushes, so a local release should use **zero GitHub Actions minutes**. To run unsigned macOS packaging in CI, use **Actions → Build Video Editor → Run workflow** (`workflow_dispatch`, optional `mac_packaging` input).
 
+**Windows:** GitHub Actions builds unsigned **`Video-Merger-*-x64-fat.exe`** installers and `latest.yml` on `windows-latest` (job `build-win-fat`). Attach those assets to the same GitHub release as the Mac DMGs. Optional Authenticode signing: [docs/local/WINDOWS_CODE_SIGNING.md](docs/local/WINDOWS_CODE_SIGNING.md).
+
 ## How users upgrade
 
 | Install | First upgrade to a release with update metadata | Later releases |

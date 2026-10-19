@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { VIDEO_EXTENSIONS } = require('./video-scanner');
+const { listVolumesForPlatform } = require('./volume-enumeration');
 
 const SKIP_NAMES = new Set(['.DS_Store', 'Thumbs.db', '.localized']);
 
@@ -26,6 +27,9 @@ function getBrowserRoots(paths = {}) {
 }
 
 async function listVolumes(volumesPath = '/Volumes') {
+  if (process.platform === 'win32') {
+    return listVolumesForPlatform();
+  }
   try {
     const names = await fs.readdir(volumesPath);
     return names

@@ -184,6 +184,14 @@ Tests use realistic GoPro filename patterns:
 The bundled `test-videos/` folder uses `GX010001`, `GX020001`, and `GX030001` so **Prepare Merge** groups them into one output. See `test-videos/README.md`.
 
 ### File Paths
+### Windows manual QA matrix (before shipping a Windows release)
+
+- Fresh install from `Video-Merger-*-x64-fat.exe`
+- Choose folder / files, merge, split, undo/redo
+- Insert GoPro SD card (removable drive) — notification and load from card
+- Settings → Check for updates (with and without `app-update.yml`)
+- YouTube OAuth connect (desktop client JSON)
+
 Tests include cross-platform path handling:
 - Unix: `/videos/folder1/video.mp4`
 - Windows: `C:\\Users\\Videos\\video.mp4`

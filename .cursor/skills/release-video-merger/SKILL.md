@@ -73,7 +73,7 @@ Releases URL: https://github.com/jsartin513/graphic_video_editor/releases/latest
 
 ## Agent checklist after success
 
-1. Confirm GitHub release has **both** fat DMGs, zips, and **`latest-mac.yml`**.
+1. Confirm GitHub release has **both** fat DMGs, zips, and **`latest-mac.yml`**. For Windows, include **`Video-Merger-*-x64-fat.exe`** and **`latest.yml`** (from CI `build-win-fat` or `npm run build:fat:win` on a Windows machine).
 2. Give user the friend message (script prints it; or `npm run release:message`).
 3. Do **not** re-enable the disabled CI `release` job or re-add `on.push.tags: v*` in `.github/workflows/build.yml` unless CI signing exists ([FUTURE_RELEASE.md](../../../FUTURE_RELEASE.md)). Local releases must stay off the Actions budget.
 
