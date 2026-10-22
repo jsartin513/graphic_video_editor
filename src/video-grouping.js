@@ -1,118 +1,192 @@
 /**
  * Video Grouping Module
- * Extracts and groups GoPro video files by session ID and directory
+ * Groups action-camera clips by session within each directory.
  */
 
 const path = require('path');
+const {
+  parseCameraFilename,
+  extractGoProSessionId
+} = require('./camera-filenames');
+const { buildDjiGroups } = require('./dji-grouping');
 
 /**
- * Extract session ID from GoPro filename
- * Supports: GX010001, GXAA0123 (letters), GP010001, GOPR0001
- * @param {string} filename - The filename (e.g., "GX010001.MP4" or "GXAA0123.MP4")
- * @returns {string|null} - The 4-digit session ID or null if not a GoPro file
+ * Extract session ID from a supported camera filename (GoPro-compatible API).
+ * @param {string} filename
+ * @returns {string|null}
  */
 function extractSessionId(filename) {
-  // Pattern: GX??????.MP4 -> extract last 4 digits (GX + 2 alphanumeric + 4 digits)
-  // Covers GX010001, GXAA0123, GX01ABCD, etc.
-  const gxMatch = filename.match(/GX[A-Z0-9]{2}(\d{4})\.MP4$/i);
-  if (gxMatch) return gxMatch[1];
-  
-  // Pattern: GP??????.MP4 -> extract last 4 digits
-  const gpMatch = filename.match(/GP[A-Z0-9]{2}(\d{4})\.MP4$/i);
-  if (gpMatch) return gpMatch[1];
-  
-  // Pattern: GOPR????.MP4 -> extract 4 digits
-  const goprMatch = filename.match(/GOPR(\d{4})\.MP4$/i);
-  if (goprMatch) return goprMatch[1];
-  
-  return null;
+  const gopro = extractGoProSessionId(filename);
+  if (gopro) return gopro;
+
+  const parsed = parseCameraFilename(filename);
+  if (!parsed || parsed.sessionId == null) return null;
+  return parsed.sessionId;
 }
 
 /**
- * Derive a filename pattern from a GoPro filename for output suggestions
- * e.g. "GXAA0123.MP4" -> "GXAA{sessionId}", "GOPR0001.MP4" -> "GOPR{sessionId}"
- * @param {string} filename - The filename (e.g., "GXAA0123.MP4")
- * @returns {string|null} - A pattern with {sessionId} placeholder, or null
+ * Derive a filename pattern from a camera clip for output suggestions.
+ * @param {string} filename
+ * @returns {string|null}
  */
 function derivePatternFromFilename(filename) {
-  const sessionId = extractSessionId(filename);
-  if (!sessionId) return null;
-  const base = filename.replace(/\.MP4$/i, '');
-  // The sessionId is always the last 4 characters of the base; use slice to avoid
-  // replacing an earlier occurrence of the same digit sequence in the prefix.
-  const prefix = base.slice(0, -sessionId.length);
-  return `${prefix}{sessionId}`;
+  const goproSession = extractGoProSessionId(filename);
+  if (goproSession) {
+    const base = filename.replace(/\.MP4$/i, '');
+    const prefix = base.slice(0, -goproSession.length);
+    return `${prefix}{sessionId}`;
+  }
+
+  const parsed = parseCameraFilename(filename);
+  if (!parsed || !parsed.patternPrefix) return null;
+  return parsed.patternPrefix;
 }
 
 /**
- * Analyze and group video files by session ID and directory
- * Files from different subdirectories with the same session ID are processed separately
- * @param {string[]} filePaths - Array of file paths to analyze
- * @returns {Array} - Array of grouped video objects with sessionId, directory, files, and outputFilename
+ * @param {string} directory
+ * @param {Array<{ filePath: string, sonyIndex: number }>} entries
  */
-function analyzeAndGroupVideos(filePaths) {
+function buildSonyGroups(directory, entries) {
+  const sorted = [...entries].sort((a, b) => a.sonyIndex - b.sonyIndex);
+  const groups = [];
+  if (sorted.length === 0) return groups;
+
+  let chain = [sorted[0]];
+  for (let i = 1; i < sorted.length; i += 1) {
+    if (sorted[i].sonyIndex === sorted[i - 1].sonyIndex + 1) {
+      chain.push(sorted[i]);
+    } else {
+      const startId = String(chain[0].sonyIndex).padStart(4, '0');
+      const endId = String(chain[chain.length - 1].sonyIndex).padStart(4, '0');
+      const sessionId = chain.length > 1 ? `${startId}-${endId}` : startId;
+      groups.push({
+        sessionId,
+        directory,
+        files: chain.map((e) => e.filePath).sort(),
+        cameraVendor: 'sony'
+      });
+      chain = [sorted[i]];
+    }
+  }
+
+  const startId = String(chain[0].sonyIndex).padStart(4, '0');
+  const endId = String(chain[chain.length - 1].sonyIndex).padStart(4, '0');
+  const sessionId = chain.length > 1 ? `${startId}-${endId}` : startId;
+  groups.push({
+    sessionId,
+    directory,
+    files: chain.map((e) => e.filePath).sort(),
+    cameraVendor: 'sony'
+  });
+
+  return groups;
+}
+
+/**
+ * Analyze and group video files by session ID and directory.
+ * @param {string[]} filePaths
+ * @returns {Promise<Array>}
+ */
+async function analyzeAndGroupVideos(filePaths) {
   const groups = new Map();
+  const djiByDirectory = new Map();
+  const sonyByDirectory = new Map();
+
   if (!Array.isArray(filePaths)) return [];
 
   for (const filePath of filePaths) {
     const filename = path.basename(filePath);
-    const sessionId = extractSessionId(filename);
-    
-    if (!sessionId) {
-      // Skip files that don't match GoPro patterns
+    const parsed = parseCameraFilename(filename);
+    if (!parsed) continue;
+
+    const directory = path.dirname(filePath);
+
+    if (parsed.needsDjiChain && parsed.djiIndex != null) {
+      if (!djiByDirectory.has(directory)) djiByDirectory.set(directory, []);
+      djiByDirectory.get(directory).push({
+        filePath,
+        djiIndex: parsed.djiIndex
+      });
       continue;
     }
-    
-    // Group by directory path AND session ID to handle files with same name in different directories
-    const directory = path.dirname(filePath);
-    const groupKey = `${directory}:${sessionId}`;
-    
+
+    if (parsed.vendor === 'sony' && parsed.sonyIndex != null && parsed.sessionId == null) {
+      if (!sonyByDirectory.has(directory)) sonyByDirectory.set(directory, []);
+      sonyByDirectory.get(directory).push({
+        filePath,
+        sonyIndex: parsed.sonyIndex
+      });
+      continue;
+    }
+
+    if (!parsed.sessionId) continue;
+
+    const groupKey = `${directory}:${parsed.vendor}:${parsed.sessionId}`;
+
     if (!groups.has(groupKey)) {
       groups.set(groupKey, {
-        sessionId,
+        sessionId: parsed.sessionId,
         directory,
-        files: []
+        files: [],
+        cameraVendor: parsed.vendor
       });
     }
-    
-    groups.get(groupKey).files.push(filePath);
+
+    groups.get(groupKey).files.push({ filePath, sortKey: parsed.sortKey });
   }
-  
-  // Sort files within each group and create result objects
+
   const result = [];
-  for (const [groupKey, groupData] of groups.entries()) {
-    const sortedFiles = groupData.files.sort();
-    
-    // For display, use session ID. If multiple directories have the same session ID,
-    // include directory name in the output filename to differentiate
-    const hasDuplicateSessionId = Array.from(groups.values())
-      .filter(g => g.sessionId === groupData.sessionId).length > 1;
-    
-    let outputFilename = `PROCESSED${groupData.sessionId}.MP4`;
-    if (hasDuplicateSessionId) {
-      // Include directory name to differentiate files from different directories
-      const dirName = path.basename(groupData.directory) || 'root';
-      // Sanitize directory name for filename (remove invalid chars)
-      const sanitizedDirName = dirName.replace(/[^a-zA-Z0-9_-]/g, '_');
-      outputFilename = `PROCESSED${groupData.sessionId}_${sanitizedDirName}.MP4`;
-    }
-    
+
+  for (const [, groupData] of groups.entries()) {
+    const sortedFiles = groupData.files
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .map((f) => f.filePath);
+
     result.push({
       sessionId: groupData.sessionId,
       directory: groupData.directory,
       files: sortedFiles,
-      outputFilename
+      cameraVendor: groupData.cameraVendor,
+      outputFilename: null
     });
   }
-  
-  // Sort by directory first, then by session ID
+
+  for (const [directory, entries] of djiByDirectory.entries()) {
+    result.push(...(await buildDjiGroups(directory, entries)));
+  }
+
+  for (const [directory, entries] of sonyByDirectory.entries()) {
+    result.push(...buildSonyGroups(directory, entries));
+  }
+
+  assignOutputFilenames(result);
+
   result.sort((a, b) => {
     const dirCompare = a.directory.localeCompare(b.directory);
     if (dirCompare !== 0) return dirCompare;
     return a.sessionId.localeCompare(b.sessionId);
   });
-  
+
   return result;
+}
+
+/**
+ * @param {Array<{ sessionId: string, directory: string, files: string[], outputFilename?: string|null }>} result
+ */
+function assignOutputFilenames(result) {
+  for (const groupData of result) {
+    const hasDuplicateSessionId = result.filter(
+      (g) => g.sessionId === groupData.sessionId
+    ).length > 1;
+
+    let outputFilename = `PROCESSED${groupData.sessionId}.MP4`;
+    if (hasDuplicateSessionId) {
+      const dirName = path.basename(groupData.directory) || 'root';
+      const sanitizedDirName = dirName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      outputFilename = `PROCESSED${groupData.sessionId}_${sanitizedDirName}.MP4`;
+    }
+    groupData.outputFilename = outputFilename;
+  }
 }
 
 module.exports = {
@@ -120,5 +194,3 @@ module.exports = {
   derivePatternFromFilename,
   analyzeAndGroupVideos
 };
-
-

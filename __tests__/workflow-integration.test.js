@@ -1,3 +1,7 @@
+jest.mock('../src/dji-grouping', () => ({
+  buildDjiGroups: jest.fn().mockResolvedValue([])
+}));
+
 const { analyzeAndGroupVideos } = require('../src/video-grouping');
 const {
   addRecentPattern,
@@ -9,7 +13,7 @@ const {
 
 describe('Video Merge Workflow Integration', () => {
   describe('Grouping with preferences', () => {
-    test('groups videos and applies filename pattern from preferences', () => {
+    test('groups videos and applies filename pattern from preferences', async () => {
       // Setup: files from same session
       const files = [
         '/videos/session1/GX010001.MP4',
@@ -18,7 +22,7 @@ describe('Video Merge Workflow Integration', () => {
       ];
 
       // Analyze and group
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
 
       // Verify grouping
       expect(groups).toHaveLength(1);
@@ -39,7 +43,7 @@ describe('Video Merge Workflow Integration', () => {
       expect(sessionId).toBe('0001');
     });
 
-    test('handles multiple sessions with different patterns', () => {
+    test('handles multiple sessions with different patterns', async () => {
       const files = [
         '/videos/morning/GX010001.MP4',
         '/videos/morning/GX020001.MP4',
@@ -47,7 +51,7 @@ describe('Video Merge Workflow Integration', () => {
         '/videos/afternoon/GX020002.MP4'
       ];
 
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
 
       expect(groups).toHaveLength(2);
       
@@ -88,14 +92,14 @@ describe('Video Merge Workflow Integration', () => {
       expect(result).toContain('Session_{sessionId}'); // sessionId not replaced by applyDateTokens
     });
 
-    test('complete workflow: group videos, apply preferences, generate filename', () => {
+    test('complete workflow: group videos, apply preferences, generate filename', async () => {
       // Step 1: Group videos
       const files = [
         '/videos/trip/GX010001.MP4',
         '/videos/trip/GX020001.MP4'
       ];
       
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
       expect(groups).toHaveLength(1);
       
       const group = groups[0];
@@ -134,11 +138,11 @@ describe('Video Merge Workflow Integration', () => {
       expect(byotName).toBe('BDL Fall 2026 BYOT Week 3 2026-09-12 0534');
     });
 
-    test('generic default pattern resolves without PROCESSED placeholder', () => {
+    test('generic default pattern resolves without PROCESSED placeholder', async () => {
       const { chooseDefaultFilenamePattern } = require('../src/filename-pattern');
       const { applyDateTokens, sanitizeFilenameForOutput } = require('../src/preferences');
       const files = ['/court1/GX010534.MP4'];
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
       const pattern = chooseDefaultFilenamePattern({});
       const date = new Date(2026, 8, 21);
       let resolved = applyDateTokens(pattern.replace(/\{sessionId\}/gi, groups[0].sessionId), date, 'YYYY-MM-DD');
@@ -147,9 +151,9 @@ describe('Video Merge Workflow Integration', () => {
       expect(resolved).not.toMatch(/PROCESSED/i);
     });
 
-    test('apply template workflow: PROCESSED placeholder then BYOT pattern with sessionId', () => {
+    test('apply template workflow: PROCESSED placeholder then BYOT pattern with sessionId', async () => {
       const files = ['/court1/GX010534.MP4', '/court1/GX020534.MP4'];
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
       expect(groups[0].outputFilename).toBe('PROCESSED0534.MP4');
 
       const byot = DEFAULT_EVENT_TEMPLATES.find((t) => t.name === 'BDL Fall 2026 BYOT');
@@ -185,23 +189,23 @@ describe('Video Merge Workflow Integration', () => {
   });
 
   describe('Error handling', () => {
-    test('handles empty file list', () => {
-      const groups = analyzeAndGroupVideos([]);
+    test('handles empty file list', async () => {
+      const groups = await analyzeAndGroupVideos([]);
       expect(groups).toHaveLength(0);
     });
 
-    test('handles non-GoPro files', () => {
+    test('handles non-GoPro files', async () => {
       const files = [
         '/videos/random1.mp4',
         '/videos/random2.mov',
         '/videos/test.avi'
       ];
       
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
       expect(groups).toHaveLength(0);
     });
 
-    test('handles mixed GoPro and non-GoPro files', () => {
+    test('handles mixed GoPro and non-GoPro files', async () => {
       const files = [
         '/videos/GX010001.MP4',
         '/videos/random.mp4',
@@ -209,7 +213,7 @@ describe('Video Merge Workflow Integration', () => {
         '/videos/test.mov'
       ];
       
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
       expect(groups).toHaveLength(1);
       expect(groups[0].files).toHaveLength(2);
       expect(groups[0].files).not.toContain('/videos/random.mp4');
@@ -229,7 +233,7 @@ describe('Video Merge Workflow Integration', () => {
   });
 
   describe('Complex scenarios', () => {
-    test('handles videos from multiple directories with same session ID', () => {
+    test('handles videos from multiple directories with same session ID', async () => {
       const files = [
         '/videos/camera1/GX010001.MP4',
         '/videos/camera1/GX020001.MP4',
@@ -237,7 +241,7 @@ describe('Video Merge Workflow Integration', () => {
         '/videos/camera2/GX020001.MP4'
       ];
       
-      const groups = analyzeAndGroupVideos(files);
+      const groups = await analyzeAndGroupVideos(files);
       
       // Should create separate groups for different directories
       expect(groups).toHaveLength(2);

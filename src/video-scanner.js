@@ -6,7 +6,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { logger } = require('./logger');
 
-const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.m4v'];
+const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.insv'];
 
 /**
  * Recursively scan a directory for video files

@@ -96,41 +96,43 @@ describe('SDCardDetector', () => {
     });
   });
 
-  describe('hasGoProFiles', () => {
+  describe('hasMatchingFiles', () => {
     it('should detect GX pattern files', async () => {
       const mockDirEntry = { name: 'subdir', isDirectory: () => true };
       fs.readdir.mockResolvedValueOnce([mockDirEntry]);
       fs.readdir.mockResolvedValueOnce(['GX010001.MP4', 'GX020001.MP4']);
 
-      const result = await detector.hasGoProFiles('/test/path');
+      const result = await detector.hasMatchingFiles('/test/path', /^(GX|GP|GOPR)\d+\.MP4$/i);
       expect(result).toBe(true);
     });
 
-    it('should detect GP pattern files', async () => {
-      const mockDirEntry = { name: 'subdir', isDirectory: () => true };
-      fs.readdir.mockResolvedValueOnce([mockDirEntry]);
-      fs.readdir.mockResolvedValueOnce(['GP010001.MP4']);
-
-      const result = await detector.hasGoProFiles('/test/path');
-      expect(result).toBe(true);
-    });
-
-    it('should detect GOPR pattern files', async () => {
-      const mockDirEntry = { name: 'subdir', isDirectory: () => true };
-      fs.readdir.mockResolvedValueOnce([mockDirEntry]);
-      fs.readdir.mockResolvedValueOnce(['GOPR0001.MP4']);
-
-      const result = await detector.hasGoProFiles('/test/path');
-      expect(result).toBe(true);
-    });
-
-    it('should return false if no GoPro files found', async () => {
+    it('should return false if no matching files found', async () => {
       const mockDirEntry = { name: 'subdir', isDirectory: () => true };
       fs.readdir.mockResolvedValueOnce([mockDirEntry]);
       fs.readdir.mockResolvedValueOnce(['video.mp4', 'movie.avi']);
 
-      const result = await detector.hasGoProFiles('/test/path');
+      const result = await detector.hasMatchingFiles('/test/path', /^DJI_.*\.MP4$/i);
       expect(result).toBe(false);
+    });
+  });
+
+  describe('isDjiSDCard', () => {
+    it('should return true for DCIM/DJI_001 layout', async () => {
+      fs.stat.mockResolvedValueOnce({ isDirectory: () => true });
+      fs.readdir.mockResolvedValueOnce(['DJI_001', 'MISC']);
+
+      const result = await detector.isDjiSDCard('/Volumes/DJI_SD');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('isInsta360SDCard', () => {
+    it('should return true for DCIM/Camera01 layout', async () => {
+      fs.stat.mockResolvedValueOnce({ isDirectory: () => true });
+      fs.readdir.mockResolvedValueOnce(['Camera01', 'fileinfo_list.list']);
+
+      const result = await detector.isInsta360SDCard('/Volumes/INSTA360');
+      expect(result).toBe(true);
     });
   });
 
@@ -229,11 +231,12 @@ describe('SDCardDetector', () => {
       expect(emitted[0].name).toBe('GOPRO_SD');
       expect(emitted[0].path).toBe(path.join('/Volumes', 'GOPRO_SD'));
       expect(emitted[0].dcimPath).toBe(path.join('/Volumes', 'GOPRO_SD', 'DCIM'));
+      expect(emitted[0].cameraType).toBe('gopro');
     });
 
     it('should remove unmounted volume and emit sd-card-removed', async () => {
       detector.knownVolumes.add('OLD_VOL');
-      detector.knownGoProVolumes.add('OLD_VOL');
+      detector.knownCameraVolumes.set('OLD_VOL', 'gopro');
       fsSync.existsSync.mockReturnValue(true);
       fs.readdir.mockResolvedValue([]); // no volumes mounted
 
@@ -245,7 +248,7 @@ describe('SDCardDetector', () => {
       expect(emitted).toHaveLength(1);
       expect(emitted[0].name).toBe('OLD_VOL');
       expect(detector.knownVolumes.has('OLD_VOL')).toBe(false);
-      expect(detector.knownGoProVolumes.has('OLD_VOL')).toBe(false);
+      expect(detector.knownCameraVolumes.has('OLD_VOL')).toBe(false);
     });
 
     it('should skip excluded volumes', async () => {

@@ -1,3 +1,7 @@
+jest.mock('../src/dji-grouping', () => ({
+  buildDjiGroups: jest.fn().mockResolvedValue([])
+}));
+
 const { extractSessionId, derivePatternFromFilename, analyzeAndGroupVideos } = require('../src/video-grouping');
 const path = require('path');
 
@@ -88,32 +92,32 @@ describe('derivePatternFromFilename', () => {
 });
 
 describe('analyzeAndGroupVideos', () => {
-  test('returns empty array when filePaths is null', () => {
-    expect(analyzeAndGroupVideos(null)).toEqual([]);
+  test('returns empty array when filePaths is null', async () => {
+    await expect(analyzeAndGroupVideos(null)).resolves.toEqual([]);
   });
 
-  test('returns empty array when filePaths is undefined', () => {
-    expect(analyzeAndGroupVideos(undefined)).toEqual([]);
+  test('returns empty array when filePaths is undefined', async () => {
+    await expect(analyzeAndGroupVideos(undefined)).resolves.toEqual([]);
   });
 
-  test('returns empty array when filePaths is not an array', () => {
-    expect(analyzeAndGroupVideos('string')).toEqual([]);
-    expect(analyzeAndGroupVideos(123)).toEqual([]);
-    expect(analyzeAndGroupVideos({})).toEqual([]);
+  test('returns empty array when filePaths is not an array', async () => {
+    await expect(analyzeAndGroupVideos('string')).resolves.toEqual([]);
+    await expect(analyzeAndGroupVideos(123)).resolves.toEqual([]);
+    await expect(analyzeAndGroupVideos({})).resolves.toEqual([]);
   });
 
-  test('returns empty array for empty filePaths', () => {
-    expect(analyzeAndGroupVideos([])).toEqual([]);
+  test('returns empty array for empty filePaths', async () => {
+    await expect(analyzeAndGroupVideos([])).resolves.toEqual([]);
   });
 
-  test('groups files by session ID from same directory', () => {
+  test('groups files by session ID from same directory', async () => {
     const filePaths = [
       '/videos/folder1/GX010001.MP4',
       '/videos/folder1/GX020001.MP4',
       '/videos/folder1/GX030001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(1);
     expect(result[0].sessionId).toBe('0001');
@@ -122,7 +126,7 @@ describe('analyzeAndGroupVideos', () => {
     expect(result[0].outputFilename).toBe('PROCESSED0001.MP4');
   });
 
-  test('separates files with same session ID from different directories', () => {
+  test('separates files with same session ID from different directories', async () => {
     const filePaths = [
       '/videos/folder1/GX010001.MP4',
       '/videos/folder1/GX020001.MP4',
@@ -130,7 +134,7 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder2/GX020001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(2); // Two separate groups
     
@@ -151,7 +155,7 @@ describe('analyzeAndGroupVideos', () => {
     expect(folder2Group.outputFilename).toContain('folder2');
   });
 
-  test('groups different session IDs separately', () => {
+  test('groups different session IDs separately', async () => {
     const filePaths = [
       '/videos/folder1/GX010001.MP4',
       '/videos/folder1/GX020001.MP4',
@@ -159,7 +163,7 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder1/GX020002.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(2);
     
@@ -173,7 +177,7 @@ describe('analyzeAndGroupVideos', () => {
     expect(session2.files).toHaveLength(2);
   });
 
-  test('skips non-GoPro files', () => {
+  test('skips non-GoPro files', async () => {
     const filePaths = [
       '/videos/folder1/GX010001.MP4',
       '/videos/folder1/regular-video.mp4',
@@ -181,21 +185,21 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder1/test.MOV',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(1);
     expect(result[0].files).toHaveLength(2); // Only GoPro files included
     expect(result[0].files.every(f => f.includes('GX'))).toBe(true);
   });
 
-  test('sorts files within each group', () => {
+  test('sorts files within each group', async () => {
     const filePaths = [
       '/videos/folder1/GX030001.MP4',
       '/videos/folder1/GX010001.MP4',
       '/videos/folder1/GX020001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(1);
     expect(result[0].files).toEqual([
@@ -205,7 +209,7 @@ describe('analyzeAndGroupVideos', () => {
     ]);
   });
 
-  test('sorts groups by directory then session ID', () => {
+  test('sorts groups by directory then session ID', async () => {
     const filePaths = [
       '/videos/folder2/GX010002.MP4',
       '/videos/folder1/GX010002.MP4',
@@ -213,7 +217,7 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder2/GX010001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(4);
     
@@ -228,7 +232,7 @@ describe('analyzeAndGroupVideos', () => {
     expect(result[3].sessionId).toBe('0002');
   });
 
-  test('handles Windows-style paths', () => {
+  test('handles Windows-style paths', async () => {
     // Use forward slashes for Windows paths in Node.js (path module handles conversion)
     const filePaths = [
       'C:/Videos/folder1/GX010001.MP4',
@@ -236,7 +240,7 @@ describe('analyzeAndGroupVideos', () => {
       'C:/Videos/folder2/GX010001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(2);
     const folder1Group = result.find(g => g.directory.includes('folder1'));
@@ -247,13 +251,13 @@ describe('analyzeAndGroupVideos', () => {
     expect(folder2Group.files).toHaveLength(1);
   });
 
-  test('sanitizes directory names in output filename', () => {
+  test('sanitizes directory names in output filename', async () => {
     const filePaths = [
       '/videos/my folder/GX010001.MP4',
       '/videos/my-folder/GX010001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(2);
     // Directory names with spaces should be sanitized
@@ -261,22 +265,22 @@ describe('analyzeAndGroupVideos', () => {
     expect(folderWithSpace.outputFilename).toMatch(/my_folder/);
   });
 
-  test('handles empty input', () => {
-    const result = analyzeAndGroupVideos([]);
+  test('handles empty input', async () => {
+    const result = await analyzeAndGroupVideos([]);
     expect(result).toHaveLength(0);
   });
 
-  test('handles files with no valid GoPro patterns', () => {
+  test('handles files with no valid GoPro patterns', async () => {
     const filePaths = [
       '/videos/folder1/video1.mp4',
       '/videos/folder1/video2.mov',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
     expect(result).toHaveLength(0);
   });
 
-  test('groups GX format files by session ID (session 0123)', () => {
+  test('groups GX format files by session ID (session 0123)', async () => {
     // GX + 2 alphanumeric + 4 digits (session). Clips 01, 02, 03 same session.
     const filePaths = [
       '/videos/folder1/GX010123.MP4',
@@ -284,7 +288,7 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder1/GX030123.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(1);
     expect(result[0].sessionId).toBe('0123');
@@ -293,14 +297,14 @@ describe('analyzeAndGroupVideos', () => {
     expect(result[0].outputFilename).toBe('PROCESSED0123.MP4');
   });
 
-  test('groups GXAA format files (user format GXAA0123, GXAA0223)', () => {
+  test('groups GXAA format files (user format GXAA0123, GXAA0223)', async () => {
     // GXAA: GX + 2 letters + 4 digits. Each file is a separate session.
     const filePaths = [
       '/videos/folder1/GXAA0123.MP4',
       '/videos/folder1/GXAA0223.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(2);
     expect(result[0].sessionId).toBe('0123');
@@ -309,7 +313,7 @@ describe('analyzeAndGroupVideos', () => {
     expect(result[1].files).toHaveLength(1);
   });
 
-  test('groups GXAA and GX01 format together when same session', () => {
+  test('groups GXAA and GX01 format together when same session', async () => {
     // Both GXAA0001 and GX010001 extract session 0001
     const filePaths = [
       '/videos/folder1/GXAA0001.MP4',
@@ -317,14 +321,78 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder1/GX020001.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(1);
     expect(result[0].sessionId).toBe('0001');
     expect(result[0].files).toHaveLength(3);
   });
 
-  test('separates sessions by session ID (GX format multi-clip)', () => {
+  test('groups Insta360 segments with the same timestamp and lens', async () => {
+    const filePaths = [
+      '/videos/Camera01/VID_20220110_121609_00_001.insv',
+      '/videos/Camera01/VID_20220110_121609_00_002.insv',
+    ];
+
+    const result = await analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('20220110_121609_00');
+    expect(result[0].files).toHaveLength(2);
+    expect(result[0].cameraVendor).toBe('insta360');
+  });
+
+  test('groups Sony consecutive chapter files', async () => {
+    const filePaths = [
+      '/videos/folder1/C0001.MP4',
+      '/videos/folder1/C0002.MP4',
+      '/videos/folder1/C0003.MP4',
+    ];
+
+    const result = await analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0001-0003');
+    expect(result[0].files).toHaveLength(3);
+    expect(result[0].cameraVendor).toBe('sony');
+  });
+
+  test('delegates DJI numeric clips to buildDjiGroups', async () => {
+    const { buildDjiGroups } = require('../src/dji-grouping');
+    buildDjiGroups.mockResolvedValueOnce([
+      {
+        sessionId: '0024-0026',
+        directory: '/videos/folder1',
+        files: [
+          '/videos/folder1/DJI_0024.MP4',
+          '/videos/folder1/DJI_0025.MP4',
+          '/videos/folder1/DJI_0026.MP4'
+        ],
+        cameraVendor: 'dji',
+        outputFilename: null
+      }
+    ]);
+
+    const filePaths = [
+      '/videos/folder1/DJI_0024.MP4',
+      '/videos/folder1/DJI_0025.MP4',
+      '/videos/folder1/DJI_0026.MP4'
+    ];
+
+    const result = await analyzeAndGroupVideos(filePaths);
+
+    expect(buildDjiGroups).toHaveBeenCalledWith(
+      '/videos/folder1',
+      expect.arrayContaining([
+        expect.objectContaining({ djiIndex: 24 }),
+        expect.objectContaining({ djiIndex: 26 })
+      ])
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0024-0026');
+  });
+
+  test('separates sessions by session ID (GX format multi-clip)', async () => {
     // GX010123/GX020123 = session 0123; GX010223/GX020223 = session 0223
     const filePaths = [
       '/videos/folder1/GX010123.MP4',
@@ -333,7 +401,7 @@ describe('analyzeAndGroupVideos', () => {
       '/videos/folder1/GX020223.MP4',
     ];
 
-    const result = analyzeAndGroupVideos(filePaths);
+    const result = await analyzeAndGroupVideos(filePaths);
 
     expect(result).toHaveLength(2);
     const session123 = result.find(g => g.sessionId === '0123');
