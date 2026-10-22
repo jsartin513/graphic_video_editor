@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Video Merger - Merge and manage GoPro video files">
+  <meta name="description" content="Video Merger - Merge and manage GoPro, DJI, Insta360, and other action camera clips">
   <meta name="color-scheme" content="light dark">
   <title>Video Merger</title>
   <link rel="stylesheet" href="styles.css">
@@ -32,7 +32,7 @@
       <div class="sd-card-notification-content">
         <div class="sd-card-notification-icon" aria-hidden="true">💾</div>
         <div class="sd-card-notification-text">
-          <strong>GoPro SD Card Detected</strong>
+          <strong id="sdCardTitle">Camera SD Card Detected</strong>
           <p id="sdCardName">SD Card Name</p>
         </div>
         <div class="sd-card-notification-actions">
@@ -151,7 +151,7 @@
         </div>
 
         <p class="form-hint merge-sessions-hint">
-          Clips are grouped by GoPro <strong>session</strong>. Check each session you want in this merge; unchecked sessions are skipped.
+          Clips are grouped by recording <strong>session</strong> (GoPro, DJI, Insta360, Sony, and similar naming). Check each session you want in this merge; unchecked sessions are skipped.
         </p>
         <div id="previewList" class="preview-list" role="list" aria-label="Preview of videos to merge"></div>
 

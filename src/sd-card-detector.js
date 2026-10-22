@@ -1,34 +1,29 @@
 /**
  * SD Card Detection Module
- * Monitors for GoPro SD card mounts and detects GoPro directory structure
+ * Monitors removable volumes for action-camera DCIM layouts (GoPro, DJI, Insta360, etc.)
  */
 
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
+const { cameraVendorLabel } = require('./camera-filenames');
 
 class SDCardDetector extends EventEmitter {
   constructor(volumesPath = '/Volumes') {
     super();
     this.volumesPath = volumesPath;
     this.knownVolumes = new Set();
-    this.knownGoProVolumes = new Set();
+    /** @type {Map<string, string>} volume name -> camera vendor id */
+    this.knownCameraVolumes = new Map();
     this.checkInterval = null;
     this.isScanning = false;
-    // List of volume names to exclude (common system volumes)
     this.excludedVolumes = new Set(['Macintosh HD', 'Preboot', 'Recovery', 'VM', 'Update']);
   }
 
-  /**
-   * Start monitoring for SD card mounts
-   */
   start() {
-    // Initial scan of existing volumes
     this.scanVolumes();
 
-    // Set up periodic checking (every 2 seconds)
-    // Using polling instead of fs.watch for better reliability on macOS
     this.checkInterval = setInterval(() => {
       if (!this.isScanning) {
         this.scanVolumes();
@@ -38,9 +33,6 @@ class SDCardDetector extends EventEmitter {
     console.log('[SDCardDetector] Started monitoring for SD cards');
   }
 
-  /**
-   * Stop monitoring
-   */
   stop() {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
@@ -49,16 +41,12 @@ class SDCardDetector extends EventEmitter {
     console.log('[SDCardDetector] Stopped monitoring');
   }
 
-  /**
-   * Scan the /Volumes directory for new SD cards
-   */
   async scanVolumes() {
     if (this.isScanning) {
       return;
     }
     this.isScanning = true;
     try {
-      // Check if /Volumes directory exists
       if (!fsSync.existsSync(this.volumesPath)) {
         return;
       }
@@ -66,40 +54,39 @@ class SDCardDetector extends EventEmitter {
       const volumes = await fs.readdir(this.volumesPath);
       const currentVolumes = new Set(volumes);
 
-      // Find new volumes (newly mounted)
       for (const volume of volumes) {
         if (!this.knownVolumes.has(volume) && !this.excludedVolumes.has(volume)) {
           const volumePath = path.join(this.volumesPath, volume);
-          
-          // Check if this is a GoPro SD card
-          const isGoPro = await this.isGoProSDCard(volumePath);
-          if (isGoPro) {
-            console.log(`[SDCardDetector] Detected GoPro SD card: ${volume}`);
-            this.knownGoProVolumes.add(volume);
+
+          const cameraType = await this.detectCameraType(volumePath);
+          if (cameraType) {
+            console.log(`[SDCardDetector] Detected ${cameraVendorLabel(cameraType)} SD card: ${volume}`);
+            this.knownCameraVolumes.set(volume, cameraType);
             this.emit('sd-card-detected', {
               name: volume,
               path: volumePath,
-              dcimPath: path.join(volumePath, 'DCIM')
+              dcimPath: path.join(volumePath, 'DCIM'),
+              cameraType,
+              cameraLabel: cameraVendorLabel(cameraType)
             });
           }
-          
+
           this.knownVolumes.add(volume);
         }
       }
 
-      // Remove volumes that are no longer mounted
       for (const volume of this.knownVolumes) {
         if (!currentVolumes.has(volume)) {
           this.knownVolumes.delete(volume);
-          if (this.knownGoProVolumes.has(volume)) {
-            console.log(`[SDCardDetector] GoPro SD card removed: ${volume}`);
-            this.knownGoProVolumes.delete(volume);
-            this.emit('sd-card-removed', { name: volume });
+          if (this.knownCameraVolumes.has(volume)) {
+            const cameraType = this.knownCameraVolumes.get(volume);
+            console.log(`[SDCardDetector] ${cameraVendorLabel(cameraType)} SD card removed: ${volume}`);
+            this.knownCameraVolumes.delete(volume);
+            this.emit('sd-card-removed', { name: volume, cameraType });
           }
         }
       }
     } catch (error) {
-      // Silently ignore errors (e.g., permission issues)
       console.error('[SDCardDetector] Error scanning volumes:', error.message);
     } finally {
       this.isScanning = false;
@@ -107,23 +94,28 @@ class SDCardDetector extends EventEmitter {
   }
 
   /**
-   * Check if a volume is a GoPro SD card
-   * @param {string} volumePath - Path to the volume
-   * @returns {Promise<boolean>}
+   * @param {string} volumePath
+   * @returns {Promise<string|null>} camera vendor id or null
    */
+  async detectCameraType(volumePath) {
+    if (await this.isGoProSDCard(volumePath)) return 'gopro';
+    if (await this.isDjiSDCard(volumePath)) return 'dji';
+    if (await this.isInsta360SDCard(volumePath)) return 'insta360';
+    return null;
+  }
+
+  /** @deprecated Use detectCameraType — kept for tests */
   async isGoProSDCard(volumePath) {
     try {
-      // Check if DCIM directory exists
       const dcimPath = path.join(volumePath, 'DCIM');
       const dcimExists = await this.directoryExists(dcimPath);
-      
+
       if (!dcimExists) {
         return false;
       }
 
-      // Check for typical GoPro subdirectories (e.g., 100GOPRO, 101GOPRO, etc.)
       const dcimContents = await fs.readdir(dcimPath);
-      const hasGoProDir = dcimContents.some(dir => 
+      const hasGoProDir = dcimContents.some((dir) =>
         /^\d{3}GOPRO$/i.test(dir) || /^\d{3}MEDIA$/i.test(dir)
       );
 
@@ -131,50 +123,73 @@ class SDCardDetector extends EventEmitter {
         return true;
       }
 
-      // Alternative check: look for GoPro video files directly
-      const hasGoProFiles = await this.hasGoProFiles(dcimPath);
-      return hasGoProFiles;
+      return this.hasMatchingFiles(dcimPath, /^(GX|GP|GOPR)\d+\.MP4$/i);
     } catch (error) {
       return false;
     }
   }
 
+  async isDjiSDCard(volumePath) {
+    try {
+      const dcimPath = path.join(volumePath, 'DCIM');
+      if (!(await this.directoryExists(dcimPath))) return false;
+
+      const dcimContents = await fs.readdir(dcimPath);
+      const hasDjiFolder = dcimContents.some((dir) => /^DJI_\d+$/i.test(dir));
+      if (hasDjiFolder) return true;
+
+      return this.hasMatchingFiles(dcimPath, /^DJI_.*\.(MP4|MOV)$/i);
+    } catch {
+      return false;
+    }
+  }
+
+  async isInsta360SDCard(volumePath) {
+    try {
+      const dcimPath = path.join(volumePath, 'DCIM');
+      if (!(await this.directoryExists(dcimPath))) return false;
+
+      const dcimContents = await fs.readdir(dcimPath);
+      const hasCameraFolder = dcimContents.some((dir) => /^Camera\d+$/i.test(dir));
+      if (hasCameraFolder) return true;
+
+      const hasFileInfoList = dcimContents.some((f) => f.toLowerCase() === 'fileinfo_list.list');
+      if (hasFileInfoList) return true;
+
+      return this.hasMatchingFiles(
+        dcimPath,
+        /^(?:PRO_)?VID_\d{8}_\d{6}_\d{2}_\d{3}\.(insv|mp4)$/i
+      );
+    } catch {
+      return false;
+    }
+  }
+
   /**
-   * Check if a directory contains GoPro video files
-   * @param {string} dirPath - Directory path to check
-   * @returns {Promise<boolean>}
+   * @param {string} dirPath
+   * @param {RegExp} pattern
    */
-  async hasGoProFiles(dirPath) {
+  async hasMatchingFiles(dirPath, pattern) {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const subDirPath = path.join(dirPath, entry.name);
           const subEntries = await fs.readdir(subDirPath);
-          
-          // Check for GoPro filename patterns
-          const hasGoPro = subEntries.some(file => 
-            /^(GX|GP|GOPR)\d+\.MP4$/i.test(file)
-          );
-          
-          if (hasGoPro) {
+          const hasMatch = subEntries.some((file) => pattern.test(file));
+          if (hasMatch) {
             return true;
           }
         }
       }
-      
+
       return false;
     } catch (error) {
       return false;
     }
   }
 
-  /**
-   * Check if a directory exists
-   * @param {string} dirPath - Directory path
-   * @returns {Promise<boolean>}
-   */
   async directoryExists(dirPath) {
     try {
       const stats = await fs.stat(dirPath);
@@ -185,38 +200,44 @@ class SDCardDetector extends EventEmitter {
   }
 
   /**
-   * Get all currently mounted GoPro SD cards
+   * Get all currently mounted camera SD cards
    * @returns {Promise<Array>}
    */
   async getGoProSDCards() {
-    const goProCards = [];
-    
+    return this.getCameraSDCards();
+  }
+
+  async getCameraSDCards() {
+    const cards = [];
+
     try {
       if (!fsSync.existsSync(this.volumesPath)) {
-        return goProCards;
+        return cards;
       }
 
       const volumes = await fs.readdir(this.volumesPath);
-      
+
       for (const volume of volumes) {
         if (this.excludedVolumes.has(volume)) continue;
-        
+
         const volumePath = path.join(this.volumesPath, volume);
-        const isGoPro = await this.isGoProSDCard(volumePath);
-        
-        if (isGoPro) {
-          goProCards.push({
+        const cameraType = await this.detectCameraType(volumePath);
+
+        if (cameraType) {
+          cards.push({
             name: volume,
             path: volumePath,
-            dcimPath: path.join(volumePath, 'DCIM')
+            dcimPath: path.join(volumePath, 'DCIM'),
+            cameraType,
+            cameraLabel: cameraVendorLabel(cameraType)
           });
         }
       }
     } catch (error) {
-      console.error('[SDCardDetector] Error getting GoPro SD cards:', error.message);
+      console.error('[SDCardDetector] Error getting camera SD cards:', error.message);
     }
-    
-    return goProCards;
+
+    return cards;
   }
 }
 

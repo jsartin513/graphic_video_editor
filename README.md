@@ -1,6 +1,6 @@
 # Video Merger
 
-A Mac desktop application for selecting and reviewing GoPro video files before merging them.
+A Mac desktop application for selecting and reviewing action-camera clips (GoPro, DJI, Insta360, Sony, and similar naming) before merging them.
 
 **Using the app (install, merge, updates):** see **[USER_GUIDE.md](USER_GUIDE.md)** — written for non-developers.
 
@@ -13,8 +13,8 @@ A Mac desktop application for selecting and reviewing GoPro video files before m
 - **Expandable metadata details** - Toggle detailed properties for each video
 - **Compatibility checking** - Automatic detection of mismatched video properties
 - **Visual warnings** - Highlights videos with incompatible properties before merging
-- **Auto-detect GoPro SD cards** - Automatically detects when GoPro SD cards are inserted
-- **SD card notifications** - Get notified when a GoPro SD card is detected with quick actions
+- **Auto-detect camera SD cards** - Detects GoPro, DJI, and Insta360 cards when inserted
+- **SD card notifications** - Get notified when a supported camera SD card is detected with quick actions
 - View selected files with metadata (file size, modification date)
 - Remove individual files from the selection list
 - **Automatic updates** - get notified when new versions are available and install them with one click

@@ -17,7 +17,7 @@ import { initializeHelpUi } from './helpUi.js';
 import { initializeBugReport } from './bugReport.js';
 import { setAppPhase } from './appPhase.js';
 
-const SPLIT_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v']);
+const SPLIT_VIDEO_EXTENSIONS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.m4v', '.insv']);
 
 function isSupportedSplitVideoPath(filePath) {
   if (typeof filePath !== 'string') return false;
@@ -258,6 +258,11 @@ window.electronAPI.onSDCardRemoved((sdCard) => {
 });
 
 function showSDCardNotification(sdCard) {
+  const titleEl = document.getElementById('sdCardTitle');
+  if (titleEl) {
+    const label = sdCard.cameraLabel || 'Camera';
+    titleEl.textContent = `${label} SD Card Detected`;
+  }
   domElements.sdCardName.textContent = sdCard.name;
   domElements.sdCardNotification.style.display = 'block';
 }

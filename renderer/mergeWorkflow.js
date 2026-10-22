@@ -427,13 +427,14 @@ export function initializeMergeWorkflow(state, domElements, fileHandling, loadSp
         if (fileHandling?.updateFileList) {
           await fileHandling.updateFileList();
         }
-        showError('No GoPro video files found', {
+        showError('No supported camera video files found', {
           operation: 'Analyze Videos',
           suggestions: [
-            'Ensure files match GoPro naming patterns:',
-            '• GX??????.MP4 (e.g. GX010001, GXAA0123)',
-            '• GP??????.MP4',
-            '• GOPR????.MP4'
+            'Ensure files match a supported camera naming pattern:',
+            '• GoPro: GX??????.MP4, GP??????.MP4, GOPR????.MP4',
+            '• DJI: DJI_####.MP4 or DJI_…_####_D.MP4',
+            '• Insta360: VID_YYYYMMDD_HHMMSS_00_NNN.insv or .mp4',
+            '• Sony: C####.MP4 (consecutive chapters merge together)'
           ]
         });
         return;

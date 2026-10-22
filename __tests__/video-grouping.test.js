@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { extractSessionId, derivePatternFromFilename, analyzeAndGroupVideos } = require('../src/video-grouping');
 const path = require('path');
 
@@ -322,6 +323,75 @@ describe('analyzeAndGroupVideos', () => {
     expect(result).toHaveLength(1);
     expect(result[0].sessionId).toBe('0001');
     expect(result[0].files).toHaveLength(3);
+  });
+
+  test('groups Insta360 segments with the same timestamp and lens', () => {
+    const filePaths = [
+      '/videos/Camera01/VID_20220110_121609_00_001.insv',
+      '/videos/Camera01/VID_20220110_121609_00_002.insv',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('20220110_121609_00');
+    expect(result[0].files).toHaveLength(2);
+    expect(result[0].cameraVendor).toBe('insta360');
+  });
+
+  test('groups Sony consecutive chapter files', () => {
+    const filePaths = [
+      '/videos/folder1/C0001.MP4',
+      '/videos/folder1/C0002.MP4',
+      '/videos/folder1/C0003.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0001-0003');
+    expect(result[0].files).toHaveLength(3);
+    expect(result[0].cameraVendor).toBe('sony');
+  });
+
+  test('chains DJI split files when the head clip is at the 4GB split size', () => {
+    const statSpy = jest.spyOn(fs, 'statSync').mockImplementation((filePath) => {
+      const name = path.basename(filePath);
+      const size = name === 'DJI_0024.MP4' || name === 'DJI_0025.MP4'
+        ? 4090000001
+        : 500000000;
+      return { size };
+    });
+
+    const filePaths = [
+      '/videos/folder1/DJI_0024.MP4',
+      '/videos/folder1/DJI_0025.MP4',
+      '/videos/folder1/DJI_0026.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    statSpy.mockRestore();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].sessionId).toBe('0024-0026');
+    expect(result[0].files).toHaveLength(3);
+    expect(result[0].cameraVendor).toBe('dji');
+  });
+
+  test('keeps small standalone DJI clips as separate sessions', () => {
+    const statSpy = jest.spyOn(fs, 'statSync').mockImplementation(() => ({ size: 1000000 }));
+
+    const filePaths = [
+      '/videos/folder1/DJI_0024.MP4',
+      '/videos/folder1/DJI_0025.MP4',
+    ];
+
+    const result = analyzeAndGroupVideos(filePaths);
+
+    statSpy.mockRestore();
+
+    expect(result).toHaveLength(2);
   });
 
   test('separates sessions by session ID (GX format multi-clip)', () => {
