@@ -3,13 +3,12 @@
  * Groups action-camera clips by session within each directory.
  */
 
-const fs = require('fs');
 const path = require('path');
 const {
   parseCameraFilename,
-  extractGoProSessionId,
-  DJI_SPLIT_SIZE_BYTES
+  extractGoProSessionId
 } = require('./camera-filenames');
+const { buildDjiGroups } = require('./dji-grouping');
 
 /**
  * Extract session ID from a supported camera filename (GoPro-compatible API).
@@ -41,51 +40,6 @@ function derivePatternFromFilename(filename) {
   const parsed = parseCameraFilename(filename);
   if (!parsed || !parsed.patternPrefix) return null;
   return parsed.patternPrefix;
-}
-
-/**
- * @param {string} directory
- * @param {Array<{ filePath: string, djiIndex: number }>} entries
- * @returns {Array<{ sessionId: string, directory: string, files: string[], cameraVendor: string }>}
- */
-function buildDjiGroups(directory, entries) {
-  const sorted = [...entries].sort((a, b) => a.djiIndex - b.djiIndex);
-  const groups = [];
-  let i = 0;
-
-  while (i < sorted.length) {
-    const chain = [sorted[i]];
-    let headSize = 0;
-    try {
-      headSize = fs.statSync(sorted[i].filePath).size;
-    } catch {
-      headSize = 0;
-    }
-
-    if (headSize >= DJI_SPLIT_SIZE_BYTES) {
-      let j = i + 1;
-      while (j < sorted.length && sorted[j].djiIndex === sorted[j - 1].djiIndex + 1) {
-        chain.push(sorted[j]);
-        j += 1;
-      }
-      i = j;
-    } else {
-      i += 1;
-    }
-
-    const startId = String(chain[0].djiIndex).padStart(4, '0');
-    const endId = String(chain[chain.length - 1].djiIndex).padStart(4, '0');
-    const sessionId = chain.length > 1 ? `${startId}-${endId}` : startId;
-
-    groups.push({
-      sessionId,
-      directory,
-      files: chain.map((e) => e.filePath).sort(),
-      cameraVendor: 'dji'
-    });
-  }
-
-  return groups;
 }
 
 /**
@@ -131,9 +85,9 @@ function buildSonyGroups(directory, entries) {
 /**
  * Analyze and group video files by session ID and directory.
  * @param {string[]} filePaths
- * @returns {Array}
+ * @returns {Promise<Array>}
  */
-function analyzeAndGroupVideos(filePaths) {
+async function analyzeAndGroupVideos(filePaths) {
   const groups = new Map();
   const djiByDirectory = new Map();
   const sonyByDirectory = new Map();
@@ -198,7 +152,7 @@ function analyzeAndGroupVideos(filePaths) {
   }
 
   for (const [directory, entries] of djiByDirectory.entries()) {
-    result.push(...buildDjiGroups(directory, entries));
+    result.push(...(await buildDjiGroups(directory, entries)));
   }
 
   for (const [directory, entries] of sonyByDirectory.entries()) {

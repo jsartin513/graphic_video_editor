@@ -17,7 +17,7 @@ const { logger } = require('../src/logger');
 function registerVideoIpcHandlers() {
   ipcMain.handle('analyze-videos', async (event, filePaths) => {
     if (!Array.isArray(filePaths)) return [];
-    return analyzeAndGroupVideos(filePaths);
+    return await analyzeAndGroupVideos(filePaths);
   });
 
   ipcMain.handle('get-video-duration', async (event, filePath) => {

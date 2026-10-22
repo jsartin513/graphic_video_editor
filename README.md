@@ -96,7 +96,8 @@ Shipping a new version: [RELEASE.md](RELEASE.md). Development builds (`npm start
   - `ipc-logger.js` - Log viewing, export, debug mode
   - `ipc-sd-card.js` - SD card detection, failed operations, error mapping
 - `src/` - Core modules
-  - `video-grouping.js` - Groups GoPro videos by session ID
+  - `camera-filenames.js` - Parses GoPro, DJI, Insta360, Sony, and generic clip names
+  - `video-grouping.js` - Groups camera videos by session within each folder
   - `video-scanner.js` - Recursively scans directories for video files
   - `preferences.js` - User preferences storage and management
   - `sd-card-detector.js` - SD card detection and monitoring
