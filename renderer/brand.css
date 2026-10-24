@@ -429,6 +429,24 @@ h1.brand-wordmark {
   margin-bottom: 6px;
 }
 
+#weekCountInput {
+  width: 7.5rem;
+  max-width: 100%;
+}
+
+.input-file {
+  font-family: "Geist", ui-monospace, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--muted-fill);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.event-template-row.field-with-hint {
+  align-items: flex-start;
+}
+
 .file-item,
 .recent-directory-item {
   border-radius: 14px;
