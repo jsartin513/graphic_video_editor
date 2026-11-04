@@ -113,8 +113,6 @@ jobs:
           path: |
             ~/.cache/electron
           key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci
@@ -127,6 +125,24 @@ jobs:
 
       - name: Run Playwright E2E (Electron on Linux)
         run: xvfb-run -a npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 1
+          if-no-files-found: ignore
 
   build-x64-fat:
     needs: [test, e2e, packaging-gate]
@@ -151,8 +167,6 @@ jobs:
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
           key: electron-mac-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -213,7 +227,7 @@ jobs:
             dist/*x64*fat*.zip
             dist/latest-mac.yml
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   build-x64-lite:
     needs: [test, e2e, packaging-gate]
@@ -238,8 +252,6 @@ jobs:
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
           key: electron-mac-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -273,7 +285,7 @@ jobs:
             dist/*x64*lite*.zip
             dist/latest-mac.yml
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
   build-arm64-fat:
     needs: [test, e2e, packaging-gate]
@@ -298,8 +310,6 @@ jobs:
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
           key: electron-mac-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -359,7 +369,7 @@ jobs:
             dist/*arm64*fat*.dmg
             dist/*arm64*fat*.zip
             dist/latest-mac.yml
-          retention-days: 30
+          retention-days: 7
 
   build-arm64-lite:
     needs: [test, e2e, packaging-gate]
@@ -384,8 +394,6 @@ jobs:
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
           key: electron-mac-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-mac-
 
       - name: Install dependencies
         run: npm ci
@@ -420,7 +428,7 @@ jobs:
             dist/*arm64*lite*.dmg
             dist/*arm64*lite*.zip
             dist/latest-mac.yml
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: error
 
   # Signed friend releases are created locally via `npm run release` (see RELEASE.md).
