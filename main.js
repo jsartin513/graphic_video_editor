@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fsSync = require('fs');
@@ -68,7 +68,7 @@ function createWindow() {
       // Default sandbox strips File.path from Finder drops on recent Electron.
       sandbox: false
     },
-    backgroundColor: '#ffffff',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#121212' : '#f7f5f2',
     titleBarStyle: 'default',
     frame: true
   });

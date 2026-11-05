@@ -7,13 +7,21 @@
   <meta name="color-scheme" content="light dark">
   <title>Video Merger</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="brand.css">
 </head>
 <body>
   <a href="#main-content" class="skip-to-main">Skip to main content</a>
   <div class="app-container phase-pick">
     <header class="app-header" role="banner">
+      <div class="app-header-inner">
       <div class="app-header-row">
-        <h1>Video Merger</h1>
+        <div class="brand-lockup">
+          <h1 class="brand-wordmark">
+            <span class="brand-name">Double Zero</span>
+            <span class="brand-badge" aria-hidden="true">00</span>
+          </h1>
+          <p class="brand-subtitle">Video Merger</p>
+        </div>
         <div class="app-header-actions">
           <button type="button" id="openHelpBtn" class="btn btn-text btn-small" aria-label="Open user guide in browser">
             Help
@@ -23,6 +31,7 @@
             <span class="btn-shortcut" id="settingsShortcutHint" aria-label="Keyboard shortcut"></span>
           </button>
         </div>
+      </div>
       </div>
     </header>
 
@@ -64,7 +73,9 @@
         </div>
 
         <div id="dropZone" class="add-videos-card drop-zone" role="group" aria-labelledby="addVideosTitle" aria-describedby="dropZoneHint">
+          <p class="eyebrow">GoPro clips</p>
           <h2 id="addVideosTitle" class="add-videos-title">Add videos</h2>
+          <p class="lede">Merge a night of court footage into one video.</p>
           <div class="selection-controls">
             <button id="selectFilesBtn" class="btn btn-primary" type="button" aria-label="Choose video files">
               Choose Files
@@ -142,7 +153,10 @@
         <div class="preview-screen-scroll">
         <div class="preview-header">
           <div class="preview-header-row">
-            <h2 class="preview-heading">Merge</h2>
+            <div class="preview-heading-lockup">
+              <p class="eyebrow">Ready to merge</p>
+              <h2 class="preview-heading">Merge</h2>
+            </div>
             <button type="button" id="addMoreVideosBtn" class="btn btn-secondary btn-small" aria-label="Add more videos">
               Add more
               <span class="btn-shortcut" aria-label="Keyboard shortcut">Esc</span>
@@ -330,6 +344,9 @@
         </div>
       </div>
     </main>
+    <footer class="app-footer" role="contentinfo">
+      <p>Fantastical Tales LLC</p>
+    </footer>
   </div>
 
   <!-- Split Video Modal -->
